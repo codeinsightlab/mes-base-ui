@@ -1,0 +1,5 @@
+<script setup lang="ts">
+import { ref } from 'vue';import { useAuth } from '@/stores/auth';import { useRouter } from 'vue-router'
+const username=ref(''),password=ref(''),loading=ref(false),error=ref(''),auth=useAuth(),router=useRouter()
+async function login(){loading.value=true;error.value='';try{await auth.login(username.value,password.value);password.value='';await router.replace('/')}catch(e){password.value='';error.value=e instanceof Error?e.message:'登录失败'}finally{loading.value=false}}
+</script><template><div class="login-shell"><form class="login-card" @submit.prevent="login"><p class="eyebrow">MES BASE</p><h1>登录管理工作台</h1><p class="muted">账号身份与工厂权限独立管理</p><el-alert v-if="error" type="error" :title="error" :closable="false"/><label>账号<el-input v-model="username" autocomplete="username" placeholder="请输入账号" required /></label><label>密码<el-input v-model="password" type="password" autocomplete="current-password" show-password required /></label><el-button type="primary" native-type="submit" :loading="loading" style="width:100%">登录</el-button><p class="small muted">没有默认账号。请联系平台管理员开通。</p></form></div></template>

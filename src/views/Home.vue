@@ -1,0 +1,1 @@
+<template><section class="page"><p class="eyebrow">MES BASE · PLATFORM FOUNDATION</p><h1>管理工作台</h1><p class="muted">选择左侧已授权功能。工厂切换只改变执行范围，具体权限由后端验证。</p><div class="panel welcome"><h2>平台已连接</h2><p>账号、角色、菜单、字典、配置与调度在平台库管理；业务数据通过各自的工厂运行时访问。</p></div></section></template>

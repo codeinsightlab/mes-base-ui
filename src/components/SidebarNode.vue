@@ -1,0 +1,1 @@
+<script setup lang="ts">import type {Menu} from '@/stores/auth';defineProps<{menu:Menu}>()</script><template><div class="nav-node"><RouterLink :to="menu.path">{{menu.name}}</RouterLink><div v-if="menu.children.length" class="nav-children"><SidebarNode v-for="child in menu.children" :key="child.id" :menu="child" /></div></div></template>
