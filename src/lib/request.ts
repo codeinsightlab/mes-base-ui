@@ -24,7 +24,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<Respons
     try { error = await response.json() } catch { /* Non-JSON upstream error is a transport failure, never success. */ }
     if (response.status === 401 && !options.public) unauthenticated()
     const messages: Record<number,string> = {400:'输入不符合要求，请检查字段',401:'登录已失效，请重新登录',403:'当前范围没有此操作权限',404:'资源不存在或不在当前范围',409:'数据冲突，请刷新后重试',422:'当前操作不可执行'}
-    throw new ApiError(error.errorCode ?? 'HTTP_ERROR', messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status)
+    throw new ApiError(error.errorCode ?? 'HTTP_ERROR', (error.errorCode==='BUSINESS_REJECTED'?error.message:undefined) ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status)
   }
   return response
 }
