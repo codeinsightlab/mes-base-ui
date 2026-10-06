@@ -119,13 +119,15 @@
 import { unallocatedUserList, authUserSelectAll } from '@/api/system/role'
 import { treeselect } from '@/api/system/dept'
 export default {
-  dicts: ['sys_normal_disable'],
   props: {
     // 角色编号
     roleId: {
-      type: [Number, String]
+      type: [Number, String],
+      required: true
     }
   },
+  emits: ['ok'],
+  dicts: ['sys_normal_disable'],
   data() {
     return {
       // 遮罩层

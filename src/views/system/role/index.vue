@@ -446,10 +446,10 @@ export default {
       if (this.$refs.menu != undefined) {
         this.$refs.menu.setCheckedKeys([])
       }
-      this.menuExpand = false,
-      this.menuNodeAll = false,
-      this.deptExpand = true,
-      this.deptNodeAll = false,
+      this.menuExpand = false
+      this.menuNodeAll = false
+      this.deptExpand = true
+      this.deptNodeAll = false
       this.form = {
         roleId: undefined,
         kind: 'PLATFORM', factoryId: null,

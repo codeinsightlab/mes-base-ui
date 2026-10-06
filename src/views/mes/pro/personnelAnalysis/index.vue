@@ -224,7 +224,7 @@ export default {
         if (ticket !== this.listSequence) return
         this.rows = response.rows; this.total = response.total
         if (this.pageNum === 1) this.dataThrough = this.rows.length ? this.rows[0].lastReportTime : null
-      } catch(error) {
+      } catch {
         if (ticket === this.listSequence) { this.rows = []; this.total = 0; this.dataThrough = null; this.listError = '账号列表加载失败，请重试。' }
       } finally { if (ticket === this.listSequence) this.listLoading = false }
     },
@@ -244,22 +244,22 @@ export default {
     async loadOverview() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.overviewLoading = true; this.overviewError = ''
-      try { const response = await getPersonnelOverview(userId, this.params(this.applied)); if (ticket === this.detailSequence) this.overview = response.data } catch(error) { if (ticket === this.detailSequence) this.overviewError = '概览加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.overviewLoading = false }
+      try { const response = await getPersonnelOverview(userId, this.params(this.applied)); if (ticket === this.detailSequence) this.overview = response.data } catch { if (ticket === this.detailSequence) this.overviewError = '概览加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.overviewLoading = false }
     },
     async loadProcesses() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.processLoading = true; this.processError = ''
-      try { const response = await listPersonnelProcesses(userId, { ...this.params(this.applied), pageNum: this.processPage, pageSize: this.processPageSize }); if (ticket === this.detailSequence) { this.processRows = response.rows; this.processTotal = response.total } } catch(error) { if (ticket === this.detailSequence) this.processError = '工序经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.processLoading = false }
+      try { const response = await listPersonnelProcesses(userId, { ...this.params(this.applied), pageNum: this.processPage, pageSize: this.processPageSize }); if (ticket === this.detailSequence) { this.processRows = response.rows; this.processTotal = response.total } } catch { if (ticket === this.detailSequence) this.processError = '工序经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.processLoading = false }
     },
     async loadProducts() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.productLoading = true; this.productError = ''
-      try { const response = await listPersonnelProducts(userId, { ...this.params(this.applied), pageNum: this.productPage, pageSize: this.productPageSize }); if (ticket === this.detailSequence) { this.productRows = response.rows; this.productTotal = response.total; this.productsLoaded = true } } catch(error) { if (ticket === this.detailSequence) this.productError = '产品经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.productLoading = false }
+      try { const response = await listPersonnelProducts(userId, { ...this.params(this.applied), pageNum: this.productPage, pageSize: this.productPageSize }); if (ticket === this.detailSequence) { this.productRows = response.rows; this.productTotal = response.total; this.productsLoaded = true } } catch { if (ticket === this.detailSequence) this.productError = '产品经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.productLoading = false }
     },
     async loadTrend() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.trendLoading = true; this.trendError = ''
-      try { const response = await getPersonnelTrend(userId, this.params(this.applied)); if (ticket === this.detailSequence) { this.trendRows = response.data; this.trendLoaded = true; this.$nextTick(this.renderTrend) } } catch(error) { if (ticket === this.detailSequence) this.trendError = '活动趋势加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.trendLoading = false }
+      try { const response = await getPersonnelTrend(userId, this.params(this.applied)); if (ticket === this.detailSequence) { this.trendRows = response.data; this.trendLoaded = true; this.$nextTick(this.renderTrend) } } catch { if (ticket === this.detailSequence) this.trendError = '活动趋势加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.trendLoading = false }
     },
     onTab(tab) {
       if (tab.name === 'products' && !this.productsLoaded) this.loadProducts()
@@ -287,7 +287,7 @@ export default {
           pageNum: this.recordPage, pageSize: this.recordPageSize
         })
         if (ticket === this.recordsSequence) { this.recordRows = response.rows; this.recordTotal = response.total }
-      } catch(error) { if (ticket === this.recordsSequence) this.recordsError = '源记录加载失败。请核对报工列表查看权限后重试。' } finally { if (ticket === this.recordsSequence) this.recordsLoading = false }
+      } catch { if (ticket === this.recordsSequence) this.recordsError = '源记录加载失败。请核对报工列表查看权限后重试。' } finally { if (ticket === this.recordsSequence) this.recordsLoading = false }
     }
   }
 }

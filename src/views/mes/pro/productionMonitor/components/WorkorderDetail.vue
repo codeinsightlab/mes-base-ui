@@ -98,6 +98,7 @@ export default {
   name: 'ProductionMonitorWorkorderDetail',
   components: { WorkorderTimeline, WorkorderFlowcards },
   props: { workorderId: { type: Number, required: true }},
+  emits: ['close'],
   data() { return { COVERAGE, RISK_TAG_STYLE, detail: null, detailLoading: false, detailLoadError: false, activeTab: 'basic', requestSequence: 0, timelineFilter: {}, timelineFilterRevision: 0 } },
   watch: { workorderId() { this.loadDetail() } },
   created() { this.loadDetail() },

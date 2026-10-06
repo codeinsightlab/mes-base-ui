@@ -134,15 +134,14 @@
 </template>
 
 <script>
-import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus } from '@/api/system/user'
-import { getToken } from '@/utils/auth'
+import { listUser } from '@/api/system/user'
+
 import { treeselect } from '@/api/system/dept'
-import Treeselect from '@/components/Treeselect/index.vue'
 
 export default {
   name: 'UserSingleSelect',
+  emits: ['onSelected'],
   dicts: ['sys_normal_disable', 'sys_user_sex'],
-  components: { Treeselect },
   data() {
     return {
       showFlag: false,

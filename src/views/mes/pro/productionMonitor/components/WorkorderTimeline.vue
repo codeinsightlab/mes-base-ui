@@ -46,6 +46,7 @@ export default {
     filter: { type: Object, default: () => ({}) },
     filterResetKey: { type: Number, default: 0 }
   },
+  emits: ['clear-filter'],
   data() { return { rows: [], total: 0, initialLoading: false, moreLoading: false, initialError: false, moreError: false, pagingContractError: false, loadedOnce: false, requestSequence: 0, query: { pageNum: 1, pageSize: 30 }} },
   computed: {
     hasMore() { return this.rows.length < this.total },

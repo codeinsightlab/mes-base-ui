@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';import { request } from '@/lib/request';import { ElMessage } from 'element-plus';import DOMPurify from 'dompurify';import { useRouter } from 'vue-router';import { useAuth } from '@/stores/auth'
+import { ref, onMounted, onUnmounted } from 'vue';import { request } from '@/lib/request';import DOMPurify from 'dompurify';import { useRouter } from 'vue-router';import { useAuth } from '@/stores/auth'
 interface Message { messageId: string;messageTitle: string;messageContent: string;senderNick: string;messageLevel: string;status: string;callBack: string;createTime: string }
 const rows = ref<Message[]>([]), loading = ref(false), total = ref(0), page = ref(1), selected = ref<Message>(), open = ref(false), router = useRouter(), auth = useAuth();let refreshTimer:ReturnType<typeof setInterval> | undefined;let stream:AbortController | undefined
 async function load() { loading.value = true;try { const data = await request<{ rows: Message[];total: number }>('/api/system/inbox', { scope: 'platform', query: { pageNum: page.value, pageSize: 20 }});rows.value = data.rows;total.value = data.total } finally { loading.value = false } }

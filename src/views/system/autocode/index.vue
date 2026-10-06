@@ -329,7 +329,6 @@ export default {
     },
     /** 删除按钮操作 */
     handleDelete(row) {
-      debugger
       const ruleIds = row.ruleId || this.ids
       this.$modal.confirm('是否确认删除编码规则为"' + ruleIds + '"的数据项？').then(function() {
         return delRule(ruleIds)
@@ -337,12 +336,6 @@ export default {
         this.getList()
         this.$modal.msgSuccess('删除成功')
       }).catch(() => {})
-    },
-    /** 刷新缓存按钮操作 */
-    handleRefreshCache() {
-      refreshCache().then(() => {
-        this.$modal.msgSuccess('刷新成功')
-      })
     }
   }
 }

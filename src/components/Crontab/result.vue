@@ -13,7 +13,9 @@
 <script>
 export default {
   name: 'CrontabResult',
-  props: ['ex'],
+  props: {
+    ex: { type: String, required: true }
+  },
   data() {
     return {
       dayRule: '',
@@ -37,7 +39,7 @@ export default {
       // 计算开始-隐藏结果
       this.isShow = false
       // 获取规则数组[0秒、1分、2时、3日、4月、5星期、6年]
-      let ruleArr = this.$options.propsData.ex.split(' ')
+      let ruleArr = this.ex.split(' ')
       // 用于记录进入循环的次数
       let nums = 0
       // 用于暂时存符号时间规则结果的数组

@@ -277,7 +277,7 @@ import Treeselect from '@/components/Treeselect/index.vue'
 import IconSelect from '@/components/IconSelect/index.vue'
 
 export default {
-  name: 'Menu',
+  name: 'SystemMenu',
   dicts: ['sys_show_hide', 'sys_normal_disable'],
   components: { Treeselect, IconSelect },
   data() {

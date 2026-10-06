@@ -36,7 +36,11 @@
 <script>
 export default {
   name: 'CrontabSecond',
-  props: ['check', 'radioParent'],
+  props: {
+    check: { type: Function, required: true },
+    radioParent: { type: Number, default: 1 }
+  },
+  emits: ['update'],
   data() {
     return {
       radioValue: 1,
@@ -45,7 +49,7 @@ export default {
       average01: 0,
       average02: 1,
       checkboxList: [],
-      checkNum: this.$options.propsData.check
+      checkNum: this.check
     }
   },
   computed: {

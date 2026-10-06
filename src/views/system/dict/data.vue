@@ -197,7 +197,7 @@ import { listData, getData, delData, addData, updateData } from '@/api/system/di
 import { listType, getType } from '@/api/system/dict/type'
 
 export default {
-  name: 'Data',
+  name: 'DictData',
   dicts: ['sys_normal_disable'],
   data() {
     return {

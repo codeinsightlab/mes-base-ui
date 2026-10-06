@@ -220,7 +220,7 @@ export default {
       try {
         if (!navigator.clipboard || !window.isSecureContext) throw new Error('Clipboard unavailable')
         await navigator.clipboard.writeText(this.secret[field]); this.$modal.msgSuccess('复制成功')
-      } catch(error) { this.$modal.msgError('复制失败，请手工复制并妥善保存') }
+      } catch { this.$modal.msgError('复制失败，请手工复制并妥善保存') }
     },
     handleCreate() {
       this.$refs.createForm.validate(async valid => {
@@ -238,7 +238,7 @@ export default {
     },
     async toggleStatus(row) {
       const status = row.status === 1 ? 0 : 1
-      try { await this.$modal.confirm(status === 0 ? '确认禁用该应用？现有 Token 将失效。' : '确认启用该应用？凭证版本将更新，调用方需重新获取 Token。') } catch(cancel) { return }
+      try { await this.$modal.confirm(status === 0 ? '确认禁用该应用？现有 Token 将失效。' : '确认启用该应用？凭证版本将更新，调用方需重新获取 Token。') } catch { return }
       this.busy = true
       try {
         await changeStatus({ clientId: row.clientId, status }); this.$modal.msgSuccess('状态更新成功'); this.getList()
@@ -248,7 +248,7 @@ export default {
       try {
         await this.$modal.confirm('确认重置该应用的 Secret？')
         await this.$modal.confirm('旧 Secret 和历史 Token 将失效，调用方需使用新 Secret 重新获取 Token。')
-      } catch(cancel) { return }
+      } catch { return }
       this.busy = true
       try { const response = await resetSecret(row.clientId); this.showSecret(response.data); this.getList() } finally { this.busy = false }
     },
@@ -266,7 +266,7 @@ export default {
       const added = requestedApis.filter(code => !this.originalApis.includes(code))
       const removed = this.originalApis.filter(code => !requestedApis.includes(code))
       const summary = `新增：${added.length ? added.join('、') : '无'}；移除：${removed.length ? removed.join('、') : '无'}。${this.selectedApis.length === 0 ? '保存后无法调用任何需要授权的业务 API。' : ''}`
-      try { await this.$modal.confirm(summary) } catch(cancel) { return }
+      try { await this.$modal.confirm(summary) } catch { return }
       this.busy = true
       try {
         await replaceClientApis({ clientId: this.apiClientId, apiCodes: requestedApis })

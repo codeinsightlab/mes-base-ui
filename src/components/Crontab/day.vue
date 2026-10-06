@@ -55,7 +55,11 @@
 <script>
 export default {
   name: 'CrontabDay',
-  props: ['check', 'cron'],
+  props: {
+    check: { type: Function, required: true },
+    cron: { type: Object, required: true }
+  },
+  emits: ['update'],
   data() {
     return {
       radioValue: 1,
@@ -65,7 +69,7 @@ export default {
       average01: 1,
       average02: 1,
       checkboxList: [],
-      checkNum: this.$options.propsData.check
+      checkNum: this.check
     }
   },
   computed: {
@@ -102,7 +106,6 @@ export default {
   methods: {
     // 单选按钮值变化时
     radioChange() {
-      ('day rachange')
       if (this.radioValue !== 2 && this.cron.week !== '?') {
         this.$emit('update', 'week', '?', 'day')
       }
@@ -130,7 +133,6 @@ export default {
           this.$emit('update', 'day', this.checkboxString)
           break
       }
-      ('day rachange end')
     },
     // 周期两个值变化时
     cycleChange() {

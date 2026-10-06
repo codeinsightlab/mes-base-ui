@@ -30,9 +30,11 @@ export default {
       default: true
     },
     columns: {
-      type: Array
+      type: Array,
+      default: null
     }
   },
+  emits: ['update:showSearch', 'queryTable', 'update:columns'],
   data() {
     return {
       // 显隐数据
@@ -43,12 +45,11 @@ export default {
       open: false
     }
   },
-  created() {
-    // 显隐列初始默认隐藏列
-    for (let item in this.columns) {
-      if (this.columns[item].visible === false) {
-        this.value.push(parseInt(item))
-      }
+  watch: {
+    columns: {
+      handler(columns) { this.value = (columns || []).filter(column => column.visible === false).map(column => column.key) },
+      immediate: true,
+      deep: true
     }
   },
   methods: {
@@ -62,10 +63,9 @@ export default {
     },
     // 右侧列表元素变化
     dataChange(data) {
-      for (let item in this.columns) {
-        const key = this.columns[item].key
-        this.columns[item].visible = !data.includes(key)
-      }
+      this.$emit('update:columns', (this.columns || []).map(column => ({
+        ...column, visible: !data.includes(column.key)
+      })))
     },
     // 打开显隐列dialog
     showColumn() {

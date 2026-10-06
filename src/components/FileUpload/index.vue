@@ -2,7 +2,7 @@
 import { saveAs } from 'file-saver'
 import { ref, computed, watch, onUnmounted } from 'vue';import { request, requestBlob } from '@/lib/request';import { useAuth } from '@/stores/auth';import { ElMessage } from 'element-plus'
 /** Source FileUpload/ImageUpload PORT. Persist private IDs, retrieve previews with authentication. */
-const props = withDefaults(defineProps<{ limit?: number;fileSize?: number;fileType?: string[];isShowTip?: boolean;resource?: string;images?: boolean }>(), { limit: 5, fileSize: 10, isShowTip: true, resource: 'personal', images: false })
+const props = withDefaults(defineProps<{ limit?: number;fileSize?: number;fileType?: string[];isShowTip?: boolean;resource?: string;images?: boolean }>(), { limit: 5, fileSize: 10, fileType: () => [], isShowTip: true, resource: 'personal', images: false })
 const model = defineModel<string>({ default: '' }), busy = ref(false), auth = useAuth(), ids = computed(() => model.value ? model.value.split(',').filter(Boolean) : [])
 interface FileView { id: string;name: string;url?: string;error?: string }
 const files = ref<FileView[]>([]), selection = ref<FileView[]>([]), picker = ref(false), picked = ref<string[]>([]);let version = 0

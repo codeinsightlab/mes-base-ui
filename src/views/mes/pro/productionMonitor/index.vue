@@ -128,13 +128,13 @@ export default {
     async loadSummary() {
       const sequence = ++this.summarySequence
       this.summaryLoading = true; this.summaryError = ''
-      try { const response = await getProductionMonitorSummary({ month: this.dashboardContext.month }); if (sequence === this.summarySequence) { this.summary = response.data; this.summaryFetchedAt = dayjs().format('YYYY-MM-DD HH:mm:ss') } } catch(error) { if (sequence === this.summarySequence) { this.summary = null; this.summaryError = '摘要加载失败，请重试。'; this.summaryFetchedAt = '' } } finally { if (sequence === this.summarySequence) this.summaryLoading = false }
+      try { const response = await getProductionMonitorSummary({ month: this.dashboardContext.month }); if (sequence === this.summarySequence) { this.summary = response.data; this.summaryFetchedAt = dayjs().format('YYYY-MM-DD HH:mm:ss') } } catch { if (sequence === this.summarySequence) { this.summary = null; this.summaryError = '摘要加载失败，请重试。'; this.summaryFetchedAt = '' } } finally { if (sequence === this.summarySequence) this.summaryLoading = false }
     },
     async loadWorkorders() {
       const sequence = ++this.listSequence
       const requestedQuery = { ...this.filters, month: this.dashboardContext.month }
       this.listLoading = true; this.listError = ''
-      try { const response = await listProductionMonitorWorkorders(requestedQuery); if (sequence === this.listSequence) { this.rows = response.rows; this.total = response.total } } catch(error) { if (sequence === this.listSequence) { this.rows = []; this.total = 0; this.listError = '工单列表加载失败，请重试。' } } finally { if (sequence === this.listSequence) this.listLoading = false }
+      try { const response = await listProductionMonitorWorkorders(requestedQuery); if (sequence === this.listSequence) { this.rows = response.rows; this.total = response.total } } catch { if (sequence === this.listSequence) { this.rows = []; this.total = 0; this.listError = '工单列表加载失败，请重试。' } } finally { if (sequence === this.listSequence) this.listLoading = false }
     },
     refresh() { this.loadSummary(); this.loadWorkorders() },
     search() {

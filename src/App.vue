@@ -8,7 +8,6 @@ import SidebarNode from '@/components/SidebarNode.vue'
 import { workspaceTabs, visitTab, resetTabs, closeTabs } from '@/lib/workspaceTabs'
 const auth = useAuth(), route = useRoute(), router = useRouter(), collapsed = ref(false), mobile = ref(false), pageVisible = ref(true)
 const publicPage = computed(() => ['/login', '/register'].includes(route.path))
-const factoryName = computed(() => auth.factories.find(f => f.factoryId === auth.factoryId)?.name)
 function findTrail(menus:Menu[], path:string):Menu[] { for (const menu of menus) { if (menu.path === path) return [menu];const children = findTrail(menu.children, path);if (children.length) return [menu, ...children] } return [] }
 const trail = computed(() => findTrail([...auth.platformMenus, ...auth.factoryMenus], route.path))
 const title = computed(() => String(route.meta.title ?? trail.value.at(-1)?.name ?? '工作页面'))

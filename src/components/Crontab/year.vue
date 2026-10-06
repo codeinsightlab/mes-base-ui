@@ -43,7 +43,12 @@
 <script>
 export default {
   name: 'CrontabYear',
-  props: ['check', 'month', 'cron'],
+  props: {
+    check: { type: Function, required: true },
+    month: { type: [Number, String], default: undefined },
+    cron: { type: Object, required: true }
+  },
+  emits: ['update'],
   data() {
     return {
       fullYear: 0,
@@ -53,7 +58,7 @@ export default {
       average01: 0,
       average02: 1,
       checkboxList: [],
-      checkNum: this.$options.propsData.check
+      checkNum: this.check
     }
   },
   computed: {

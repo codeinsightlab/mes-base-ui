@@ -57,6 +57,7 @@ import { getProductionMonitorRouteTrack } from '@/api/pro/productionMonitor'
 export default {
   name: 'ProductionMonitorWorkorderFlowcards',
   props: { workorderId: { type: Number, required: true }, flowcards: { type: Array, default: () => [] }},
+  emits: ['view-logs'],
   data() { return { expandedKey: '', routeTracks: {}, routeLoadingKey: '', routeErrorKey: '', routeSequence: 0 } },
   methods: {
     trackKey(card) { return String(card.xtransferNo) + '|' + String(card.routeId) },
@@ -86,8 +87,8 @@ export default {
       this.routeErrorKey = ''
       try {
         const response = await getProductionMonitorRouteTrack(this.workorderId, card.xtransferNo, card.routeId)
-        if (sequence === this.routeSequence && this.expandedKey === key) this.$set(this.routeTracks, key, response.data)
-      } catch(error) {
+        if (sequence === this.routeSequence && this.expandedKey === key) this.routeTracks[key] = response.data
+      } catch {
         if (sequence === this.routeSequence) this.routeErrorKey = key
       } finally { if (sequence === this.routeSequence && this.routeLoadingKey === key) this.routeLoadingKey = '' }
     },

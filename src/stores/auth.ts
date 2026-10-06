@@ -4,7 +4,6 @@ import type { PermissionScope } from '@/lib/request'
 import { routeMenus, type SourceRoute } from '@/lib/sourceMenus'
 import type { PasswordPolicy } from '@/utils/passwordPolicy'
 export interface Menu { id: string;name: string;path: string;permission: string;kind: string;children: Menu[];component?: string;hidden?: boolean;isCache?: boolean;query?: string;icon?: string;link?: string }
-interface Navigation { menus: Menu[];permissions: string[] }
 export const useAuth = defineStore('auth', { state: () => ({ passwordPolicy: { minLength: 12, maxLength: 128, maxBytes: 72 } as PasswordPolicy, token: '', avatar: '', username: '', factoryId: '', revision: 0, platformMenus: [] as Menu[], factoryMenus: [] as Menu[], platformPermissions: [] as string[], factoryPermissions: [] as string[], factories: [] as { factoryId: string;name: string }[], expiresAt: '' }),
   getters: { loggedIn: s => !!s.token }, actions: {
     hasPermission(code:string, scope:PermissionScope = 'factory') { return (scope === 'platform' ? this.platformPermissions : this.factoryPermissions).includes(code) },

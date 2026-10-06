@@ -71,7 +71,11 @@
 <script>
 export default {
   name: 'CrontabWeek',
-  props: ['check', 'cron'],
+  props: {
+    check: { type: Function, required: true },
+    cron: { type: Object, required: true }
+  },
+  emits: ['update'],
   data() {
     return {
       radioValue: 2,
@@ -111,26 +115,26 @@ export default {
           value: '星期日'
         }
       ],
-      checkNum: this.$options.propsData.check
+      checkNum: this.check
     }
   },
   computed: {
     // 计算两个周期值
     cycleTotal: function() {
-      this.cycle01 = this.checkNum(this.cycle01, 1, 7)
-      this.cycle02 = this.checkNum(this.cycle02, 1, 7)
-      return this.cycle01 + '-' + this.cycle02
+      const cycle01 = this.checkNum(this.cycle01, 1, 7)
+      const cycle02 = this.checkNum(this.cycle02, 1, 7)
+      return cycle01 + '-' + cycle02
     },
     // 计算平均用到的值
     averageTotal: function() {
-      this.average01 = this.checkNum(this.average01, 1, 4)
-      this.average02 = this.checkNum(this.average02, 1, 7)
-      return this.average02 + '#' + this.average01
+      const average01 = this.checkNum(this.average01, 1, 4)
+      const average02 = this.checkNum(this.average02, 1, 7)
+      return average02 + '#' + average01
     },
     // 最近的工作日（格式）
     weekdayCheck: function() {
-      this.weekday = this.checkNum(this.weekday, 1, 7)
-      return this.weekday
+      const weekday = this.checkNum(this.weekday, 1, 7)
+      return weekday
     },
     // 计算勾选的checkbox值合集
     checkboxString: function() {

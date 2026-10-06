@@ -34,7 +34,7 @@ export default {
       type: Array,
       default: () => []
     },
-    value: [Number, String, Array]
+    value: { type: [Number, String, Array], default: undefined }
   },
   computed: {
     values() {

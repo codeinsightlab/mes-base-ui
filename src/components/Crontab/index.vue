@@ -134,7 +134,11 @@ export default {
     CrontabYear,
     CrontabResult
   },
-  props: ['expression', 'hideComponent'],
+  props: {
+    expression: { type: String, default: '' },
+    hideComponent: { type: Array, default: () => [] }
+  },
+  emits: ['hide', 'fill'],
   data() {
     return {
       tabTitles: ['秒', '分钟', '小时', '日', '月', '周', '年'],
@@ -217,7 +221,6 @@ export default {
     },
     // 由子组件触发，更改表达式组成的字段值
     updateCrontabValue(name, value, from) {
-      'updateCrontabValue', name, value, from
       this.crontabValueObj[name] = value
       if (from && from !== name) {
         console.log(`来自组件 ${from} 改变了 ${name} ${value}`)
@@ -237,16 +240,12 @@ export default {
           insValue = 1
         } else if (value.indexOf('-') > -1) {
           let indexArr = value.split('-')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].cycle01 = 0)
-            : (this.$refs[refName].cycle01 = indexArr[0])
+          this.$refs[refName].cycle01 = isNaN(indexArr[0]) ? 0 : indexArr[0]
           this.$refs[refName].cycle02 = indexArr[1]
           insValue = 2
         } else if (value.indexOf('/') > -1) {
           let indexArr = value.split('/')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].average01 = 0)
-            : (this.$refs[refName].average01 = indexArr[0])
+          this.$refs[refName].average01 = isNaN(indexArr[0]) ? 0 : indexArr[0]
           this.$refs[refName].average02 = indexArr[1]
           insValue = 3
         } else {
@@ -260,23 +259,17 @@ export default {
           insValue = 2
         } else if (value.indexOf('-') > -1) {
           let indexArr = value.split('-')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].cycle01 = 0)
-            : (this.$refs[refName].cycle01 = indexArr[0])
+          this.$refs[refName].cycle01 = isNaN(indexArr[0]) ? 0 : indexArr[0]
           this.$refs[refName].cycle02 = indexArr[1]
           insValue = 3
         } else if (value.indexOf('/') > -1) {
           let indexArr = value.split('/')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].average01 = 0)
-            : (this.$refs[refName].average01 = indexArr[0])
+          this.$refs[refName].average01 = isNaN(indexArr[0]) ? 0 : indexArr[0]
           this.$refs[refName].average02 = indexArr[1]
           insValue = 4
         } else if (value.indexOf('W') > -1) {
           let indexArr = value.split('W')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].workday = 0)
-            : (this.$refs[refName].workday = indexArr[0])
+          this.$refs[refName].workday = isNaN(indexArr[0]) ? 0 : indexArr[0]
           insValue = 5
         } else if (value === 'L') {
           insValue = 6
@@ -291,23 +284,17 @@ export default {
           insValue = 2
         } else if (value.indexOf('-') > -1) {
           let indexArr = value.split('-')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].cycle01 = 0)
-            : (this.$refs[refName].cycle01 = indexArr[0])
+          this.$refs[refName].cycle01 = isNaN(indexArr[0]) ? 0 : indexArr[0]
           this.$refs[refName].cycle02 = indexArr[1]
           insValue = 3
         } else if (value.indexOf('#') > -1) {
           let indexArr = value.split('#')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].average01 = 1)
-            : (this.$refs[refName].average01 = indexArr[0])
+          this.$refs[refName].average01 = isNaN(indexArr[0]) ? 1 : indexArr[0]
           this.$refs[refName].average02 = indexArr[1]
           insValue = 4
         } else if (value.indexOf('L') > -1) {
           let indexArr = value.split('L')
-          isNaN(indexArr[0])
-            ? (this.$refs[refName].weekday = 1)
-            : (this.$refs[refName].weekday = indexArr[0])
+          this.$refs[refName].weekday = isNaN(indexArr[0]) ? 1 : indexArr[0]
           insValue = 5
         } else {
           this.$refs[refName].checkboxList = value.split(',')
@@ -351,7 +338,7 @@ export default {
     },
     clearCron() {
       // 还原选择项
-      ('准备还原')
+
       this.crontabValueObj = {
         second: '*',
         min: '*',

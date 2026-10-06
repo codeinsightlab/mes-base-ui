@@ -37,7 +37,11 @@
 <script>
 export default {
   name: 'CrontabMin',
-  props: ['check', 'cron'],
+  props: {
+    check: { type: Function, required: true },
+    cron: { type: Object, required: true }
+  },
+  emits: ['update'],
   data() {
     return {
       radioValue: 1,
@@ -46,7 +50,7 @@ export default {
       average01: 0,
       average02: 1,
       checkboxList: [],
-      checkNum: this.$options.propsData.check
+      checkNum: this.check
     }
   },
   computed: {

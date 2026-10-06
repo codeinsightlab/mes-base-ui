@@ -229,7 +229,7 @@ export default {
     /** 查询部门列表 */
     getList() {
       return sourceList(this, () => listDept(this.queryParams), response => {
-        debugger
+
         var depts = this.handleTree(response.data, 'deptId')
         this.deptList = depts
 

@@ -36,7 +36,11 @@
 <script>
 export default {
   name: 'CrontabMonth',
-  props: ['check', 'cron'],
+  props: {
+    check: { type: Function, required: true },
+    cron: { type: Object, required: true }
+  },
+  emits: ['update'],
   data() {
     return {
       radioValue: 1,

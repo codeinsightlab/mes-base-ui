@@ -7,14 +7,14 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vue-tsc --noEmit && vite build",
+    "dev": "vite --host 127.0.0.1 --mode development",
+    "build": "vue-tsc --noEmit && vite build --mode production",
+    "build:prod": "npm run build",
+    "build:dev": "vue-tsc --noEmit && vite build --mode development",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "eslint . --fix --fix-type layout",
-    "format:check": "eslint ."
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "dompurify": "^3.4.16",
