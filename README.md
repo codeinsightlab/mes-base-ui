@@ -19,20 +19,20 @@ MES_DEV_API_TARGET=http://127.0.0.1:18081 npm run dev -- --host 127.0.0.1 --port
 
 ## 代码格式化
 
-使用项目本地 Prettier，统一为两空格缩进、单引号、无分号、LF 换行，建议行宽 100。Vue 模板保留有意义的空白，script/style 不额外缩进。
+使用项目本地 ESLint flat config，配合 Vue3、TypeScript 和 ESLint Stylistic 插件。沿用 ktg-mes-ui 的主要格式风格：两空格缩进、单引号、无分号、无尾逗号、函数括号前不加空格、LF 换行；不强制按 100 列重排。Vue 属性单行最多 10 个，多行每行 1 个。EditorConfig 统一编辑器缩进和换行。
 
 ```sh
 nvm use
-npm run format:check # 只检查，不修改文件
-npm run format       # 格式化整个项目，请先核对工作区改动
-npm exec prettier -- --write src/views/Home.vue # 仅格式化指定文件
+npm run lint         # 检查格式及基础代码问题，不修改文件
+npm run format:check # 与 lint 相同
+npm run format       # 只自动修复 layout 类格式问题；其余检查问题仍会报告
+npm run lint:fix     # 自动修复所有可修复问题，请先核对工作区改动
+npm exec eslint -- src/views/Home.vue --fix --fix-type layout # 仅格式化指定文件
 ```
 
-VS Code 安装推荐的 Prettier 扩展后，项目设置会对 Vue、TypeScript、CSS 等文件启用保存时格式化。IDEA/WebStorm 可在 Prettier
-设置中选择本项目的 `node_modules/prettier`，启用保存时运行；EditorConfig 统一编辑器缩进和换行。
+VS Code 安装推荐的 ESLint 扩展后，手动保存 Vue、TypeScript、JavaScript 文件会执行 ESLint 自动修复；格式化文档也使用 ESLint。Volar 保留 Vue 语言服务，不再作为格式化入口。IDEA/WebStorm 在 ESLint 设置中使用本项目的 `node_modules/eslint` 和 `eslint.config.mjs`，启用保存时执行 `eslint --fix`；需使用支持当前 ESLint flat config 的 IDE 版本。本次未验证编辑器实际操作。
 
-忽略依赖、构建产物、IDEA 本地文件、lockfile、环境配置和迁入的 SVG
-图标。配置接入时没有批量格式化已有源码，历史文件可能使 `format:check` 报告不符合格式；可按修改范围逐步格式化。
+ESLint 检查 JS/TS/Vue 和脚本配置，忽略依赖、构建产物和 IDEA 本地文件；不沿用旧项目会屏蔽全部 JS/Vue 的忽略模式。CSS、JSON、Markdown 和 SVG 不在本次 ESLint 范围内。启用 JS/TS/Vue 推荐基础检查；为兼容现有迁入代码，保留显式 `any`、既有 `v-html` 和单词组件名。配置接入时没有批量修复已有源码，历史文件可能使 `lint` / `format:check` 不通过；可按修改范围逐步处理。
 
 现有功能页面包括用户/组织岗位/角色菜单/字典参数/公告消息/自动编码、日志在线用户/Quartz/Server/Cache/Druid、系统接口及个人资料/文件/消息。具体来源及迁移缺口见相邻
 Base 的迁移报告“前端迁移来源复核”章节；功能列表不代表每项前端实现均直接来自 Source。Source data/rows/total 经

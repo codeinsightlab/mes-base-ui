@@ -3,4 +3,5 @@ dist/
 target/
 .env
 *.local
-./docs/acceptance
+docs
+.vscode
