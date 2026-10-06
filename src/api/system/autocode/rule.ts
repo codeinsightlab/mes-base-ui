@@ -1,16 +1,16 @@
 import request from '@/utils/request'
 
-export function genCode(ruleCode: any){
+export function genCode(ruleCode: any) {
   return request({
-      scope:'platform', url: '/system/autocode/generate',
-      method: 'post', data: {ruleCode}
+    scope: 'platform', url: '/system/autocode/generate',
+    method: 'post', data: { ruleCode }
   })
 }
 
 // 查询字典类型列表
 export function listRule(query: any) {
   return request({
-    scope:'platform', url: '/system/autocode/rule/list',
+    scope: 'platform', url: '/system/autocode/rule/list',
     method: 'get',
     params: query
   })
@@ -19,7 +19,7 @@ export function listRule(query: any) {
 // 查询字典类型详细
 export function getRule(ruleId: any) {
   return request({
-    scope:'platform', url: '/system/autocode/rule/' + ruleId,
+    scope: 'platform', url: '/system/autocode/rule/' + ruleId,
     method: 'get'
   })
 }
@@ -27,7 +27,7 @@ export function getRule(ruleId: any) {
 // 新增字典类型
 export function addRule(data: any) {
   return request({
-    scope:'platform', url: '/system/autocode/rule',
+    scope: 'platform', url: '/system/autocode/rule',
     method: 'post',
     data: data
   })
@@ -36,7 +36,7 @@ export function addRule(data: any) {
 // 修改字典类型
 export function updateRule(data: any) {
   return request({
-    scope:'platform', url: '/system/autocode/rule',
+    scope: 'platform', url: '/system/autocode/rule',
     method: 'put',
     data: data
   })
@@ -45,7 +45,7 @@ export function updateRule(data: any) {
 // 删除字典类型
 export function delRule(ruleId: any) {
   return request({
-    scope:'platform', url: '/system/autocode/rule/' + ruleId,
+    scope: 'platform', url: '/system/autocode/rule/' + ruleId,
     method: 'delete'
   })
 }

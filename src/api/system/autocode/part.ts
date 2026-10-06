@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 查询规则组成
 export function listPart(query: any) {
   return request({
-    scope:'platform', url: '/system/autocode/part/list',
+    scope: 'platform', url: '/system/autocode/part/list',
     method: 'get',
     params: query
   })
@@ -12,16 +12,15 @@ export function listPart(query: any) {
 // 查询规则组成详细
 export function getPart(partId: any) {
   return request({
-    scope:'platform', url: '/system/autocode/part/' + partId,
+    scope: 'platform', url: '/system/autocode/part/' + partId,
     method: 'get'
   })
 }
 
-
 // 新增规则组成
 export function addPart(data: any) {
   return request({
-    scope:'platform', url: '/system/autocode/part',
+    scope: 'platform', url: '/system/autocode/part',
     method: 'post',
     data: data
   })
@@ -30,7 +29,7 @@ export function addPart(data: any) {
 // 修改规则组成
 export function updatePart(data: any) {
   return request({
-    scope:'platform', url: '/system/autocode/part',
+    scope: 'platform', url: '/system/autocode/part',
     method: 'put',
     data: data
   })
@@ -39,7 +38,7 @@ export function updatePart(data: any) {
 // 删除规则组成
 export function delPart(partIds: any) {
   return request({
-    scope:'platform', url: '/system/autocode/part/' + partIds,
+    scope: 'platform', url: '/system/autocode/part/' + partIds,
     method: 'delete'
   })
 }

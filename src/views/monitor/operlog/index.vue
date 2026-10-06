@@ -2,12 +2,13 @@
   <div class="app-container">
     <PageHeader title="操作日志" description="操作记录与结果追踪" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form class="filter-panel"
-      :model="queryParams"
+    <el-form
+      v-show="showSearch"
       ref="queryForm"
+      class="filter-panel"
+      :model="queryParams"
       size="small"
       :inline="true"
-      v-show="showSearch"
       label-width="68px"
     >
       <el-form-item label="系统模块" prop="title">
@@ -76,7 +77,7 @@
           range-separator="-"
           start-placeholder="开始日期"
           end-placeholder="结束日期"
-        ></el-date-picker>
+        />
       </el-form-item>
       <el-form-item>
         <el-button
@@ -84,61 +85,59 @@
           icon="Search"
           size="small"
           @click="handleQuery"
-          >搜索</el-button
-        >
-        <el-button icon="Refresh" size="small" @click="resetQuery"
-          >重置</el-button
-        >
+        >搜索</el-button>
+        <el-button
+          icon="Refresh"
+          size="small"
+          @click="resetQuery"
+        >重置</el-button>
       </el-form-item>
     </el-form>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
+          v-hasPermi="['monitor:operlog:remove']"
           type="danger"
           plain
           icon="Delete"
           size="small"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['monitor:operlog:remove']"
-          >删除</el-button
-        >
+        >删除</el-button>
       </el-col>
       <el-col :span="3">
         <el-button
+          v-hasPermi="['monitor:operlog:remove']"
           type="danger"
           plain
           icon="Delete"
           size="small"
           @click="handleClean"
-          v-hasPermi="['monitor:operlog:remove']"
-          >清空</el-button
-        >
+        >清空</el-button>
       </el-col>
       <el-col :span="3">
         <el-button
+          v-hasPermi="['monitor:operlog:export']"
           type="warning"
           plain
           icon="Download"
           size="small"
           @click="handleExport"
-          v-hasPermi="['monitor:operlog:export']"
-          >导出</el-button
-        >
+        >导出</el-button>
       </el-col>
       <right-toolbar
-        v-model:showSearch="showSearch"
-        @queryTable="getList"
-      ></right-toolbar>
+        v-model:show-search="showSearch"
+        @query-table="getList"
+      />
     </el-row>
 
     <el-table
       ref="tables"
       v-loading="loading"
       :data="list"
-      @selection-change="handleSelectionChange"
       :default-sort="defaultSort"
+      @selection-change="handleSelectionChange"
       @sort-change="handleSortChange"
     >
       <el-table-column type="selection" width="55" align="center" />
@@ -180,7 +179,8 @@
       />
       <el-table-column label="操作状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag status
+          <dict-tag
+            status
             :options="dict.type.sys_common_status"
             :value="scope.row.status"
           />
@@ -205,42 +205,37 @@
       >
         <template #default="scope">
           <el-button
+            v-hasPermi="['monitor:operlog:query']"
             size="small"
             link
             icon="View"
             @click="handleView(scope.row, scope.index)"
-            v-hasPermi="['monitor:operlog:query']"
-            >详细</el-button
-          >
+          >详细</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <pagination
       v-show="total > 0"
-      :total="total"
       v-model:page="queryParams.pageNum"
       v-model:limit="queryParams.pageSize"
+      :total="total"
       @pagination="getList"
     />
 
     <!-- 操作日志详细 -->
     <el-dialog
-      title="操作日志详细"
       v-model="open"
+      title="操作日志详细"
       width="700px"
       append-to-body
     >
       <el-form ref="form" :model="form" label-width="100px" size="small">
         <el-row>
           <el-col :span="12">
-            <el-form-item label="操作模块："
-              >{{ form.title }} / {{ typeFormat(form) }}</el-form-item
-            >
-            <el-form-item label="登录信息："
-              >{{ form.operName }} / {{ form.operIp }} /
-              {{ form.operLocation }}</el-form-item
-            >
+            <el-form-item label="操作模块：">{{ form.title }} / {{ typeFormat(form) }}</el-form-item>
+            <el-form-item label="登录信息：">{{ form.operName }} / {{ form.operIp }} /
+              {{ form.operLocation }}</el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="请求地址：">{{ form.operUrl }}</el-form-item>
@@ -271,7 +266,7 @@
             }}</el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="异常信息：" v-if="form.status === 1">{{
+            <el-form-item v-if="form.status === 1" label="异常信息：">{{
               form.errorMsg
             }}</el-form-item>
           </el-col>
@@ -285,7 +280,7 @@
 </template>
 
 <script>
-import {sourceList} from "@/utils/sourceList";
+import { sourceList } from '@/utils/sourceList'
 import { list, delOperlog, cleanOperlog } from '@/api/monitor/operlog'
 
 export default {
@@ -294,7 +289,7 @@ export default {
   data() {
     return {
       // 遮罩层
-      loading: true,queryError:"",
+      loading: true, queryError: '',
       // 选中数组
       ids: [],
       // 非多个禁用
@@ -331,8 +326,8 @@ export default {
   methods: {
     /** 查询登录日志 */
     getList() {
-      return sourceList(this,()=>list(this.addDateRange(this.queryParams, this.dateRange)),response=>{
-        this.list=response.rows;this.total=response.total
+      return sourceList(this, () => list(this.addDateRange(this.queryParams, this.dateRange)), response => {
+        this.list = response.rows;this.total = response.total
       })
     },
     // 操作日志类型字典翻译
@@ -375,7 +370,7 @@ export default {
       const operIds = row.operId || this.ids
       this.$modal
         .confirm('是否确认删除日志编号为"' + operIds + '"的数据项？')
-        .then(function () {
+        .then(function() {
           return delOperlog(operIds)
         })
         .then(() => {
@@ -388,7 +383,7 @@ export default {
     handleClean() {
       this.$modal
         .confirm('是否确认清空所有操作日志数据项？')
-        .then(function () {
+        .then(function() {
           return cleanOperlog()
         })
         .then(() => {

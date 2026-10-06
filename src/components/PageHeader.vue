@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{title:string; description?:string; section?:string}>()
+defineProps<{ title: string; description?: string; section?: string }>()
 </script>
 <template>
   <header class="page-header">

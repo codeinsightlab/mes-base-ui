@@ -65,9 +65,9 @@
       <el-empty v-else-if="!listLoading && total === 0" description="当前工厂在所选时间范围内未发现报工账号记录" />
       <pagination
         v-show="total > 0"
-        :total="total"
         v-model:page="pageNum"
         v-model:limit="pageSize"
+        :total="total"
         :page-sizes="[10, 30, 50]"
         @pagination="loadAccounts"
       />
@@ -115,7 +115,7 @@
               <el-table-column label="操作" width="92"><template #default="{ row }"><el-button v-permission="{code:'mes:pro:reportingWork:list',scope:'factory'}" link @click="openRecords({ processId: row.processId })">查看报工记录</el-button></template></el-table-column>
             </el-table>
             <el-alert v-if="processError" :title="processError" type="error" :closable="false" show-icon class="panel-error" />
-            <pagination v-show="processTotal > 0" :total="processTotal" v-model:page="processPage" v-model:limit="processPageSize" :page-sizes="[10, 30, 50]" @pagination="loadProcesses" />
+            <pagination v-show="processTotal > 0" v-model:page="processPage" v-model:limit="processPageSize" :total="processTotal" :page-sizes="[10, 30, 50]" @pagination="loadProcesses" />
           </el-tab-pane>
           <el-tab-pane label="产品经验覆盖" name="products">
             <el-table v-loading="productLoading" :data="productRows" size="small" stripe>
@@ -127,7 +127,7 @@
               <el-table-column label="操作" width="92"><template #default="{ row }"><el-button v-permission="{code:'mes:pro:reportingWork:list',scope:'factory'}" link @click="openRecords({ itemCode: row.itemCode })">查看报工记录</el-button></template></el-table-column>
             </el-table>
             <el-alert v-if="productError" :title="productError" type="error" :closable="false" show-icon class="panel-error" />
-            <pagination v-show="productTotal > 0" :total="productTotal" v-model:page="productPage" v-model:limit="productPageSize" :page-sizes="[10, 30, 50]" @pagination="loadProducts" />
+            <pagination v-show="productTotal > 0" v-model:page="productPage" v-model:limit="productPageSize" :total="productTotal" :page-sizes="[10, 30, 50]" @pagination="loadProducts" />
           </el-tab-pane>
           <el-tab-pane label="活动趋势" name="trend">
             <p class="tab-note">每月有报工记录的自然日数量，不代表出勤天数。{{ trendRows.some(row => row.partialMonth) ? '本月数据截至当前查询时间。' : '' }}</p>
@@ -139,7 +139,7 @@
       </div>
     </el-drawer>
 
-    <el-dialog title="源报工记录" v-model="recordsVisible" width="min(1100px, 96vw)" append-to-body>
+    <el-dialog v-model="recordsVisible" title="源报工记录" width="min(1100px, 96vw)" append-to-body>
       <p class="tab-note">归属账号、登录录入账号和报工时间分别展示；统一报工可能形成多行。</p>
       <el-table v-loading="recordsLoading" :data="recordRows" size="small" stripe>
         <el-table-column prop="recordId" label="记录ID" width="100" />
@@ -152,7 +152,7 @@
         <el-table-column label="数量 / 单位" width="120"><template #default="{ row }">{{ row.reportingWorkQuantity }} {{ row.unitOfMeasure }}</template></el-table-column>
       </el-table>
       <el-alert v-if="recordsError" :title="recordsError" type="error" :closable="false" show-icon class="panel-error" />
-      <pagination v-show="recordTotal > 0" :total="recordTotal" v-model:page="recordPage" v-model:limit="recordPageSize" :page-sizes="[10, 30, 50]" @pagination="loadRecords" />
+      <pagination v-show="recordTotal > 0" v-model:page="recordPage" v-model:limit="recordPageSize" :total="recordTotal" :page-sizes="[10, 30, 50]" @pagination="loadRecords" />
     </el-dialog>
   </div>
 </template>
@@ -224,7 +224,7 @@ export default {
         if (ticket !== this.listSequence) return
         this.rows = response.rows; this.total = response.total
         if (this.pageNum === 1) this.dataThrough = this.rows.length ? this.rows[0].lastReportTime : null
-      } catch (error) {
+      } catch(error) {
         if (ticket === this.listSequence) { this.rows = []; this.total = 0; this.dataThrough = null; this.listError = '账号列表加载失败，请重试。' }
       } finally { if (ticket === this.listSequence) this.listLoading = false }
     },
@@ -244,22 +244,22 @@ export default {
     async loadOverview() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.overviewLoading = true; this.overviewError = ''
-      try { const response = await getPersonnelOverview(userId, this.params(this.applied)); if (ticket === this.detailSequence) this.overview = response.data } catch (error) { if (ticket === this.detailSequence) this.overviewError = '概览加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.overviewLoading = false }
+      try { const response = await getPersonnelOverview(userId, this.params(this.applied)); if (ticket === this.detailSequence) this.overview = response.data } catch(error) { if (ticket === this.detailSequence) this.overviewError = '概览加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.overviewLoading = false }
     },
     async loadProcesses() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.processLoading = true; this.processError = ''
-      try { const response = await listPersonnelProcesses(userId, { ...this.params(this.applied), pageNum: this.processPage, pageSize: this.processPageSize }); if (ticket === this.detailSequence) { this.processRows = response.rows; this.processTotal = response.total } } catch (error) { if (ticket === this.detailSequence) this.processError = '工序经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.processLoading = false }
+      try { const response = await listPersonnelProcesses(userId, { ...this.params(this.applied), pageNum: this.processPage, pageSize: this.processPageSize }); if (ticket === this.detailSequence) { this.processRows = response.rows; this.processTotal = response.total } } catch(error) { if (ticket === this.detailSequence) this.processError = '工序经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.processLoading = false }
     },
     async loadProducts() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.productLoading = true; this.productError = ''
-      try { const response = await listPersonnelProducts(userId, { ...this.params(this.applied), pageNum: this.productPage, pageSize: this.productPageSize }); if (ticket === this.detailSequence) { this.productRows = response.rows; this.productTotal = response.total; this.productsLoaded = true } } catch (error) { if (ticket === this.detailSequence) this.productError = '产品经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.productLoading = false }
+      try { const response = await listPersonnelProducts(userId, { ...this.params(this.applied), pageNum: this.productPage, pageSize: this.productPageSize }); if (ticket === this.detailSequence) { this.productRows = response.rows; this.productTotal = response.total; this.productsLoaded = true } } catch(error) { if (ticket === this.detailSequence) this.productError = '产品经验加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.productLoading = false }
     },
     async loadTrend() {
       const ticket = this.detailSequence; const userId = this.selectedUserId
       this.trendLoading = true; this.trendError = ''
-      try { const response = await getPersonnelTrend(userId, this.params(this.applied)); if (ticket === this.detailSequence) { this.trendRows = response.data; this.trendLoaded = true; this.$nextTick(this.renderTrend) } } catch (error) { if (ticket === this.detailSequence) this.trendError = '活动趋势加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.trendLoading = false }
+      try { const response = await getPersonnelTrend(userId, this.params(this.applied)); if (ticket === this.detailSequence) { this.trendRows = response.data; this.trendLoaded = true; this.$nextTick(this.renderTrend) } } catch(error) { if (ticket === this.detailSequence) this.trendError = '活动趋势加载失败，请重试。' } finally { if (ticket === this.detailSequence) this.trendLoading = false }
     },
     onTab(tab) {
       if (tab.name === 'products' && !this.productsLoaded) this.loadProducts()
@@ -284,10 +284,10 @@ export default {
       if (!rangeStart || !rangeEnd) { this.recordsLoading = false; this.recordsError = '统计范围尚未加载，请稍后重试。'; return }
       try {
         const response = await listPersonnelRecords(this.selectedUserId, { ...this.params(this.applied), ...this.recordScope,
-          pageNum: this.recordPage, pageSize: this.recordPageSize,
-})
+          pageNum: this.recordPage, pageSize: this.recordPageSize
+        })
         if (ticket === this.recordsSequence) { this.recordRows = response.rows; this.recordTotal = response.total }
-      } catch (error) { if (ticket === this.recordsSequence) this.recordsError = '源记录加载失败。请核对报工列表查看权限后重试。' } finally { if (ticket === this.recordsSequence) this.recordsLoading = false }
+      } catch(error) { if (ticket === this.recordsSequence) this.recordsError = '源记录加载失败。请核对报工列表查看权限后重试。' } finally { if (ticket === this.recordsSequence) this.recordsLoading = false }
     }
   }
 }

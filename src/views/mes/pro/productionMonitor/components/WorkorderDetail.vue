@@ -122,7 +122,7 @@ export default {
           this.detail = response.data
           this.activeTab = this.detail.reportCount > 0 ? 'flowcards' : 'basic'
         }
-      } catch (error) {
+      } catch(error) {
         if (sequence === this.requestSequence) {
           this.detailLoadError = true
           if (error && error.message === '工单不存在') {

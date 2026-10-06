@@ -1,13 +1,13 @@
 <template>
   <!-- 授权用户 -->
   <el-dialog
-    title="选择用户"
     v-model="visible"
+    title="选择用户"
     width="1100px"
     top="5vh"
     append-to-body
   >
-    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true">
+    <el-form ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="用户名称" prop="userName">
         <el-input
           v-model="queryParams.userName"
@@ -36,8 +36,7 @@
           :options="deptOptions"
           :props="{ expandTrigger: 'hover', label: 'label', value: 'id' }"
           @keyup.enter="handleQuery"
-        >
-        </el-cascader>
+        />
       </el-form-item>
       <el-form-item>
         <el-button
@@ -45,22 +44,23 @@
           icon="Search"
           size="small"
           @click="handleQuery"
-          >搜索</el-button
-        >
-        <el-button icon="Refresh" size="small" @click="resetQuery"
-          >重置</el-button
-        >
+        >搜索</el-button>
+        <el-button
+          icon="Refresh"
+          size="small"
+          @click="resetQuery"
+        >重置</el-button>
       </el-form-item>
     </el-form>
     <el-row>
       <el-table
-        @row-click="clickRow"
         ref="table"
         :data="userList"
-        @selection-change="handleSelectionChange"
         height="260px"
+        @row-click="clickRow"
+        @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55"></el-table-column>
+        <el-table-column type="selection" width="55" />
         <el-table-column
           label="用户名称"
           prop="userName"
@@ -102,9 +102,9 @@
       </el-table>
       <pagination
         v-show="total > 0"
-        :total="total"
         v-model:page="queryParams.pageNum"
         v-model:limit="queryParams.pageSize"
+        :total="total"
         @pagination="getList"
       />
     </el-row>

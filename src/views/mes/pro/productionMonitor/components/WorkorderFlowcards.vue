@@ -87,7 +87,7 @@ export default {
       try {
         const response = await getProductionMonitorRouteTrack(this.workorderId, card.xtransferNo, card.routeId)
         if (sequence === this.routeSequence && this.expandedKey === key) this.$set(this.routeTracks, key, response.data)
-      } catch (error) {
+      } catch(error) {
         if (sequence === this.routeSequence) this.routeErrorKey = key
       } finally { if (sequence === this.routeSequence && this.routeLoadingKey === key) this.routeLoadingKey = '' }
     },

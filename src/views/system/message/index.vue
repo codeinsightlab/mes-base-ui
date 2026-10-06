@@ -2,7 +2,7 @@
   <div class="app-container">
     <PageHeader title="消息管理" description="站内消息、接收人与发送状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="100px">
+    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="100px">
       <el-form-item label="消息类型" prop="messageType">
         <el-select v-model="queryParams.messageType" placeholder="请选择消息类型" clearable>
           <el-option
@@ -42,7 +42,6 @@
         />
       </el-form-item>
 
-
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
           <el-option
@@ -63,48 +62,48 @@
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
+          v-hasPermi="['system:message:add']"
           type="primary"
           plain
           icon="Plus"
           size="small"
           @click="handleAdd"
-          v-hasPermi="['system:message:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="3">
         <el-button
+          v-hasPermi="['system:message:remove']"
           type="danger"
           plain
           icon="Delete"
           size="small"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['system:message:remove']"
         >删除</el-button>
       </el-col>
       <el-col :span="3">
         <el-button
+          v-hasPermi="['system:message:export']"
           type="warning"
           plain
           icon="Download"
           size="small"
           @click="handleExport"
-          v-hasPermi="['system:message:export']"
         >导出</el-button>
       </el-col>
-      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
+      <right-toolbar v-model:show-search="showSearch" @query-table="getList" />
     </el-row>
 
-    <el-table v-loading="loading" :data="messageList" @selection-change="handleSelectionChange">      
+    <el-table v-loading="loading" :data="messageList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="消息类型" align="center" prop="messageType">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_message_type" :value="scope.row.messageType"/>
+          <dict-tag :options="dict.type.sys_message_type" :value="scope.row.messageType" />
         </template>
       </el-table-column>
       <el-table-column label="消息级别" align="center" prop="messageLevel">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_message_level" :value="scope.row.messageLevel"/>
+          <dict-tag :options="dict.type.sys_message_level" :value="scope.row.messageLevel" />
         </template>
       </el-table-column>
       <el-table-column label="标题" align="center" prop="messageTitle" />
@@ -119,39 +118,39 @@
       <el-table-column label="回调地址" align="center" prop="callBack" />
       <el-table-column label="状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag status :options="dict.type.sys_message_status" :value="scope.row.status"/>
+          <dict-tag status :options="dict.type.sys_message_status" :value="scope.row.status" />
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="150" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
+            v-hasPermi="['system:message:edit']"
             size="small"
             link
             icon="Edit"
             @click="handleUpdate(scope.row)"
-            v-hasPermi="['system:message:edit']"
           >修改</el-button>
           <el-button
+            v-hasPermi="['system:message:remove']"
             size="small"
             link
             icon="Delete"
             @click="handleDelete(scope.row)"
-            v-hasPermi="['system:message:remove']"
           >删除</el-button>
         </template>
       </el-table-column>
     </el-table>
-    
+
     <pagination
       v-show="total>0"
-      :total="total"
       v-model:page="queryParams.pageNum"
       v-model:limit="queryParams.pageSize"
+      :total="total"
       @pagination="getList"
     />
 
     <!-- 添加或修改消息对话框 -->
-    <el-dialog :title="title" v-model="open" width="960px" append-to-body>
+    <el-dialog v-model="open" :title="title" width="960px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="8">
@@ -162,7 +161,7 @@
                   :key="dict.value"
                   :label="dict.label"
                   :value="dict.value"
-                ></el-option>
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -174,18 +173,18 @@
                   :key="dict.value"
                   :label="dict.label"
                   :value="dict.value"
-                ></el-option>
+                />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="接收人" prop="recipientId">
-              <el-input v-model="form.recipientNick" readonly placeholder="请选择接收人" >
-                <template #append><el-button @click="handleUserSelect" icon="Search"></el-button></template>
+              <el-input v-model="form.recipientNick" readonly placeholder="请选择接收人">
+                <template #append><el-button icon="Search" @click="handleUserSelect" /></template>
               </el-input>
             </el-form-item>
-            <UserSingleSelect ref="userSelect" @onSelected="onUserSelected"></UserSingleSelect>
-          </el-col>          
+            <UserSingleSelect ref="userSelect" @on-selected="onUserSelected" />
+          </el-col>
         </el-row>
         <el-row>
           <el-col :span="24">
@@ -197,7 +196,7 @@
         <el-row>
           <el-col :span="24">
             <el-form-item label="内容">
-              <editor v-model="form.messageContent" :min-height="192"/>
+              <editor v-model="form.messageContent" :min-height="192" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -218,16 +217,16 @@
 </template>
 
 <script>
-import {sourceList} from "@/utils/sourceList";
-import { listMessage, getMessage, delMessage, addMessage, updateMessage } from "@/api/system/message";
-import UserSingleSelect from "@/components/userSelect/single.vue"
+import { sourceList } from '@/utils/sourceList'
+import { listMessage, getMessage, delMessage, addMessage, updateMessage } from '@/api/system/message'
+import UserSingleSelect from '@/components/userSelect/single.vue'
 export default {
-  name: "Message",
-  components: {UserSingleSelect},
-  dicts: ['sys_message_type', 'sys_message_status','sys_message_level'],
+  name: 'Message',
+  components: { UserSingleSelect },
+  dicts: ['sys_message_type', 'sys_message_status', 'sys_message_level'],
   data() {
     return {
-      queryError:"",
+      queryError: '',
       // 遮罩层
       loading: true,
       // 选中数组
@@ -243,120 +242,120 @@ export default {
       // 消息表格数据
       messageList: [],
       // 弹出层标题
-      title: "",
+      title: '',
       // 是否显示弹出层
       open: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        messageType: null,        messageLevel: null,        messageTitle: null,        messageContent: null,        senderId: null,        senderName: null,        senderNick: null,        recipientId: null,        recipientName: null,        recipientNick: null,        processTime: null,        callBack: null,        status: null,        deletedFlag: null,      },
+        messageType: null, messageLevel: null, messageTitle: null, messageContent: null, senderId: null, senderName: null, senderNick: null, recipientId: null, recipientName: null, recipientNick: null, processTime: null, callBack: null, status: null, deletedFlag: null },
       // 表单参数
       form: {},
       // 表单校验
       rules: {
         messageType: [
-          { required: true, message: "消息类型不能为空", trigger: "change" }
-        ],        
+          { required: true, message: '消息类型不能为空', trigger: 'change' }
+        ],
         messageLevel: [
-          { required: true, message: "消息级别不能为空", trigger: "blur" }
-        ],      
+          { required: true, message: '消息级别不能为空', trigger: 'blur' }
+        ],
         messageTitle: [
-          { required: true, message: "消息标题不能为空", trigger: "blur" }
+          { required: true, message: '消息标题不能为空', trigger: 'blur' }
         ],
         messageContent: [
-          { required: true, message: "消息内容不能为空", trigger: "blur" }
-        ],  
+          { required: true, message: '消息内容不能为空', trigger: 'blur' }
+        ],
         recipientId: [
-          { required: true, message: "接收人不能为空", trigger: "blur" }
-        ]     
+          { required: true, message: '接收人不能为空', trigger: 'blur' }
+        ]
       }
-    };
+    }
   },
   created() {
-    this.getList();
+    this.getList()
   },
   methods: {
     /** 查询消息列表 */
     getList() {
-      return sourceList(this,()=>listMessage(this.queryParams),response=>{
-        this.messageList = response.rows;
-        this.total = response.total;
-      
-      });
+      return sourceList(this, () => listMessage(this.queryParams), response => {
+        this.messageList = response.rows
+        this.total = response.total
+
+      })
     },
     // 取消按钮
     cancel() {
-      this.open = false;
-      this.reset();
+      this.open = false
+      this.reset()
     },
     // 表单重置
     reset() {
       this.form = {
-        messageId: null,        messageType: null,        messageLevel: null,        messageTitle: null,        messageContent: null,        senderId: null,        senderName: null,        senderNick: null,        recipientId: null,        recipientName: null,        recipientNick: null,        processTime: null,        callBack: null,        status: "0",        deletedFlag: null,        remark: null,        attr1: null,        attr2: null,        attr3: null,        attr4: null,        createBy: null,        createTime: null,        updateBy: null,        updateTime: null      };
-      this.resetForm("form");
+        messageId: null, messageType: null, messageLevel: null, messageTitle: null, messageContent: null, senderId: null, senderName: null, senderNick: null, recipientId: null, recipientName: null, recipientNick: null, processTime: null, callBack: null, status: '0', deletedFlag: null, remark: null, attr1: null, attr2: null, attr3: null, attr4: null, createBy: null, createTime: null, updateBy: null, updateTime: null }
+      this.resetForm('form')
     },
     /** 搜索按钮操作 */
     handleQuery() {
-      this.queryParams.pageNum = 1;
-      this.getList();
+      this.queryParams.pageNum = 1
+      this.getList()
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm("queryForm");
-      this.handleQuery();
+      this.resetForm('queryForm')
+      this.handleQuery()
     },
     // 多选框选中数据
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.messageId)
-      this.single = selection.length!==1
+      this.single = selection.length !== 1
       this.multiple = !selection.length
     },
     /** 新增按钮操作 */
     handleAdd() {
-      this.reset();
-      this.open = true;
-      this.title = "添加消息";
+      this.reset()
+      this.open = true
+      this.title = '添加消息'
     },
     /** 修改按钮操作 */
     handleUpdate(row) {
-      this.reset();
+      this.reset()
       const messageId = row.messageId || this.ids
       getMessage(messageId).then(response => {
-        this.form = response.data;
-        this.open = true;
-        this.title = "修改消息";
-      });
+        this.form = response.data
+        this.open = true
+        this.title = '修改消息'
+      })
     },
     /** 提交按钮 */
     submitForm() {
-      this.$refs["form"].validate(valid => {
+      this.$refs['form'].validate(valid => {
         if (valid) {
           if (this.form.messageId != null) {
             updateMessage(this.form).then(response => {
-              this.$modal.msgSuccess("修改成功");
-              this.open = false;
-              this.getList();
-            });
+              this.$modal.msgSuccess('修改成功')
+              this.open = false
+              this.getList()
+            })
           } else {
             addMessage(this.form).then(response => {
-              this.$modal.msgSuccess("新增成功");
-              this.open = false;
-              this.getList();
-            });
+              this.$modal.msgSuccess('新增成功')
+              this.open = false
+              this.getList()
+            })
           }
         }
-      });
+      })
     },
     /** 删除按钮操作 */
     handleDelete(row) {
-      const messageIds = row.messageId || this.ids;
+      const messageIds = row.messageId || this.ids
       this.$modal.confirm('是否确认删除消息编号为"' + messageIds + '"的数据项？').then(function() {
-        return delMessage(messageIds);
+        return delMessage(messageIds)
       }).then(() => {
-        this.getList();
-        this.$modal.msgSuccess("删除成功");
-      }).catch(() => {});
+        this.getList()
+        this.$modal.msgSuccess('删除成功')
+      }).catch(() => {})
     },
     /** 导出按钮操作 */
     handleExport() {
@@ -364,17 +363,17 @@ export default {
         ...this.queryParams
       }, `message_${new Date().getTime()}.xlsx`)
     },
-    handleUserSelect(){
-      this.$refs.userSelect.showFlag = true;
+    handleUserSelect() {
+      this.$refs.userSelect.showFlag = true
     },
-    onUserSelected(row){
-      if(row != null){
-        
-        this.form.recipientId = row.userId;
-        this.form.recipientName = row.userName;
-        this.form.recipientNick = row.nickName;
+    onUserSelected(row) {
+      if (row != null) {
+
+        this.form.recipientId = row.userId
+        this.form.recipientName = row.userName
+        this.form.recipientNick = row.nickName
       }
     }
   }
-};
+}
 </script>

@@ -2,9 +2,15 @@
   <div class="app-container">
     <PageHeader title="OpenAPI 应用" description="应用凭证、状态与接口授权" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-alert :title="dataScopeEnabled ? '业务数据范围校验已开启' : '业务数据范围校验已关闭'" :type="dataScopeEnabled ? 'success' : 'info'" :closable="false" show-icon class="mb8"
-      description="应用仍需有效凭证和接口授权。数据范围规则由业务系统配置，可按实际需要启用。" />
-    <el-form class="filter-panel" ref="queryForm" :model="queryParams" :inline="true" size="small">
+    <el-alert
+      :title="dataScopeEnabled ? '业务数据范围校验已开启' : '业务数据范围校验已关闭'"
+      :type="dataScopeEnabled ? 'success' : 'info'"
+      :closable="false"
+      show-icon
+      class="mb8"
+      description="应用仍需有效凭证和接口授权。数据范围规则由业务系统配置，可按实际需要启用。"
+    />
+    <el-form ref="queryForm" class="filter-panel" :model="queryParams" :inline="true" size="small">
       <el-form-item label="appKey" prop="appKey"><el-input v-model="queryParams.appKey" clearable @keyup.enter="handleQuery" /></el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" clearable><el-option label="禁用" :value="0" /><el-option label="启用" :value="1" /></el-select>
@@ -23,7 +29,7 @@
           <el-button v-hasPermi="['system:openApiClient:query']" link size="small" :disabled="busy" @click="showDetail(scope.row)">详情</el-button>
           <el-button v-hasPermi="['system:openApiClient:edit']" link size="small" :disabled="busy" @click="toggleStatus(scope.row)">{{ scope.row.status === 1 ? '禁用' : '启用' }}</el-button>
           <el-dropdown v-hasPermi="['system:openApiClient:reset','system:openApiClient:authorize']" trigger="click" :disabled="busy">
-            <el-button link size="small" :disabled="busy" aria-label="更多应用操作">更多<el-icon><ArrowDown/></el-icon></el-button>
+            <el-button link size="small" :disabled="busy" aria-label="更多应用操作">更多<el-icon><ArrowDown /></el-icon></el-button>
             <template #dropdown><el-dropdown-menu>
               <el-dropdown-item v-if="hasPermi(['system:openApiClient:authorize'])" :disabled="busy" @click="showApis(scope.row)">接口授权</el-dropdown-item>
               <el-dropdown-item v-if="hasPermi(['system:openApiClient:reset'])" :disabled="busy" @click="handleReset(scope.row)">重置 Secret</el-dropdown-item>
@@ -32,9 +38,9 @@
         </template>
       </el-table-column>
     </el-table>
-    <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :page-sizes="[10, 20, 50, 100]" @pagination="getList" />
+    <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" :page-sizes="[10, 20, 50, 100]" @pagination="getList" />
 
-    <el-dialog title="新建 OpenAPI 应用" v-model="createOpen" width="520px" :close-on-click-modal="false" @closed="clearCreate">
+    <el-dialog v-model="createOpen" title="新建 OpenAPI 应用" width="520px" :close-on-click-modal="false" @closed="clearCreate">
       <el-form ref="createForm" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="应用名称" prop="clientName"><el-input v-model="form.clientName" maxlength="100" /></el-form-item>
         <el-form-item label="备注" prop="remark"><el-input v-model="form.remark" type="textarea" maxlength="500" show-word-limit /></el-form-item>
@@ -43,7 +49,7 @@
       <template #footer><el-button :disabled="busy" @click="createOpen = false">取消</el-button><el-button type="primary" :loading="busy" @click="handleCreate">创建</el-button></template>
     </el-dialog>
 
-    <el-dialog title="应用详情" v-model="detailOpen" width="650px">
+    <el-dialog v-model="detailOpen" title="应用详情" width="650px">
       <el-descriptions v-if="detail" :column="1" border>
         <el-descriptions-item label="应用名称">{{ detail.clientName }}</el-descriptions-item>
         <el-descriptions-item label="appKey">{{ detail.appKey }}</el-descriptions-item>
@@ -54,7 +60,7 @@
       </el-descriptions>
     </el-dialog>
 
-    <el-dialog title="一次性凭证" v-model="secretOpen" width="700px" :close-on-click-modal="false" :before-close="closeSecret" @closed="clearSecret">
+    <el-dialog v-model="secretOpen" title="一次性凭证" width="700px" :close-on-click-modal="false" :before-close="closeSecret" @closed="clearSecret">
       <el-alert title="Secret 仅本次展示，关闭后无法再次查看，请妥善保存。" type="warning" :closable="false" />
       <el-form v-if="secret" label-width="90px" class="credentials">
         <el-form-item label="appKey"><el-input :model-value="secret.appKey" readonly><template #append><el-button @click="copyCredential('appKey')">复制</el-button></template></el-input></el-form-item>
@@ -64,8 +70,8 @@
     </el-dialog>
 
     <el-dialog
-      title="接口授权"
       v-model="apisOpen"
+      title="接口授权"
       width="800px"
       top="10vh"
       class="api-permission-dialog"
@@ -77,7 +83,7 @@
       </div></template>
       <div class="permission-content">
         <div class="permission-notice" :class="{ 'is-empty': selectedApis.length === 0 }" role="note">
-          <el-icon aria-hidden="true"><Warning/></el-icon>
+          <el-icon aria-hidden="true"><Warning /></el-icon>
           <span>清空授权后，该应用将无法访问任何受保护 API。</span>
         </div>
         <div class="permission-toolbar">
@@ -197,8 +203,7 @@ export default {
         const [response, scope] = await Promise.all([listClients(this.queryParams), getDataScope()])
         if (this.disposed) return
         this.clients = response.data.list; this.total = response.data.total; this.dataScopeEnabled = scope.data.enabled
-      } catch (error) { this.queryError = error instanceof Error ? error.message : '应用列表加载失败' }
-      finally { this.loading = false }
+      } catch(error) { this.queryError = error instanceof Error ? error.message : '应用列表加载失败' } finally { this.loading = false }
     },
     handleQuery() { this.queryParams.pageNum = 1; this.getList() },
     resetQuery() { this.resetForm('queryForm'); this.handleQuery() },
@@ -215,7 +220,7 @@ export default {
       try {
         if (!navigator.clipboard || !window.isSecureContext) throw new Error('Clipboard unavailable')
         await navigator.clipboard.writeText(this.secret[field]); this.$modal.msgSuccess('复制成功')
-      } catch (error) { this.$modal.msgError('复制失败，请手工复制并妥善保存') }
+      } catch(error) { this.$modal.msgError('复制失败，请手工复制并妥善保存') }
     },
     handleCreate() {
       this.$refs.createForm.validate(async valid => {
@@ -233,7 +238,7 @@ export default {
     },
     async toggleStatus(row) {
       const status = row.status === 1 ? 0 : 1
-      try { await this.$modal.confirm(status === 0 ? '确认禁用该应用？现有 Token 将失效。' : '确认启用该应用？凭证版本将更新，调用方需重新获取 Token。') } catch (cancel) { return }
+      try { await this.$modal.confirm(status === 0 ? '确认禁用该应用？现有 Token 将失效。' : '确认启用该应用？凭证版本将更新，调用方需重新获取 Token。') } catch(cancel) { return }
       this.busy = true
       try {
         await changeStatus({ clientId: row.clientId, status }); this.$modal.msgSuccess('状态更新成功'); this.getList()
@@ -243,7 +248,7 @@ export default {
       try {
         await this.$modal.confirm('确认重置该应用的 Secret？')
         await this.$modal.confirm('旧 Secret 和历史 Token 将失效，调用方需使用新 Secret 重新获取 Token。')
-      } catch (cancel) { return }
+      } catch(cancel) { return }
       this.busy = true
       try { const response = await resetSecret(row.clientId); this.showSecret(response.data); this.getList() } finally { this.busy = false }
     },
@@ -261,7 +266,7 @@ export default {
       const added = requestedApis.filter(code => !this.originalApis.includes(code))
       const removed = this.originalApis.filter(code => !requestedApis.includes(code))
       const summary = `新增：${added.length ? added.join('、') : '无'}；移除：${removed.length ? removed.join('、') : '无'}。${this.selectedApis.length === 0 ? '保存后无法调用任何需要授权的业务 API。' : ''}`
-      try { await this.$modal.confirm(summary) } catch (cancel) { return }
+      try { await this.$modal.confirm(summary) } catch(cancel) { return }
       this.busy = true
       try {
         await replaceClientApis({ clientId: this.apiClientId, apiCodes: requestedApis })

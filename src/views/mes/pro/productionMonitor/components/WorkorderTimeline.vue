@@ -114,7 +114,7 @@ export default {
           this.query.pageNum = requestedPage
           this.loadedOnce = true
         }
-      } catch (error) {
+      } catch(error) {
         if (sequence === this.requestSequence) {
           this.pagingContractError = error && error.message === 'PAGING_OVERFLOW'
           if (isInitial) this.initialError = true

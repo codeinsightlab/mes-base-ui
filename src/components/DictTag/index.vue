@@ -9,8 +9,7 @@
 
           :index="index"
           :class="item.raw.cssClass"
-          >{{ item.label }}</span
-        >
+        >{{ item.label }}</span>
         <el-tag
           v-else
           :disable-transitions="true"
@@ -28,25 +27,25 @@
 
 <script>
 export default {
-  name: "DictTag",
+  name: 'DictTag',
   props: {
     status: { type: Boolean, default: false },
     options: {
       type: Array,
-      default: () => [],
+      default: () => []
     },
-    value: [Number, String, Array],
+    value: [Number, String, Array]
   },
   computed: {
     values() {
       if (this.value !== null && typeof this.value !== 'undefined') {
-        return Array.isArray(this.value) ? this.value : [String(this.value)];
+        return Array.isArray(this.value) ? this.value : [String(this.value)]
       } else {
-        return [];
+        return []
       }
-    },
-  },
-};
+    }
+  }
+}
 </script>
 <style scoped>
 .el-tag + .el-tag {

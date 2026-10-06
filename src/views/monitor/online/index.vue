@@ -2,7 +2,7 @@
   <div class="app-container">
     <PageHeader title="在线用户" description="当前在线会话" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="68px">
+    <el-form ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="登录地址" prop="ipaddr">
         <el-input
           v-model="queryParams.ipaddr"
@@ -32,7 +32,7 @@
     >
       <el-table-column label="序号" type="index" align="center">
         <template #default="scope">
-          <span>{{(pageNum - 1) * pageSize + scope.$index + 1}}</span>
+          <span>{{ (pageNum - 1) * pageSize + scope.$index + 1 }}</span>
         </template>
       </el-table-column>
       <el-table-column label="会话编号" align="center" prop="tokenId" :show-overflow-tooltip="true" />
@@ -50,29 +50,29 @@
       <el-table-column label="操作" align="center" min-width="110" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
+            v-hasPermi="['monitor:online:forceLogout']"
             size="small"
             link
             icon="Delete"
             @click="handleForceLogout(scope.row)"
-            v-hasPermi="['monitor:online:forceLogout']"
           >强退</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <pagination v-show="total>0" :total="total" v-model:page="pageNum" v-model:limit="pageSize" />
+    <pagination v-show="total>0" v-model:page="pageNum" v-model:limit="pageSize" :total="total" />
   </div>
 </template>
 
 <script>
-import {sourceList} from "@/utils/sourceList";
-import { list, forceLogout } from "@/api/monitor/online";
+import { sourceList } from '@/utils/sourceList'
+import { list, forceLogout } from '@/api/monitor/online'
 
 export default {
-  name: "Online",
+  name: 'Online',
   data() {
     return {
-      queryError:"",
+      queryError: '',
       // 遮罩层
       loading: true,
       // 总条数
@@ -86,40 +86,40 @@ export default {
         ipaddr: undefined,
         userName: undefined
       }
-    };
+    }
   },
   created() {
-    this.getList();
+    this.getList()
   },
   methods: {
     /** 查询登录日志列表 */
     getList() {
-      return sourceList(this,()=>list(this.queryParams),response=>{
-        this.list = response.rows;
-        this.total = response.total;
-      
-      });
+      return sourceList(this, () => list(this.queryParams), response => {
+        this.list = response.rows
+        this.total = response.total
+
+      })
     },
     /** 搜索按钮操作 */
     handleQuery() {
-      this.pageNum = 1;
-      this.getList();
+      this.pageNum = 1
+      this.getList()
     },
     /** 重置按钮操作 */
     resetQuery() {
-      this.resetForm("queryForm");
-      this.handleQuery();
+      this.resetForm('queryForm')
+      this.handleQuery()
     },
     /** 强退按钮操作 */
     handleForceLogout(row) {
       this.$modal.confirm('是否确认强退名称为"' + row.userName + '"的用户？').then(function() {
-        return forceLogout(row.tokenId);
+        return forceLogout(row.tokenId)
       }).then(() => {
-        this.getList();
-        this.$modal.msgSuccess("强退成功");
-      }).catch(() => {});
+        this.getList()
+        this.$modal.msgSuccess('强退成功')
+      }).catch(() => {})
     }
   }
-};
+}
 </script>
 

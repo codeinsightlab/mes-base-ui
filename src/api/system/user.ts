@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { parseStrEmpty } from "@/utils/ruoyi";
+import { parseStrEmpty } from '@/utils/ruoyi'
 
 // 查询用户列表
 export function listUser(query: any) {
@@ -83,7 +83,7 @@ export function updateUserProfile(data: any) {
   return request({
     scope: 'platform', url: '/system/user/profile',
     method: 'put',
-    data: {nickName:data.nickName,phonenumber:data.phonenumber,email:data.email,sex:data.sex}
+    data: { nickName: data.nickName, phonenumber: data.phonenumber, email: data.email, sex: data.sex }
   })
 }
 

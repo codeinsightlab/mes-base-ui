@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import {refreshDictionaries} from '@/utils/dictionaries'
+import { refreshDictionaries } from '@/utils/dictionaries'
 
 // 查询字典类型列表
 export function listType(query: any) {
@@ -49,7 +49,7 @@ export function refreshCache() {
   return request({
     scope: 'platform', url: '/system/dict/type/refreshCache',
     method: 'delete'
-  }).then(async response=>{await refreshDictionaries();return response})
+  }).then(async response => { await refreshDictionaries();return response })
 }
 
 // 获取字典选择框列表

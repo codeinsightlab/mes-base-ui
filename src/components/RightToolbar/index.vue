@@ -2,77 +2,77 @@
   <div class="top-right-btn">
     <el-row>
       <el-tooltip class="item" effect="dark" :content="showSearch ? '隐藏搜索' : '显示搜索'" placement="top">
-        <el-button size="small" circle icon="Search" @click="toggleSearch()" :aria-label="showSearch ? '隐藏搜索' : '显示搜索'" />
+        <el-button size="small" circle icon="Search" :aria-label="showSearch ? '隐藏搜索' : '显示搜索'" @click="toggleSearch()" />
       </el-tooltip>
       <el-tooltip class="item" effect="dark" content="刷新" placement="top">
-        <el-button size="small" circle icon="Refresh" @click="refresh()" aria-label="刷新列表" />
+        <el-button size="small" circle icon="Refresh" aria-label="刷新列表" @click="refresh()" />
       </el-tooltip>
-      <el-tooltip class="item" effect="dark" content="显隐列" placement="top" v-if="columns">
-        <el-button size="small" circle icon="Menu" @click="showColumn()" aria-label="显示或隐藏列" />
+      <el-tooltip v-if="columns" class="item" effect="dark" content="显隐列" placement="top">
+        <el-button size="small" circle icon="Menu" aria-label="显示或隐藏列" @click="showColumn()" />
       </el-tooltip>
     </el-row>
-    <el-dialog :title="title" v-model="open" append-to-body>
+    <el-dialog v-model="open" :title="title" append-to-body>
       <el-transfer
-        :titles="['显示', '隐藏']"
         v-model="value"
+        :titles="['显示', '隐藏']"
         :data="columns"
         @change="dataChange"
-      ></el-transfer>
+      />
     </el-dialog>
   </div>
 </template>
 <script>
 export default {
-  name: "RightToolbar",
+  name: 'RightToolbar',
+  props: {
+    showSearch: {
+      type: Boolean,
+      default: true
+    },
+    columns: {
+      type: Array
+    }
+  },
   data() {
     return {
       // 显隐数据
       value: [],
       // 弹出层标题
-      title: "显示/隐藏",
+      title: '显示/隐藏',
       // 是否显示弹出层
-      open: false,
-    };
-  },
-  props: {
-    showSearch: {
-      type: Boolean,
-      default: true,
-    },
-    columns: {
-      type: Array,
-    },
+      open: false
+    }
   },
   created() {
     // 显隐列初始默认隐藏列
     for (let item in this.columns) {
       if (this.columns[item].visible === false) {
-        this.value.push(parseInt(item));
+        this.value.push(parseInt(item))
       }
     }
   },
   methods: {
     // 搜索
     toggleSearch() {
-      this.$emit("update:showSearch", !this.showSearch);
+      this.$emit('update:showSearch', !this.showSearch)
     },
     // 刷新
     refresh() {
-      this.$emit("queryTable");
+      this.$emit('queryTable')
     },
     // 右侧列表元素变化
     dataChange(data) {
       for (let item in this.columns) {
-        const key = this.columns[item].key;
-        this.columns[item].visible = !data.includes(key);
+        const key = this.columns[item].key
+        this.columns[item].visible = !data.includes(key)
       }
     },
     // 打开显隐列dialog
     showColumn() {
-      this.open = true;
-    },
-  },
-};
+      this.open = true
+    }
+  }
+}
 </script>
 <style lang="css" scoped>
 ::v-deep .el-transfer__button {
