@@ -1,17 +1,17 @@
 <template>
   <div class="app-container">
-    <PageHeader title="业务数据源" description="连接配置、工厂绑定与本节点加载状态" />
+    <PageHeader section="MES BASE / SYSTEM" title="业务数据源" description="连接配置、工厂绑定与本节点加载状态" />
     <el-alert title="启用仅登记配置；首次业务访问时按需加载。以下加载状态来自当前服务节点，不代表数据库当前在线。" type="info" :closable="false" show-icon />
-    <div class="toolbar">
-      <div><h3>业务数据源</h3><span class="secondary">连接检测、保活和回收由 Druid 管理</span></div>
+    <div class="table-toolbar">
+      <span class="secondary">连接检测、保活和回收由 Druid 管理</span>
       <div><el-button v-hasPermi="['system:datasource:add']" type="primary" size="small" @click="edit()">新增数据源</el-button><el-button size="small" :loading="loading" @click="load">刷新状态</el-button></div>
     </div>
-    <el-table v-loading="loading" :data="rows" border>
+    <el-table v-loading="loading" :data="rows">
       <el-table-column prop="datasourceName" label="数据源" min-width="150" />
       <el-table-column label="数据库" min-width="190"><template #default="s"><div>{{ s.row.dbName }}</div><span class="secondary">{{ s.row.dbHost }}:{{ s.row.dbPort }}</span></template></el-table-column>
       <el-table-column prop="dbUsername" label="连接账号" min-width="130" show-overflow-tooltip />
       <el-table-column label="关联工厂" min-width="120"><template #default="s">{{ s.row.factoryName === null ? '未绑定' : s.row.factoryName }}</template></el-table-column>
-      <el-table-column label="管理状态" width="105"><template #default="s"><el-tag :type="s.row.status === 'ENABLED' ? 'success' : 'info'" size="small">{{ s.row.statusName }}</el-tag></template></el-table-column>
+      <el-table-column label="管理状态" width="105"><template #default="s"><StatusTag :label="s.row.statusName" :tone="s.row.status === 'ENABLED' ? 'running' : 'disabled'" /></template></el-table-column>
       <el-table-column label="本节点状态" min-width="120"><template #default="s"><div>{{ s.row.runtimeStatusName }}</div><span v-if="s.row.initialized" class="secondary">连接池已初始化</span></template></el-table-column>
       <el-table-column label="Druid 最近建连异常" min-width="170" show-overflow-tooltip><template #default="s"><span v-if="s.row.runtimeError">{{ s.row.runtimeError }}<br>{{ s.row.lastErrorTime }}</span><span v-else class="secondary">暂无异常记录</span></template></el-table-column>
       <el-table-column label="DDL 快照" min-width="185"><template #default="s">
@@ -92,8 +92,5 @@ export default {
 }
 </script>
 <style scoped>
-.toolbar { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
-h3 { margin: 0 0 6px; font-size: 17px; color: var(--ui-text); }
-.secondary { color: var(--ui-text-secondary); font-size: 12px; }
 .el-table .el-button + .el-tooltip { margin-left: 8px; }
 </style>

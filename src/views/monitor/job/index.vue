@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="任务调度" description="定时任务配置与运行状态" />
+    <PageHeader section="MES BASE / MONITOR" title="任务调度" description="定时任务配置与运行状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="任务名称" prop="jobName">

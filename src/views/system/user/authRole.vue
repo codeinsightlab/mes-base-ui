@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="授权角色" description="用户角色关联" />
+    <PageHeader section="MES BASE / SYSTEM" title="授权角色" description="用户角色关联" />
     <h4 class="form-header h4">基本信息</h4>
     <el-form ref="form" :model="form" label-width="80px">
       <el-row>

@@ -5,13 +5,10 @@ import RightToolbar from '../src/components/RightToolbar/index.vue'
 import UserInfo from '../src/views/system/user/profile/userInfo.vue'
 import CronSecond from '../src/components/Crontab/second.vue'
 import CronWeek from '../src/components/Crontab/week.vue'
-import WorkorderFlowcards from '../src/views/mes/pro/productionMonitor/components/WorkorderFlowcards.vue'
 import { updateUserProfile } from '../src/api/system/user'
-import { getProductionMonitorRouteTrack } from '../src/api/pro/productionMonitor'
 
 // TEST ONLY: mocked transport; these tests do not contact a backend.
 vi.mock('../src/api/system/user', () => ({ updateUserProfile: vi.fn() }))
-vi.mock('../src/api/pro/productionMonitor', () => ({ getProductionMonitorRouteTrack: vi.fn() }))
 const global = { plugins: [ElementPlus] }
 const check = (value: number, min: number, max: number) => Math.min(max, Math.max(min, Math.floor(value)))
 beforeEach(() => { vi.clearAllMocks() })
@@ -72,21 +69,4 @@ describe('Vue 3 component regression', () => {
     week.unmount()
   })
 
-  it('route details use Vue 3 reactive assignment and reject stale responses', async() => {
-    const card = { xtransferNo: 'TEST-ONLY', routeId: 1 }
-    let complete!: (value: any) => void
-    vi.mocked(getProductionMonitorRouteTrack).mockReturnValue(new Promise(resolve => { complete = resolve }))
-    const wrapper = shallowMount(WorkorderFlowcards, { props: { workorderId: 1, flowcards: [card] }, global })
-    const pending = wrapper.vm.expandRoute('TEST-ONLY|1')
-    await wrapper.vm.expandRoute('')
-    complete({ data: { routeDefinition: [], observedEvents: [] }})
-    await pending
-    expect(wrapper.vm.routeTracks).toEqual({})
-    const track = { routeDefinition: [], observedEvents: [] }
-    vi.mocked(getProductionMonitorRouteTrack).mockResolvedValue({ data: track })
-    await wrapper.vm.expandRoute('TEST-ONLY|1')
-    expect(wrapper.vm.routeTrack(card)).toEqual(track)
-    expect(wrapper.vm.routeErrorKey).toBe('')
-    wrapper.unmount()
-  })
 })

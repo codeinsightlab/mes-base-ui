@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="角色管理" description="角色、菜单权限与授权范围" />
+    <PageHeader section="MES BASE / SYSTEM" title="角色管理" description="角色、菜单权限与授权范围" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="角色名称" prop="roleName">
@@ -101,10 +101,11 @@
 
     <el-table v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="角色范围" width="110"><template #default="{row}">{{ row.kind==='PLATFORM'?'平台':'工厂' }}</template></el-table-column><el-table-column label="所属工厂" prop="factoryId" width="130" />
-      <el-table-column label="角色编号" prop="roleId" width="120" />
+      <el-table-column label="角色范围" min-width="150"><template #default="{row}"><ScopeTag :kind="row.kind" :factory-id="row.factoryId" /></template></el-table-column>
+      <el-table-column label="所属工厂" prop="factoryId" min-width="150" show-overflow-tooltip><template #default="{row}"><span v-if="row.factoryId != null" class="factory-cell"><span>{{ factories.find(f => f.factoryId === String(row.factoryId))?.name || row.factoryId }}</span><small v-if="factories.some(f => f.factoryId === String(row.factoryId))" class="technical-label">ID {{ row.factoryId }}</small></span><span v-else class="muted">—</span></template></el-table-column>
+      <el-table-column label="角色编号" prop="roleId" width="120"><template #default="{ row }"><CodeText :value="row.roleId" /></template></el-table-column>
       <el-table-column label="角色名称" prop="roleName" :show-overflow-tooltip="true" width="150" />
-      <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="150" />
+      <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="150"><template #default="{ row }"><CodeText :value="row.roleKey" /></template></el-table-column>
       <el-table-column label="显示顺序" prop="roleSort" width="100" />
       <el-table-column label="状态" align="center" width="100">
         <template #default="scope">
@@ -122,7 +123,7 @@
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="190" fixed="right" class-name="small-padding fixed-width">

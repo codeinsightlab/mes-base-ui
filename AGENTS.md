@@ -11,6 +11,14 @@ Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改�
 
 新增及迁入 MES 页面必须复用 [`docs/UI_DESIGN_SYSTEM.md`](docs/UI_DESIGN_SYSTEM.md)。主题 token 唯一入口 `src/assets/styles/tokens.css`，公共布局样式 `src/styles.css`；禁止页面自行创造颜色、status 映射、spacing 或 card 体系。默认浅色现代工业工作区，保留高信息密度，不引入假生产数据、展示型大屏或阻塞操作的装饰动画。
 
-优先复用 PageHeader、StatusTag、RightToolbar、Pagination、CrudPage；FilterPanel / TableToolbar / ContentCard 当前分别为 `.filter-panel` / `.table-toolbar` / `.panel` 样式协议，保留 Source 表单 ref 与操作流程。仅多个明确场景存在行为复用时再抽组件，不提前造空组件库。状态按原业务标签或显式 tone，禁止把所有领域数值 0/1 当作同一状态。移动到“更多”的操作必须保留各自权限、可发现入口和确认流程。
+优先复用 PageHeader、StatusTag、ScopeTag、RightToolbar、Pagination、CrudPage；FilterPanel / TableToolbar / ContentCard 当前分别为 `.filter-panel` / `.table-toolbar` / `.panel` 样式协议，保留 Source 表单 ref 与操作流程。仅多个明确场景存在行为复用时再抽组件，不提前造空组件库。状态按原业务标签或显式 tone，禁止把所有领域数值 0/1 当作同一状态。移动到“更多”的操作必须保留各自权限、可发现入口和确认流程。
 
 页面至少按 Page Header → Filter → Toolbar → Content 统一；保护查询字段、列、批量动作、树、校验、loading/empty/error、分页、导入导出、动态路由和范围清理。真实浏览器检查 1440/1920/1280；窄屏允许侧栏折叠、查询换行和表内滚动。UI 完成不改变后端迁移状态。
+
+
+应用内视觉延续 Modern Industrial / Control Workspace：`--mes-*` 为语义颜色，`--ui-*` 为已有消费者兼容别名；深工业蓝侧栏、浅冷灰数据工作区、克制青色范围标识。ScopeTag 只表达 PLATFORM / FACTORY，不承担授权；真实 Factory 名称未知时保留 ID，禁止猜测。Environment 只表达前端构建模式，不能伪装服务健康。Home 只使用已验证的账号、范围、菜单与真实接口数据，不造生产指标。Filter → Toolbar → Table → Pagination 使用连续内容面，避免每段独立大卡片；普通行约 40px，允许长内容增高，空态不补假行。日期列留足单行宽度，保留格式和字段。侧栏、Tags 和工厂切换保留原行为；视觉改动须经过真实截图复核、至少一轮针对问题的微调和三档宽度验证。Login 主设计与流程保持稳定。
+
+
+第二轮数据语言（2026-10-06）：复用 CodeText / MethodBadge / MetricValue / StatusTag / ScopeTag；ID 字符串不转数字，日期不改格式，耗时分级只表达 latency，不能推断 timeout。数据表 / Monitor 使用全部可用宽度，设置页按具体需要限宽。Navbar 60px、Tags 34px，移除重复页面技术标签。Home 复用现有 5 个只读监控 API，按平台权限分别读取，context revision / 卸载拒绝过期回填；不轮询，不以已读取冒充健康，不以任务启用冒充执行。授权入口和个人链接降为次要区域。第一轮主题及 Login 保持稳定。
+
+用户授权的工作台扩展（2026-10-06）：上述 Home 不造生产指标的约束继续适用于真实数据模式；用户明确授权 BusinessWorkspace 的独立示例视图。上下文、指标、列表与详情持续标明“示例数据”，禁止作为真实业务请求失败的兜底，禁止业务提交或写入。服务端 workspaces 契约决定工作台：有有效工厂角色默认业务，仅平台角色默认平台，无角色展示个人入口；双范围可切换，不由可选工厂推断授权，不自动选择首厂。平台账号可显式预览业务示例，预览不改变 Factory 或权限。侧栏一级模块默认只展开活动分支、手动展开一个模块时收起其他一级模块。Druid 目录覆盖当前节点平台、工厂业务和已配置外部池；未初始化明确表达，不因监控主动加载业务池。验收追加到 docs/acceptance/ui-industrial-upgrade/ROUND2.md。

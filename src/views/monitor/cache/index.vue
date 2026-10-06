@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="缓存监控" description="Redis 信息与缓存统计" />
+    <PageHeader section="MES BASE / MONITOR" title="缓存监控" description="Redis 信息与缓存统计" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-row>
       <el-col :span="24" class="card-box">

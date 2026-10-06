@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="OpenAPI 应用" description="应用凭证、状态与接口授权" />
+    <PageHeader section="MES BASE / SYSTEM" title="OpenAPI 应用" description="应用凭证、状态与接口授权" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-alert
       :title="dataScopeEnabled ? '业务数据范围校验已开启' : '业务数据范围校验已关闭'"
@@ -17,7 +17,7 @@
       </el-form-item>
       <el-form-item><el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button><el-button @click="resetQuery">重置</el-button></el-form-item>
     </el-form>
-    <el-button v-hasPermi="['system:openApiClient:add']" type="primary" size="small" icon="Plus" class="mb8" @click="createOpen = true">新建应用</el-button>
+    <div class="table-toolbar"><el-button v-hasPermi="['system:openApiClient:add']" type="primary" size="small" icon="Plus" @click="createOpen = true">新建应用</el-button></div>
     <el-table v-loading="loading" :data="clients">
       <el-table-column label="应用名称" prop="clientName" min-width="140" />
       <el-table-column label="appKey" prop="appKey" min-width="250" />

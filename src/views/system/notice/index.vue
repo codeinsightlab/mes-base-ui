@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="通知公告" description="公告内容与发布状态" />
+    <PageHeader section="MES BASE / SYSTEM" title="通知公告" description="公告内容与发布状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="公告标题" prop="noticeTitle">
@@ -91,7 +91,7 @@
         </template>
       </el-table-column>
       <el-table-column label="创建者" align="center" prop="createBy" width="100" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="100">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="120">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
         </template>

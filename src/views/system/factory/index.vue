@@ -1,13 +1,13 @@
 <template>
   <div class="app-container">
-    <PageHeader title="工厂管理" description="业务工厂与独立数据源绑定" />
-    <div class="toolbar"><div><h3>工厂管理</h3><span class="secondary">每个工厂绑定一个独立业务数据源；用户和角色权限在原管理页面配置</span></div><div><el-button v-hasPermi="['system:factory:add']" type="primary" size="small" @click="edit()">新增工厂</el-button><el-button size="small" :loading="loading" @click="load">刷新</el-button></div></div>
-    <el-table v-loading="loading" :data="rows" border>
-      <el-table-column prop="factoryId" label="工厂编号" width="100" />
-      <el-table-column prop="factoryCode" label="工厂编码" min-width="150" />
-      <el-table-column prop="enterpriseId" label="所属企业" width="130" />
+    <PageHeader section="MES BASE / SYSTEM" title="工厂管理" description="业务工厂与独立数据源绑定" />
+    <div class="table-toolbar"><div><span class="secondary">每个工厂绑定一个独立业务数据源；用户和角色权限在原管理页面配置</span></div><div><el-button v-hasPermi="['system:factory:add']" type="primary" size="small" @click="edit()">新增工厂</el-button><el-button size="small" :loading="loading" @click="load">刷新</el-button></div></div>
+    <el-table v-loading="loading" :data="rows">
+      <el-table-column label="工厂编号" min-width="120"><template #default="{ row }"><CodeText :value="row.factoryId" /></template></el-table-column>
+      <el-table-column label="工厂编码" min-width="150"><template #default="{ row }"><CodeText :value="row.factoryCode" /></template></el-table-column>
+      <el-table-column label="所属企业" min-width="130"><template #default="{ row }"><CodeText :value="row.enterpriseId" /></template></el-table-column>
       <el-table-column prop="factoryName" label="工厂名称" min-width="180" />
-      <el-table-column prop="status" label="状态" width="90" />
+      <el-table-column label="状态" width="100"><template #default="{ row }"><StatusTag :label="row.status === 'ENABLED' ? '启用' : row.status === 'DISABLED' ? '停用' : row.status" /></template></el-table-column>
       <el-table-column label="业务数据源" min-width="190"><template #default="s">{{ s.row.datasourceId === null ? '未绑定' : s.row.datasourceName }}</template></el-table-column>
       <el-table-column label="操作" width="170"><template #default="s"><el-button v-hasPermi="['system:factory:edit']" link size="small" @click="edit(s.row)">编辑 / 绑定</el-button><el-button v-hasPermi="['system:factory:remove']" link size="small" class="danger" @click="remove(s.row)">删除</el-button></template></el-table-column>
     </el-table>
@@ -47,8 +47,5 @@ export default {
 }
 </script>
 <style scoped>
-.toolbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
-h3 { margin:0 0 6px; font-size:17px; color:var(--ui-text); }
-.secondary { font-size:12px; color:var(--ui-text-secondary); }
 .danger { color:var(--ui-error); }
 </style>

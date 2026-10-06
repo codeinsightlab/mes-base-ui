@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="菜单管理" description="目录、页面入口与按钮权限" />
+    <PageHeader section="MES BASE / SYSTEM" title="菜单管理" description="目录、页面入口与按钮权限" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="菜单名称" prop="menuName">
@@ -72,9 +72,9 @@
           <dict-tag status :options="dict.type.sys_normal_disable" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="创建时间" align="center" prop="createTime">
+      <el-table-column label="创建时间" align="center" prop="createTime" min-width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="220" fixed="right" class-name="small-padding fixed-width">

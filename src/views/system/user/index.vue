@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="用户管理" description="组织账号与人员信息" />
+    <PageHeader section="MES BASE / SYSTEM" title="用户管理" description="组织账号与人员信息" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-row :gutter="20" class="user-content-layout">
       <!--部门数据-->
@@ -143,13 +143,13 @@
 
         <el-table v-loading="loading" :data="userList" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="50" align="center" />
-          <el-table-column v-if="columns[0].visible" key="userId" label="用户编号" align="center" min-width="90" prop="userId" />
+          <el-table-column v-if="columns[0].visible" key="userId" label="用户编号" align="center" min-width="80" prop="userId"><template #default="{ row }"><CodeText :value="row.userId" /></template></el-table-column>
           <el-table-column
             v-if="columns[1].visible"
             key="userName"
             label="用户名称"
             align="center"
-            min-width="150"
+            min-width="110"
             prop="userName"
             :show-overflow-tooltip="true"
           />
@@ -158,7 +158,7 @@
             key="nickName"
             label="用户昵称"
             align="center"
-            min-width="150"
+            min-width="110"
             prop="nickName"
             :show-overflow-tooltip="true"
           />
@@ -167,7 +167,7 @@
             key="deptName"
             label="部门"
             align="center"
-            min-width="150"
+            min-width="110"
             prop="dept.deptName"
             :show-overflow-tooltip="true"
           />
@@ -179,7 +179,7 @@
             prop="phonenumber"
             width="120"
           />
-          <el-table-column v-if="columns[5].visible" key="status" label="状态" align="center" min-width="110">
+          <el-table-column v-if="columns[5].visible" key="status" label="状态" align="center" min-width="80">
             <template #default="scope">
               <el-switch
                 v-model="scope.row.status"
@@ -194,12 +194,12 @@
               />
             </template>
           </el-table-column>
-          <el-table-column v-if="columns[6].visible" label="创建时间" align="center" prop="createTime" width="160">
+          <el-table-column v-if="columns[6].visible" label="创建时间" align="center" prop="createTime" width="180">
             <template #default="scope">
-              <span>{{ parseTime(scope.row.createTime) }}</span>
+              <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="186" fixed="right" class-name="small-padding fixed-width">
+          <el-table-column label="操作" align="center" width="172" fixed="right" class-name="small-padding fixed-width">
             <template v-if="true" #default="scope">
               <el-button
                 v-hasPermi="['system:user:edit']"

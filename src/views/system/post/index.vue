@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="岗位管理" description="岗位配置与状态" />
+    <PageHeader section="MES BASE / SYSTEM" title="岗位管理" description="岗位配置与状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="岗位编码" prop="postCode">
@@ -83,8 +83,8 @@
 
     <el-table v-loading="loading" :data="postList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="岗位编号" align="center" prop="postId" />
-      <el-table-column label="岗位编码" align="center" prop="postCode" />
+      <el-table-column label="岗位编号" align="center" prop="postId"><template #default="{ row }"><CodeText :value="row.postId" /></template></el-table-column>
+      <el-table-column label="岗位编码" align="center" prop="postCode"><template #default="{ row }"><CodeText :value="row.postCode" /></template></el-table-column>
       <el-table-column label="岗位名称" align="center" prop="postName" />
       <el-table-column label="岗位排序" align="center" prop="postSort" />
       <el-table-column label="状态" align="center" prop="status">
@@ -94,7 +94,7 @@
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="150" fixed="right" class-name="small-padding fixed-width">

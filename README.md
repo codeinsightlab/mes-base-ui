@@ -84,3 +84,7 @@ API catalog，不提供工艺路线范围表单；业务数据范围开关状态
 
 系统接口页包含外部 Token/诊断契约；外部请求使用单独 OpenApiBearer，后台 Token/工厂头不会自动注入。开发代理 /open-api 与
 /api 共用显式 loopback MES_API_TARGET。实际 Token/API/限流/撤销/数据库隔离已由HTTP验收，浏览器列表/详情/目录已验证；浏览器创建/重置凭证需用户亲自完成，未自动点击赋权保存。
+
+## 2026-10-06 业务后置
+
+生产监控、人员分析的页面和 API 已移出当前源码与构建。备份位于相邻后端仓库 `mes-base/migration-backups/2026-10-06-deferred-production-analytics`，后续接入须重新审查。后端 V15 清理对应菜单/角色菜单关联；已有数据库需按迁移流程执行 V15，本次未连接或修改数据库。系统监控与基础工作区继续保留。

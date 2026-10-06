@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="字典数据" description="字典选项、排序与展示样式" />
+    <PageHeader section="MES BASE / SYSTEM" title="字典数据" description="字典选项、排序与展示样式" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="字典名称" prop="dictType">

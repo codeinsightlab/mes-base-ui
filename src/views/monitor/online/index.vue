@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="在线用户" description="当前在线会话" />
+    <PageHeader section="MES BASE / MONITOR" title="在线用户" description="当前在线会话" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="登录地址" prop="ipaddr">
@@ -35,10 +35,10 @@
           <span>{{ (pageNum - 1) * pageSize + scope.$index + 1 }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="会话编号" align="center" prop="tokenId" :show-overflow-tooltip="true" />
+      <el-table-column label="会话编号" align="center" prop="tokenId" :show-overflow-tooltip="true"><template #default="{ row }"><CodeText :value="row.tokenId" /></template></el-table-column>
       <el-table-column label="登录名称" align="center" prop="userName" :show-overflow-tooltip="true" />
       <el-table-column label="部门名称" align="center" prop="deptName" />
-      <el-table-column label="主机" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
+      <el-table-column label="主机" align="center" prop="ipaddr" :show-overflow-tooltip="true"><template #default="{ row }"><CodeText :value="row.ipaddr" /></template></el-table-column>
       <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
       <el-table-column label="浏览器" align="center" prop="browser" />
       <el-table-column label="操作系统" align="center" prop="os" />

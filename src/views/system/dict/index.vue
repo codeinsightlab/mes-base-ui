@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="字典管理" description="系统枚举与展示选项" />
+    <PageHeader section="MES BASE / SYSTEM" title="字典管理" description="系统枚举与展示选项" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="字典名称" prop="dictName">
@@ -116,7 +116,7 @@
       <el-table-column label="字典类型" align="center" :show-overflow-tooltip="true">
         <template #default="scope">
           <router-link :to="'/system/dict-data/index/' + scope.row.dictId" class="link-type">
-            <span>{{ scope.row.dictType }}</span>
+            <CodeText :value="scope.row.dictType" />
           </router-link>
         </template>
       </el-table-column>
@@ -128,7 +128,7 @@
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="150" fixed="right" class-name="small-padding fixed-width">

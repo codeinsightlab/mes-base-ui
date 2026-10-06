@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="任务日志" description="任务执行记录与结果" />
+    <PageHeader section="MES BASE / MONITOR" title="任务日志" description="任务执行记录与结果" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="任务名称" prop="jobName">
@@ -105,10 +105,10 @@
 
     <el-table v-loading="loading" :data="jobLogList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="日志编号" width="80" align="center" prop="jobLogId" />
-      <el-table-column label="请求ID" prop="requestId" min-width="220" show-overflow-tooltip />
-      <el-table-column label="执行范围" prop="executionScope" width="110" />
-      <el-table-column label="耗时(ms)" prop="costTime" width="100" />
+      <el-table-column label="日志编号" width="80" align="center" prop="jobLogId"><template #default="{ row }"><CodeText :value="row.jobLogId" /></template></el-table-column>
+      <el-table-column label="请求ID" prop="requestId" min-width="220" show-overflow-tooltip><template #default="{ row }"><CodeText :value="row.requestId" /></template></el-table-column>
+      <el-table-column label="执行范围" prop="executionScope" min-width="145"><template #default="{ row }"><ScopeTag :kind="row.executionScope" :factory-id="row.factoryId" /></template></el-table-column>
+      <el-table-column label="耗时(ms)" prop="costTime" width="116" align="right"><template #default="{ row }"><MetricValue :value="row.costTime" latency /></template></el-table-column>
       <el-table-column label="任务名称" align="center" prop="jobName" :show-overflow-tooltip="true" />
       <el-table-column label="任务组名" align="center" prop="jobGroup" :show-overflow-tooltip="true">
         <template #default="scope">
@@ -124,7 +124,7 @@
       </el-table-column>
       <el-table-column label="执行时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="110" fixed="right" class-name="small-padding fixed-width">

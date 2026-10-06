@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="自动编码规则" description="通用编号规则、预览与生成" />
+    <PageHeader section="MES BASE / SYSTEM" title="自动编码规则" description="通用编号规则、预览与生成" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="规则名称" prop="ruleName">
@@ -104,7 +104,7 @@
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="220" fixed="right" class-name="small-padding fixed-width">

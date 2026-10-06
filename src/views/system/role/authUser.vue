@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="授权用户" description="角色关联用户" />
+    <PageHeader section="MES BASE / SYSTEM" title="授权用户" description="角色关联用户" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="用户名称" prop="userName">

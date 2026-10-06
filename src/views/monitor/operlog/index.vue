@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="操作日志" description="操作记录与结果追踪" />
+    <PageHeader section="MES BASE / MONITOR" title="操作日志" description="操作记录与结果追踪" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form
       v-show="showSearch"
@@ -141,12 +141,12 @@
       @sort-change="handleSortChange"
     >
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="请求ID" prop="requestId" min-width="220" show-overflow-tooltip />
-      <el-table-column label="耗时(ms)" prop="costTime" width="100" />
-      <el-table-column label="执行范围" prop="executionScope" width="120" />
-      <el-table-column label="日志编号" align="center" prop="operId" />
-      <el-table-column label="系统模块" align="center" prop="title" />
-      <el-table-column label="操作类型" align="center" prop="businessType">
+      <el-table-column label="请求ID" prop="requestId" min-width="220" show-overflow-tooltip><template #default="{ row }"><CodeText :value="row.requestId" /></template></el-table-column>
+      <el-table-column label="耗时(ms)" prop="costTime" width="116" align="right"><template #default="{ row }"><MetricValue :value="row.costTime" latency /></template></el-table-column>
+      <el-table-column label="执行范围" prop="executionScope" min-width="145"><template #default="{ row }"><ScopeTag :kind="row.executionScope" :factory-id="row.factoryId" /></template></el-table-column>
+      <el-table-column label="日志编号" align="center" prop="operId" width="94"><template #default="{ row }"><CodeText :value="row.operId" /></template></el-table-column>
+      <el-table-column label="系统模块" prop="title" min-width="120" />
+      <el-table-column label="操作类型" align="center" prop="businessType" width="90">
         <template #default="scope">
           <dict-tag
             :options="dict.type.sys_oper_type"
@@ -154,7 +154,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="请求方式" align="center" prop="requestMethod" />
+      <el-table-column label="请求方式" align="center" prop="requestMethod" width="90"><template #default="{ row }"><MethodBadge :method="row.requestMethod" /></template></el-table-column>
       <el-table-column
         label="操作人员"
         align="center"
@@ -169,15 +169,15 @@
         align="center"
         prop="operIp"
         width="130"
-        :show-overflow-tooltip="true"
-      />
+        :show-overflow-tooltip="true"><template #default="{ row }"><CodeText :value="row.operIp" /></template></el-table-column>
       <el-table-column
         label="操作地点"
+        min-width="100"
         align="center"
         prop="operLocation"
         :show-overflow-tooltip="true"
       />
-      <el-table-column label="操作状态" align="center" prop="status">
+      <el-table-column label="操作状态" align="center" prop="status" width="96">
         <template #default="scope">
           <dict-tag
             status
@@ -195,13 +195,13 @@
         width="180"
       >
         <template #default="scope">
-          <span>{{ parseTime(scope.row.operTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.operTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column
         label="操作"
         align="center"
-        class-name="small-padding fixed-width"
+        width="96" fixed="right" class-name="small-padding fixed-width"
       >
         <template #default="scope">
           <el-button
@@ -239,9 +239,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="请求地址：">{{ form.operUrl }}</el-form-item>
-            <el-form-item label="请求方式：">{{
-              form.requestMethod
-            }}</el-form-item>
+            <el-form-item label="请求方式："><MethodBadge :method="form.requestMethod" /></el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="操作方法：">{{ form.method }}</el-form-item>

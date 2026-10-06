@@ -35,7 +35,7 @@ onBeforeUnmount(() => { disposed = true })
 
 <template>
   <div v-loading="loading" class="app-container">
-    <PageHeader title="系统接口" description="当前系统真实接口文档" />
+    <PageHeader section="MES BASE / TOOLS" title="系统接口" description="当前系统真实接口文档" />
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon>
       <el-button size="small" @click="load">重试</el-button>
     </el-alert>

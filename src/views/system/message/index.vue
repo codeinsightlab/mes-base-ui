@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="消息管理" description="站内消息、接收人与发送状态" />
+    <PageHeader section="MES BASE / SYSTEM" title="消息管理" description="站内消息、接收人与发送状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="100px">
       <el-form-item label="消息类型" prop="messageType">

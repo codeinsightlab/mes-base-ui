@@ -7,9 +7,23 @@ import { useAuth, type Menu } from '@/stores/auth'
 import SidebarNode from '@/components/SidebarNode.vue'
 import { workspaceTabs, visitTab, resetTabs, closeTabs } from '@/lib/workspaceTabs'
 const auth = useAuth(), route = useRoute(), router = useRouter(), collapsed = ref(false), mobile = ref(false), pageVisible = ref(true)
+const environment = import.meta.env.DEV ? 'DEV' : 'PROD BUILD'
+const tagList = ref<HTMLElement>()
+watch(() => route.fullPath, async() => { await nextTick();tagList.value?.querySelector('.workspace-tag.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) })
 const publicPage = computed(() => ['/login', '/register'].includes(route.path))
 function findTrail(menus:Menu[], path:string):Menu[] { for (const menu of menus) { if (menu.path === path) return [menu];const children = findTrail(menu.children, path);if (children.length) return [menu, ...children] } return [] }
 const trail = computed(() => findTrail([...auth.platformMenus, ...auth.factoryMenus], route.path))
+const expandedRoot = ref('')
+function activeRoot() {
+  for (const [scope, menus] of [['platform', auth.platformMenus], ['factory', auth.factoryMenus]] as const) {
+    const root = menus.find(menu => findTrail([menu], route.path).length)
+    if (root) return scope + ':' + root.id
+  }
+  return ''
+}
+watch(() => [route.path, auth.revision, auth.platformMenus, auth.factoryMenus], () => { expandedRoot.value = activeRoot() }, { immediate: true })
+function toggleRoot(key:string) { expandedRoot.value = expandedRoot.value === key ? '' : key }
+
 const title = computed(() => String(route.meta.title ?? trail.value.at(-1)?.name ?? '工作页面'))
 watch(() => route.fullPath, () => { if (route.matched.length && !publicPage.value)visitTab(route.fullPath, title.value);mobile.value = false }, { immediate: true })
 watch(() => auth.loggedIn, logged => { if (!logged) { resetTabs();router.replace('/login') } })
@@ -30,30 +44,31 @@ function userCommand(command:string) { if (command === 'profile')router.push('/u
   <div v-else class="app-shell" :class="{'is-collapsed':collapsed}">
     <button v-if="mobile" class="sidebar-backdrop" aria-label="关闭导航" @click="mobile=false" />
     <aside class="sidebar" :class="{open:mobile}" aria-label="主导航">
-      <RouterLink to="/" class="brand" title="MES Base 概览"><el-icon class="brand-symbol"><Operation /></el-icon><span class="brand-name">MES <b>Base</b><small>制造执行系统</small></span></RouterLink>
+      <RouterLink to="/" class="brand" title="MES Base 概览"><el-icon class="brand-symbol"><Operation /></el-icon><span class="brand-name">MES <b>Base</b><small>MANUFACTURING / MES</small></span></RouterLink>
       <nav class="sidebar-navigation">
         <div class="nav-node"><RouterLink to="/" title="概览" class="nav-link" exact-active-class="is-active"><el-icon><Grid /></el-icon><span class="nav-text">工作台概览</span></RouterLink></div>
-        <p class="nav-label">平台管理</p>
-        <SidebarNode v-for="menu in auth.platformMenus" :key="menu.id" :menu="menu" :collapsed="collapsed" />
+        <p v-if="auth.platformMenus.length" class="nav-label">平台管理</p>
+        <SidebarNode v-for="menu in auth.platformMenus" :key="'platform:'+menu.id" :menu="menu" :collapsed="collapsed" root :expanded="expandedRoot==='platform:'+menu.id" @toggle="toggleRoot('platform:'+menu.id)" />
         <p v-if="auth.factoryId" class="nav-label">工厂工作区</p>
-        <SidebarNode v-for="menu in auth.factoryMenus" :key="menu.id" :menu="menu" :collapsed="collapsed" />
+        <SidebarNode v-for="menu in auth.factoryMenus" :key="'factory:'+menu.id" :menu="menu" :collapsed="collapsed" root :expanded="expandedRoot==='factory:'+menu.id" @toggle="toggleRoot('factory:'+menu.id)" />
         <p class="nav-label">个人工作区</p>
         <div class="nav-node"><RouterLink to="/files" title="个人文件" class="nav-link"><el-icon><Folder /></el-icon><span class="nav-text">个人文件</span></RouterLink><RouterLink to="/inbox" title="我的消息" class="nav-link"><el-icon><Message /></el-icon><span class="nav-text">我的消息</span></RouterLink></div>
         <p v-if="!auth.platformMenus.length&&!auth.factoryMenus.length" class="nav-empty">当前范围暂无授权菜单</p>
       </nav>
-      <div class="sidebar-footer"><span class="status-dot" /><span class="nav-text">MES Base · 基础管理</span></div>
+      <div class="sidebar-footer"><el-icon><Operation /></el-icon><span class="nav-text">制造执行系统<small>CONTROL WORKSPACE</small></span></div>
     </aside>
     <div class="workspace">
       <header class="navbar">
         <div class="navbar-leading"><el-button text class="collapse-button" :aria-label="collapsed?'展开侧栏':'折叠侧栏'" :aria-expanded="!collapsed" @click="toggleSidebar"><el-icon><Expand v-if="collapsed" /><Fold v-else /></el-icon></el-button>
-          <el-breadcrumb separator="/"><el-breadcrumb-item :to="{path:'/'}">工作台</el-breadcrumb-item><el-breadcrumb-item v-for="item in trail.slice(0,-1)" :key="item.id">{{ item.name }}</el-breadcrumb-item><el-breadcrumb-item v-if="route.path!=='/'">{{ title }}</el-breadcrumb-item></el-breadcrumb>
+          <div class="workspace-location"><el-breadcrumb separator="/"><el-breadcrumb-item :to="{path:'/'}">工作台</el-breadcrumb-item><el-breadcrumb-item v-for="item in trail.slice(0,-1)" :key="item.id">{{ item.name }}</el-breadcrumb-item></el-breadcrumb></div>
         </div>
         <div class="navbar-actions">
-          <div class="factory-context"><el-icon><OfficeBuilding /></el-icon><span class="context-label">当前工厂</span><el-select :model-value="auth.factoryId" clearable placeholder="未选择工厂" aria-label="当前工厂" @change="select"><el-option v-for="f in auth.factories" :key="f.factoryId" :label="f.name" :value="f.factoryId" /></el-select></div>
+          <div class="navbar-environment"><span class="context-label">前端环境</span><CodeText :value="environment" /></div>
+          <div class="factory-context" :class="{'has-factory':auth.factoryId}"><el-icon class="context-icon"><OfficeBuilding v-if="auth.factoryId" /><Grid v-else /></el-icon><div class="factory-context-body"><span class="context-label">{{ auth.factoryId ? '工厂工作空间' : '平台工作空间' }}</span><CodeText v-if="auth.factoryId" class="context-factory-id" :value="'ID '+auth.factoryId" /><el-select :model-value="auth.factoryId" clearable placeholder="未选择工厂" aria-label="当前工厂" @change="select"><el-option v-for="f in auth.factories" :key="f.factoryId" :label="f.name" :value="f.factoryId" /></el-select></div></div>
           <el-dropdown trigger="click" @command="userCommand"><button class="user-menu" type="button"><span class="user-avatar">{{ auth.username.slice(0,1).toUpperCase() }}</span><span>{{ auth.username }}</span><el-icon><ArrowDown /></el-icon></button><template #dropdown><el-dropdown-menu><el-dropdown-item command="profile" icon="User">个人资料</el-dropdown-item><el-dropdown-item command="permissions" icon="Refresh">刷新权限与菜单</el-dropdown-item><el-dropdown-item command="logout" divided icon="SwitchButton">退出登录</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
       </header>
-      <nav class="tags" aria-label="已打开页面"><div class="tag-list"><el-dropdown v-for="tag in workspaceTabs.items" :key="tag.path" trigger="contextmenu" @command="(command:string)=>tagCommand(command,tag.path)"><div class="workspace-tag" :class="{active:route.fullPath===tag.path}"><RouterLink :to="tag.path" :aria-current="route.fullPath===tag.path?'page':undefined">{{ tag.title }}</RouterLink><button v-if="tag.path!=='/'" type="button" :aria-label="'关闭'+tag.title" @click="close(tag.path)"><el-icon><Close /></el-icon></button></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新页面</el-dropdown-item><el-dropdown-item command="one" :disabled="tag.path==='/'">关闭页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown></div><el-dropdown trigger="click" @command="(command:string)=>tagCommand(command,route.fullPath)"><el-button text aria-label="页面标签操作" icon="MoreFilled" /><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新当前页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
+      <nav class="tags" aria-label="已打开页面"><div ref="tagList" class="tag-list"><el-dropdown v-for="tag in workspaceTabs.items" :key="tag.path" trigger="contextmenu" @command="(command:string)=>tagCommand(command,tag.path)"><div class="workspace-tag" :class="{active:route.fullPath===tag.path}"><RouterLink :to="tag.path" :aria-current="route.fullPath===tag.path?'page':undefined">{{ tag.title }}</RouterLink><button v-if="tag.path!=='/'" type="button" :aria-label="'关闭'+tag.title" @click="close(tag.path)"><el-icon><Close /></el-icon></button></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新页面</el-dropdown-item><el-dropdown-item command="one" :disabled="tag.path==='/'">关闭页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown></div><el-dropdown trigger="click" @command="(command:string)=>tagCommand(command,route.fullPath)"><el-button text aria-label="页面标签操作" icon="MoreFilled" /><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新当前页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
       </nav>
       <main class="workspace-main"><el-alert v-if="Object.keys(dictionaryState.errors).length" type="error" :closable="false" title="部分选项加载失败，请重试"><el-button text @click="refreshDictionaries">重新加载选项</el-button></el-alert><RouterView v-if="pageVisible" v-slot="{Component,route:pageRoute}"><KeepAlive :key="auth.revision+':'+workspaceTabs.refresh" :max="10"><component :is="Component" v-if="pageRoute.meta.keepAlive" :key="pageRoute.fullPath" /></KeepAlive><component :is="Component" v-if="!pageRoute.meta.keepAlive" :key="auth.revision+':'+workspaceTabs.refresh+':'+pageRoute.fullPath" /></RouterView></main>
     </div>

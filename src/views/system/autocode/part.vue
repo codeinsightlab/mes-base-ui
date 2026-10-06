@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="编码规则组成" description="规则组成、顺序与格式" />
+    <PageHeader section="MES BASE / SYSTEM" title="编码规则组成" description="规则组成、顺序与格式" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="组成编码" prop="partCode">

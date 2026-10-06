@@ -1,10 +1,14 @@
+import CodeText from '@/components/CodeText.vue'
+import MethodBadge from '@/components/MethodBadge.vue'
+import MetricValue from '@/components/MetricValue.vue'
+import ScopeTag from '@/components/ScopeTag.vue'
 import PageHeader from '@/components/PageHeader.vue';import StatusTag from '@/components/StatusTag.vue'
 import { saveAs } from 'file-saver'
 import type { App } from 'vue';import router from '@/router';import { ElMessage, ElMessageBox, ElLoading } from 'element-plus';import { requestBlob } from '@/lib/request';import request from '@/utils/request';import { parseTime, handleTree, addDateRange } from '@/utils/ruoyi'
 import Pagination from '@/components/Pagination/index.vue';import DictTag from '@/components/DictTag/index.vue';import RightToolbar from '@/components/RightToolbar/index.vue';import Editor from '@/components/Editor/index.vue';import { useAuth } from '@/stores/auth'
 import SvgIcon from '@/components/SvgIcon/index.vue';import { watch } from 'vue';import { dictionary, clearDictionaries, refreshDictionaries } from '@/utils/dictionaries'
 export function installSystem(app:App) {
-  for (const [name, component] of Object.entries({ Pagination, DictTag, RightToolbar, Editor, SvgIcon, PageHeader, StatusTag }))app.component(name, component)
+  for (const [name, component] of Object.entries({ Pagination, DictTag, RightToolbar, Editor, SvgIcon, PageHeader, StatusTag, ScopeTag, CodeText, MethodBadge, MetricValue }))app.component(name, component)
   const tab = { closePage() { history.back() }, openPage(path:string) { router.push(path) }, closeOpenPage(target:{ path: string }) { router.push(target.path) } };Object.assign(app.config.globalProperties, { $tab: tab, $alert: (text:string, title:string) => ElMessageBox.alert(text, title), $message: ElMessage })
   let loading:ReturnType<typeof ElLoading.service> | undefined
   const modal = { msgSuccess: (s:string) => ElMessage.success(s), msgError: (s:string) => ElMessage.error(s), msgWarning: (s:string) => ElMessage.warning(s), confirm: (s:string) => ElMessageBox.confirm(s, '操作确认', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }), prompt: (s:string) => ElMessageBox.prompt(s, '操作确认', { inputType: 'password' }), loading: (s:string) => { loading?.close();loading = ElLoading.service({ text: s });return loading }, closeLoading() { loading?.close();loading = undefined } }

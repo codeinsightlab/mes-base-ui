@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <PageHeader title="登录日志" description="登录记录与账号访问情况" />
+    <PageHeader section="MES BASE / MONITOR" title="登录日志" description="登录记录与账号访问情况" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="登录地址" prop="ipaddr">
@@ -90,10 +90,10 @@
 
     <el-table ref="tables" v-loading="loading" :data="list" :default-sort="defaultSort" @selection-change="handleSelectionChange" @sort-change="handleSortChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="请求ID" prop="requestId" min-width="220" show-overflow-tooltip />
-      <el-table-column label="访问编号" align="center" prop="infoId" />
+      <el-table-column label="请求ID" prop="requestId" min-width="220" show-overflow-tooltip><template #default="{ row }"><CodeText :value="row.requestId" /></template></el-table-column>
+      <el-table-column label="访问编号" align="center" prop="infoId"><template #default="{ row }"><CodeText :value="row.infoId" /></template></el-table-column>
       <el-table-column label="用户名称" align="center" prop="userName" :show-overflow-tooltip="true" sortable="custom" :sort-orders="['descending', 'ascending']" />
-      <el-table-column label="登录地址" align="center" prop="ipaddr" width="130" :show-overflow-tooltip="true" />
+      <el-table-column label="登录地址" align="center" prop="ipaddr" width="130" :show-overflow-tooltip="true"><template #default="{ row }"><CodeText :value="row.ipaddr" /></template></el-table-column>
       <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
       <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
       <el-table-column label="操作系统" align="center" prop="os" />
@@ -105,7 +105,7 @@
       <el-table-column label="操作信息" align="center" prop="msg" />
       <el-table-column label="登录日期" align="center" prop="loginTime" sortable="custom" :sort-orders="['descending', 'ascending']" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.loginTime) }}</span>
+          <span class="data-datetime">{{ parseTime(scope.row.loginTime) }}</span>
         </template>
       </el-table-column>
     </el-table>
