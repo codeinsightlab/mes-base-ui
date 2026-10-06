@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { request } from '@/lib/request'
+import { loadLoginOptions } from '@/api/loginOptions'
 import { passwordError, type PasswordPolicy } from '@/utils/passwordPolicy'
 
 interface Options { captchaOnOff: boolean; registrationEnabled: boolean; passwordPolicy: PasswordPolicy; uuid?: string; img?: string }
@@ -11,7 +12,7 @@ const router = useRouter(), form = ref({ username: '', password: '', confirmPass
 const options = ref<Options>(), loading = ref(false), optionsLoading = ref(false), error = ref('')
 async function getCode() {
   optionsLoading.value = true
-  try { options.value = await request<Options>('/api/captchaImage', { public: true, scope: 'platform' });form.value.uuid = options.value.uuid ?? '';form.value.code = '' } catch(e) { error.value = e instanceof Error ? e.message : '注册设置加载失败' } finally { optionsLoading.value = false }
+  try { options.value = await loadLoginOptions();form.value.uuid = options.value.uuid ?? '';form.value.code = '' } catch(e) { error.value = e instanceof Error ? e.message : '注册设置加载失败' } finally { optionsLoading.value = false }
 }
 onMounted(getCode)
 async function register() {

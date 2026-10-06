@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';import { useAuth } from '@/stores/auth';import { useRouter } from 'vue-router'
-import { ApiError, request } from '@/lib/request'
-const captcha = ref<{ captchaOnOff: boolean;registrationEnabled?: boolean;uuid?: string;img?: string }>({ captchaOnOff: false }), code = ref(''), captchaLoadFailed = ref(false);async function refreshCaptcha() { captcha.value = await request('/api/captchaImage', { public: true, scope: 'platform' });code.value = '' };async function loadCaptcha() { captchaLoadFailed.value = false;try { await refreshCaptcha() } catch(e) { captchaLoadFailed.value = true;error.value = e instanceof Error ? e.message : '登录设置加载失败' } };onMounted(loadCaptcha)
+import { ApiError } from '@/lib/request'
+import { loadLoginOptions } from '@/api/loginOptions'
+const captcha = ref<{ captchaOnOff: boolean;registrationEnabled?: boolean;uuid?: string;img?: string }>({ captchaOnOff: false }), code = ref(''), captchaLoadFailed = ref(false);async function refreshCaptcha() { captcha.value = await loadLoginOptions();code.value = '' };async function loadCaptcha() { captchaLoadFailed.value = false;try { await refreshCaptcha() } catch(e) { captchaLoadFailed.value = true;error.value = e instanceof Error ? e.message : '登录设置加载失败' } };onMounted(loadCaptcha)
 const username = ref(''), password = ref(''), loading = ref(false), error = ref(''), auth = useAuth(), router = useRouter()
-async function login() { loading.value = true;error.value = '';try { await auth.login(username.value, password.value, code.value, captcha.value.uuid);password.value = '';await router.replace('/') } catch(e) { password.value = '';error.value = e instanceof ApiError && e.status === 401 ? '登录失败，请检查账号、密码或验证码' : e instanceof Error ? e.message : '登录失败' } finally { loading.value = false;await loadCaptcha() } }
+async function login() { loading.value = true;error.value = '';try { await auth.login(username.value, password.value, code.value, captcha.value.uuid);password.value = '';await router.replace('/') } catch(e) { password.value = '';error.value = e instanceof ApiError && e.status === 401 ? '登录失败，请检查账号、密码或验证码' : e instanceof Error ? e.message : '登录失败';await loadCaptcha() } finally { loading.value = false } }
 </script>
 <template>
   <div class="login-shell">

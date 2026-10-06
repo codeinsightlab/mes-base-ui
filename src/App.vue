@@ -11,20 +11,22 @@ const publicPage = computed(() => ['/login', '/register'].includes(route.path))
 function findTrail(menus:Menu[], path:string):Menu[] { for (const menu of menus) { if (menu.path === path) return [menu];const children = findTrail(menu.children, path);if (children.length) return [menu, ...children] } return [] }
 const trail = computed(() => findTrail([...auth.platformMenus, ...auth.factoryMenus], route.path))
 const title = computed(() => String(route.meta.title ?? trail.value.at(-1)?.name ?? '工作页面'))
-watch(() => route.fullPath, () => { if (!publicPage.value)visitTab(route.fullPath, title.value);mobile.value = false }, { immediate: true })
+watch(() => route.fullPath, () => { if (route.matched.length && !publicPage.value)visitTab(route.fullPath, title.value);mobile.value = false }, { immediate: true })
 watch(() => auth.loggedIn, logged => { if (!logged) { resetTabs();router.replace('/login') } })
-watch(() => auth.revision, () => { resetTabs();if (auth.loggedIn && !publicPage.value)visitTab(route.fullPath, title.value) })
+watch(() => auth.revision, () => { resetTabs();if (auth.loggedIn && route.matched.length && !publicPage.value)visitTab(route.fullPath, title.value) })
 function toggleSidebar() { if (window.matchMedia('(max-width:800px)').matches)mobile.value = !mobile.value;else collapsed.value = !collapsed.value }
 async function select(value:string) { try { await auth.selectFactory(value);await router.replace('/') } catch(e) { ElMessage.error(e instanceof Error ? e.message : '工厂切换失败') } }
 async function refreshNavigation() { try { await auth.refreshNavigation();await router.replace('/');ElMessage.success('权限与菜单已刷新') } catch(e) { ElMessage.error(e instanceof Error ? e.message : '权限刷新失败') } }
 async function logout() { try { await auth.logout() } catch(e) { ElMessage.error(e instanceof Error ? e.message : '服务端注销未确认') } finally { router.replace('/login') } }
+async function retrySession() { try { await auth.restoreSession();await router.replace(window.location.pathname + window.location.search + window.location.hash) } catch(e) { ElMessage.error(e instanceof Error ? e.message : '登录状态恢复失败，请重试') } }
 function close(target:string, mode:'one' | 'others' | 'all' = 'one') { router.push(closeTabs(target, mode, route.fullPath)) }
 async function refreshPage() { pageVisible.value = false;workspaceTabs.refresh++;await nextTick();pageVisible.value = true }
 function tagCommand(command:string, path:string) { if (command === 'refresh') { if (path === route.fullPath)refreshPage();else router.push(path).then(refreshPage) } else close(path, command as 'one' | 'others' | 'all') }
 function userCommand(command:string) { if (command === 'profile')router.push('/user/profile');else if (command === 'permissions')refreshNavigation();else if (command === 'logout')logout() }
 </script>
 <template>
-  <RouterView v-if="publicPage" />
+  <el-result v-if="auth.loggedIn&&!auth.sessionReady" :icon="auth.sessionError?'error':'info'" :title="auth.sessionError?'暂时无法恢复登录状态':'正在恢复登录状态'" :sub-title="auth.sessionError||'正在读取当前用户、菜单和权限'"><template v-if="auth.sessionError" #extra><el-button type="primary" @click="retrySession">重试</el-button></template></el-result>
+  <RouterView v-else-if="publicPage" />
   <div v-else class="app-shell" :class="{'is-collapsed':collapsed}">
     <button v-if="mobile" class="sidebar-backdrop" aria-label="关闭导航" @click="mobile=false" />
     <aside class="sidebar" :class="{open:mobile}" aria-label="主导航">
