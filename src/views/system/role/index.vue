@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="角色管理" description="角色、菜单权限与授权范围" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
       <el-form-item label="角色名称" prop="roleName">
         <el-input
           v-model="queryParams.roleName"
@@ -52,7 +53,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -107,7 +108,7 @@
       <el-table-column label="显示顺序" prop="roleSort" width="100" />
       <el-table-column label="状态" align="center" width="100">
         <template #default="scope">
-          <el-switch
+          <el-switch inline-prompt active-text="正常" inactive-text="停用" :width="56"
             v-model="scope.row.status"
             active-value="0"
             inactive-value="1"
@@ -120,7 +121,7 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="190" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope" v-if="true">
           <el-button
             size="small"
@@ -138,12 +139,12 @@
           >删除</el-button>
           <el-dropdown size="small" @command="(command) => handleCommand(command, scope.row)" v-hasPermi="['system:role:edit']">
             <span class="el-dropdown-link">
-              <i class="el-icon-d-arrow-right el-icon--right"></i>更多
+              <el-icon><ArrowDown/></el-icon>更多
             </span>
             <template #dropdown><el-dropdown-menu>
-              <el-dropdown-item command="handleDataScope" icon="el-icon-circle-check"
+              <el-dropdown-item command="handleDataScope" icon="CircleCheck"
                 v-if="hasPermi(['system:role:edit'])">数据权限</el-dropdown-item>
-              <el-dropdown-item command="handleAuthUser" icon="el-icon-user"
+              <el-dropdown-item command="handleAuthUser" icon="User"
                 v-if="hasPermi(['system:role:edit'])">分配用户</el-dropdown-item>
             </el-dropdown-menu></template>
           </el-dropdown>
@@ -170,7 +171,7 @@
         <el-form-item prop="roleKey">
           <template #label><span>
             <el-tooltip content="控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasRole('admin')`)" placement="top">
-              <i class="el-icon-question"></i>
+              <el-icon><QuestionFilled/></el-icon>
             </el-tooltip>
             权限字符
           </span></template>

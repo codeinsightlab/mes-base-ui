@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="登录日志" description="登录记录与账号访问情况" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="登录地址" prop="ipaddr">
         <el-input
           v-model="queryParams.ipaddr"
@@ -52,7 +53,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="danger"
@@ -98,7 +99,7 @@
       <el-table-column label="操作系统" align="center" prop="os" />
       <el-table-column label="登录状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_common_status" :value="scope.row.status"/>
+          <dict-tag status :options="dict.type.sys_common_status" :value="scope.row.status"/>
         </template>
       </el-table-column>
       <el-table-column label="操作信息" align="center" prop="msg" />

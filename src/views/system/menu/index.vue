@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="菜单管理" description="目录、页面入口与按钮权限" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
       <el-form-item label="菜单名称" prop="menuName">
         <el-input
           v-model="queryParams.menuName"
@@ -26,7 +27,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -68,7 +69,7 @@
       <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
       <el-table-column prop="status" label="状态" width="80">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
+          <dict-tag status :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime">
@@ -76,7 +77,7 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="220" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button 
             size="small"
@@ -156,7 +157,7 @@
             <el-form-item>
               <template #label><span>
                 <el-tooltip content="选择是外链则路由地址需要以`http(s)://`开头" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 是否外链
               </span></template>
@@ -170,7 +171,7 @@
             <el-form-item prop="path">
               <template #label><span>
                 <el-tooltip content="访问的路由地址，如：`user`，如外网地址需内链访问则以`http(s)://`开头" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 路由地址
               </span></template>
@@ -181,7 +182,7 @@
             <el-form-item prop="component">
               <template #label><span>
                 <el-tooltip content="访问的组件路径，如：`system/user/index`，默认在`views`目录下" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 组件路径
               </span></template>
@@ -193,7 +194,7 @@
               <el-input v-model="form.perms" placeholder="请输入权限标识" maxlength="100" />
               <template #label><span>
                 <el-tooltip content="控制器中定义的权限字符，如：@PreAuthorize(`@ss.hasPermi('system:user:list')`)" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 权限字符
               </span></template>
@@ -204,7 +205,7 @@
               <el-input v-model="form.query" placeholder="请输入路由参数" maxlength="255" />
               <template #label><span>
                 <el-tooltip content='访问路由的默认传递参数，如：`{"id": 1, "name": "ry"}`' placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 路由参数
               </span></template>
@@ -214,7 +215,7 @@
             <el-form-item>
               <template #label><span>
                 <el-tooltip content="选择是则会被`keep-alive`缓存，需要匹配组件的`name`和地址保持一致" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 是否缓存
               </span></template>
@@ -228,7 +229,7 @@
             <el-form-item>
               <template #label><span>
                 <el-tooltip content="选择隐藏则路由将不会出现在侧边栏，但仍然可以访问" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 显示状态
               </span></template>
@@ -245,7 +246,7 @@
             <el-form-item>
               <template #label><span>
                 <el-tooltip content="选择停用则路由将不会出现在侧边栏，也不能被访问" placement="top">
-                <i class="el-icon-question"></i>
+                <el-icon><QuestionFilled/></el-icon>
                 </el-tooltip>
                 菜单状态
               </span></template>

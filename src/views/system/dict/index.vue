@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="字典管理" description="系统枚举与展示选项" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="字典名称" prop="dictName">
         <el-input
           v-model="queryParams.dictName"
@@ -52,7 +53,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -121,7 +122,7 @@
       </el-table-column>
       <el-table-column label="状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
+          <dict-tag status :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
         </template>
       </el-table-column>
       <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
@@ -130,7 +131,7 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="150" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
             size="small"

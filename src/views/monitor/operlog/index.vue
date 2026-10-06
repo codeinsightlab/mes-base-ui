@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="操作日志" description="操作记录与结果追踪" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form
+    <el-form class="filter-panel"
       :model="queryParams"
       ref="queryForm"
       size="small"
@@ -91,7 +92,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="danger"
@@ -179,7 +180,7 @@
       />
       <el-table-column label="操作状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag
+          <dict-tag status
             :options="dict.type.sys_common_status"
             :value="scope.row.status"
           />
@@ -206,7 +207,7 @@
           <el-button
             size="small"
             link
-            icon="el-icon-view"
+            icon="View"
             @click="handleView(scope.row, scope.index)"
             v-hasPermi="['monitor:operlog:query']"
             >详细</el-button

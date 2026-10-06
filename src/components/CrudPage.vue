@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageHeader from '@/components/PageHeader.vue'
+import StatusTag from '@/components/StatusTag.vue'
 import { computed, reactive, ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuth } from '@/stores/auth'
@@ -24,13 +26,13 @@ defineExpose({load})
 </script>
 <template>
  <section class="page">
-  <header class="page-heading"><div><p class="eyebrow">MES BASE · 管理工作台</p><h1>{{title}}</h1><p class="muted">{{permissionScope==='factory'?'当前工厂内的数据与操作':'平台全局管理'}} · 共 {{total}} 条记录</p></div><el-button v-if="!readonly&&(can('create')||can('write'))" type="primary" @click="open()">新增记录</el-button></header>
+  <PageHeader :title="title" :description="(permissionScope==='factory'?'当前工厂内的数据与操作':'平台全局管理')+' · 共 '+total+' 条记录'"><el-button v-if="!readonly&&(can('create')||can('write'))" type="primary" @click="open()">新增记录</el-button></PageHeader>
   <div v-if="searchFields.length" class="panel search-bar"><label v-for="field in searchFields" :key="field.key">{{field.label}}<el-input v-model="search[field.key]" clearable :placeholder="'搜索'+field.label" @keyup.enter="searchNow" /></label><div><el-button type="primary" @click="searchNow">查询</el-button><el-button @click="reset">重置</el-button></div></div>
   <div class="panel table-panel"><div class="table-toolbar"><strong>记录列表</strong><el-button text :loading="loading" @click="load">刷新列表</el-button></div>
    <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon class="error" />
    <el-table v-loading="loading" :data="rows" :row-key="idKey" size="default" empty-text="暂无记录，可调整筛选条件或新增" style="width:100%">
     <el-table-column v-for="field in columns" :key="field.key" :label="field.label" :prop="field.key" :min-width="field.kind==='datetime'?180:field.key===idKey?180:120" show-overflow-tooltip>
-     <template #default="{row}"><el-tag v-if="field.key==='status'" effect="light" :type="field.options?.find(o=>o.value===row[field.key])?.tone ?? (row.status==='ENABLED'?'success':'info')">{{field.options?.find(o=>o.value===row[field.key])?.label ?? formatValue(row[field.key],field.kind)}}</el-tag><span v-else :class="{'tabular':field.kind==='decimal'||field.kind==='number'}">{{formatValue(row[field.key],field.kind)}}</span></template>
+     <template #default="{row}"><StatusTag v-if="field.key==='status'" :fallback="field.options?.find(o=>o.value===row[field.key])?.tone" :label="field.options?.find(o=>o.value===row[field.key])?.label ?? formatValue(row[field.key],field.kind)" /><span v-else :class="{'tabular':field.kind==='decimal'||field.kind==='number'}">{{formatValue(row[field.key],field.kind)}}</span></template>
     </el-table-column>
     <el-table-column v-if="!readonly" label="操作" fixed="right" min-width="180"><template #default="{row}"><el-button v-if="can('update')||can('write')" text type="primary" @click="open(row)">编辑</el-button><el-button v-if="can('delete')||can('write')" text type="danger" @click="remove(row)">删除</el-button><slot name="actions" :row="row" /></template></el-table-column>
    </el-table>

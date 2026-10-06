@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <PageHeader title="缓存监控" description="Redis 信息与缓存统计" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-row>
       <el-col :span="24" class="card-box">
@@ -76,6 +77,7 @@ export default {
   data() {
     return {
       queryError:"",
+      resizeObserver:null,
       // 统计命令信息
       commandstats: null,
       // 使用内存
@@ -87,18 +89,24 @@ export default {
   created() {
     this.getList();
   },
-  beforeUnmount(){this.commandstats?.dispose();this.usedmemory?.dispose()},
+  mounted(){this.resizeObserver=new ResizeObserver(()=>{this.commandstats?.resize();this.usedmemory?.resize()});this.resizeObserver.observe(this.$el)},
+  beforeUnmount(){this.resizeObserver?.disconnect();this.commandstats?.dispose();this.usedmemory?.dispose()},
   methods: {
     /** 查缓存询信息 */
     getList() {
       this.queryError="";this.openLoading();
       return getCache().then((response) => {
         this.cache = response.data;
+        const tokens=getComputedStyle(document.documentElement);
+        const color=name=>tokens.getPropertyValue(name).trim();
+        const textStyle={fontFamily:color("--ui-font"),color:color("--ui-text-secondary")};
 
 
         this.commandstats?.dispose();
-        this.commandstats = echarts.init(this.$refs.commandstats, "macarons");
+        this.commandstats = echarts.init(this.$refs.commandstats);
         this.commandstats.setOption({
+          animation:false, textStyle,
+          color:[color("--ui-primary"),color("--ui-accent"),color("--el-color-primary-light-3"),color("--ui-text-muted"),color("--el-color-primary-light-5")],
           tooltip: {
             trigger: "item",
             formatter: "{a} <br/>{b} : {c} ({d}%)",
@@ -111,14 +119,15 @@ export default {
               radius: [15, 95],
               center: ["50%", "38%"],
               data: response.data.commandStats,
-              animationEasing: "cubicInOut",
-              animationDuration: 1000,
+              label:{color:color("--ui-text-secondary"),fontSize:12},
+              labelLine:{lineStyle:{color:color("--ui-border")}},
             },
           ],
         });
         this.usedmemory?.dispose();
-        this.usedmemory = echarts.init(this.$refs.usedmemory, "macarons");
+        this.usedmemory = echarts.init(this.$refs.usedmemory);
         this.usedmemory.setOption({
+          animation:false, textStyle,
           tooltip: {
             formatter: "{b} <br/>{a} : " + this.cache.info.used_memory_human,
           },
@@ -128,7 +137,12 @@ export default {
               type: "gauge",
               min: 0,
               max: 1000,
+              axisLine:{lineStyle:{color:[[1,color("--ui-border")]],width:10}},
+              pointer:{itemStyle:{color:color("--ui-primary")}},
+              axisLabel:{color:color("--ui-text-secondary")},
+              title:{color:color("--ui-text-secondary"),fontSize:13},
               detail: {
+                color:color("--ui-text"),fontSize:24,
                 formatter: this.cache.info.used_memory_human,
               },
               data: [

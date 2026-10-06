@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="任务调度" description="定时任务配置与运行状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="任务名称" prop="jobName">
         <el-input
           v-model="queryParams.jobName"
@@ -36,7 +37,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -83,7 +84,7 @@
         <el-button
           type="info"
           plain
-          icon="el-icon-s-operation"
+          icon="Operation"
           size="small"
           @click="handleJobLog"
           v-hasPermi="['monitor:job:query']"
@@ -105,7 +106,7 @@
       <el-table-column label="cron执行表达式" align="center" prop="cronExpression" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center">
         <template #default="scope">
-          <el-switch
+          <el-switch inline-prompt active-text="正常" inactive-text="停用" :width="56"
             v-model="scope.row.status"
             active-value="0"
             inactive-value="1"
@@ -113,7 +114,7 @@
           ></el-switch>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="190" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
             size="small"
@@ -131,15 +132,15 @@
           >删除</el-button>
           <el-dropdown size="small" @command="(command) => handleCommand(command, scope.row)" v-hasPermi="['monitor:job:changeStatus', 'monitor:job:query']">
             <span class="el-dropdown-link">
-              <i class="el-icon-d-arrow-right el-icon--right"></i>更多
+              <el-icon><ArrowDown/></el-icon>更多
             </span>
             <template #dropdown><el-dropdown-menu>
               <el-dropdown-item command="inspectRun" v-if="hasPermi(['monitor:job:query'])">运行状态/恢复</el-dropdown-item>
               <el-dropdown-item command="handleRun" icon="ArrowRight"
                 v-if="hasPermi(['monitor:job:changeStatus'])">执行一次</el-dropdown-item>
-              <el-dropdown-item command="handleView" icon="el-icon-view"
+              <el-dropdown-item command="handleView" icon="View"
                 v-if="hasPermi(['monitor:job:query'])">任务详细</el-dropdown-item>
-              <el-dropdown-item command="handleJobLog" icon="el-icon-s-operation"
+              <el-dropdown-item command="handleJobLog" icon="Operation"
                 v-if="hasPermi(['monitor:job:query'])">调度日志</el-dropdown-item>
             </el-dropdown-menu></template>
           </el-dropdown>
@@ -192,7 +193,7 @@
                 <template #append>
                   <el-button type="primary" @click="handleShowCron">
                     生成表达式
-                    <i class="el-icon-time el-icon--right"></i>
+                    <el-icon><Clock/></el-icon>
                   </el-button>
                 </template>
               </el-input>

@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <PageHeader title="个人资料" description="账号资料、头像与密码" />
     <el-row :gutter="20">
       <el-col :span="6" :xs="24">
         <el-card class="box-card">

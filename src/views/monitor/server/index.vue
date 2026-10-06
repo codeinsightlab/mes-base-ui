@@ -1,5 +1,6 @@
 <template>
   <div class="app-container">
+    <PageHeader title="服务监控" description="当前服务的主机与资源信息" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <el-row>
       <el-col :span="12" class="card-box">
@@ -143,6 +144,7 @@
         <el-card>
           <template #header><div>
             <span>磁盘状态</span>
+            <span v-if="server.diskSource === 'JAVA_NIO_APPLICATION_VOLUME'" class="muted"> · 当前应用所在卷</span>
           </div></template>
           <div class="el-table el-table--enable-row-hover el-table--medium">
             <table cellspacing="0" style="width: 100%;">

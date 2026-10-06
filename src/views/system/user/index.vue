@@ -1,9 +1,10 @@
 <template>
   <div class="app-container">
+    <PageHeader title="用户管理" description="组织账号与人员信息" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-row :gutter="20">
+    <el-row :gutter="20" class="user-content-layout">
       <!--部门数据-->
-      <el-col :span="4" :xs="24">
+      <el-col :span="5" :xs="24" class="user-tree-panel"><h2 class="tree-heading">部门导航</h2>
         <div class="head-container">
           <el-input v-model="deptName" placeholder="请输入部门名称" clearable size="small" prefix-icon="Search"
             style="margin-bottom: 20px" />
@@ -14,8 +15,8 @@
         </div>
       </el-col>
       <!--用户数据-->
-      <el-col :span="20" :xs="24">
-        <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch"
+      <el-col :span="19" :xs="24">
+        <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch"
           label-width="68px">
           <el-form-item label="用户名称" prop="userName">
             <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable style="width: 240px"
@@ -42,7 +43,7 @@
           </el-form-item>
         </el-form>
 
-        <el-row :gutter="10" class="mb8">
+        <el-row :gutter="10" class="table-toolbar mb8">
           <el-col :span="3">
             <el-button type="primary" plain icon="Plus" size="small" @click="handleAdd"
               v-hasPermi="['system:user:add']">新增</el-button>
@@ -56,7 +57,7 @@
               v-hasPermi="['system:user:remove']">删除</el-button>
           </el-col>
           <el-col :span="3">
-            <el-button type="info" plain icon="el-icon-upload2" size="small" @click="handleImport"
+            <el-button type="info" plain icon="Upload" size="small" @click="handleImport"
               v-hasPermi="['system:user:import']">导入</el-button>
           </el-col>
           <el-col :span="3">
@@ -68,19 +69,19 @@
 
         <el-table v-loading="loading" :data="userList" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="50" align="center" />
-          <el-table-column label="用户编号" align="center" key="userId" prop="userId" v-if="columns[0].visible" />
-          <el-table-column label="用户名称" align="center" key="userName" prop="userName" v-if="columns[1].visible"
+          <el-table-column label="用户编号" align="center" key="userId" min-width="90" prop="userId" v-if="columns[0].visible" />
+          <el-table-column label="用户名称" align="center" key="userName" min-width="150" prop="userName" v-if="columns[1].visible"
             :show-overflow-tooltip="true" />
-          <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName" v-if="columns[2].visible"
+          <el-table-column label="用户昵称" align="center" key="nickName" min-width="150" prop="nickName" v-if="columns[2].visible"
             :show-overflow-tooltip="true" />
-          <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName" v-if="columns[3].visible"
+          <el-table-column label="部门" align="center" key="deptName" min-width="150" prop="dept.deptName" v-if="columns[3].visible"
             :show-overflow-tooltip="true" />
           <el-table-column label="手机号码" align="center" key="phonenumber" prop="phonenumber" v-if="columns[4].visible"
             width="120" />
-          <el-table-column label="状态" align="center" key="status" v-if="columns[5].visible">
+          <el-table-column label="状态" align="center" key="status" min-width="110" v-if="columns[5].visible">
             <template #default="scope">
-              <el-switch v-model="scope.row.status" active-value="0" inactive-value="1"
-                @change="handleStatusChange(scope.row)"></el-switch>
+              <el-switch inline-prompt active-text="正常" inactive-text="停用" :width="56" v-model="scope.row.status" active-value="0" inactive-value="1"
+                :aria-label="scope.row.userName+'：'+(scope.row.status==='0'?'正常':'停用')" @change="handleStatusChange(scope.row)"></el-switch>
             </template>
           </el-table-column>
           <el-table-column label="创建时间" align="center" prop="createTime" v-if="columns[6].visible" width="160">
@@ -88,7 +89,7 @@
               <span>{{ parseTime(scope.row.createTime) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
+          <el-table-column label="操作" align="center" width="186" fixed="right" class-name="small-padding fixed-width">
             <template #default="scope" v-if="true">
               <el-button size="small" link icon="Edit" @click="handleUpdate(scope.row)"
                 v-hasPermi="['system:user:edit']">修改</el-button>
@@ -97,12 +98,12 @@
               <el-dropdown size="small" @command="(command) => handleCommand(command, scope.row)"
                 v-hasPermi="['system:user:resetPwd', 'system:user:edit']">
                 <span class="el-dropdown-link">
-                  <i class="el-icon-d-arrow-right el-icon--right"></i>更多
+                  <el-icon><ArrowDown/></el-icon>更多
                 </span>
                 <template #dropdown><el-dropdown-menu>
                   <el-dropdown-item command="handleResetPwd" icon="Key"
                     v-if="hasPermi(['system:user:resetPwd'])">重置密码</el-dropdown-item>
-                  <el-dropdown-item command="handleAuthRole" icon="el-icon-circle-check"
+                  <el-dropdown-item command="handleAuthRole" icon="CircleCheck"
                     v-if="hasPermi(['system:user:edit'])">分配角色</el-dropdown-item>
                 </el-dropdown-menu></template>
               </el-dropdown>
@@ -210,7 +211,7 @@
       <el-upload ref="upload" :limit="1" accept=".xlsx, .xls" :http-request="importUsers"
         :action="upload.url + '?updateSupport=' + upload.updateSupport" :disabled="upload.isUploading"
         :on-progress="handleFileUploadProgress" :on-success="handleFileSuccess" :auto-upload="false" drag>
-        <i class="el-icon-upload"></i>
+        <el-icon><UploadFilled/></el-icon>
         <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
         <template #tip><div class="el-upload__tip text-center">
           <div class="el-upload__tip">

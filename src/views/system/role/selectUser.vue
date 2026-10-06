@@ -7,7 +7,7 @@
     top="5vh"
     append-to-body
   >
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true">
       <el-form-item label="用户名称" prop="userName">
         <el-input
           v-model="queryParams.userName"

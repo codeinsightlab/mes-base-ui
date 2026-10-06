@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="授权用户" description="角色关联用户" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
+     <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch">
       <el-form-item label="用户名称" prop="userName">
         <el-input
           v-model="queryParams.userName"
@@ -32,7 +33,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -47,7 +48,7 @@
         <el-button
           type="danger"
           plain
-          icon="el-icon-circle-close"
+          icon="CircleClose"
           size="small"
           :disabled="multiple"
           @click="cancelAuthUserAll"
@@ -74,7 +75,7 @@
       <el-table-column label="手机" prop="phonenumber" :show-overflow-tooltip="true" />
       <el-table-column label="状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
+          <dict-tag status :options="dict.type.sys_normal_disable" :value="scope.row.status"/>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
@@ -82,12 +83,12 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="120" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
             size="small"
             link
-            icon="el-icon-circle-close"
+            icon="CircleClose"
             @click="cancelAuthUser(scope.row)"
             v-hasPermi="['system:role:remove']"
           >取消授权</el-button>

@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="自动编码规则" description="通用编号规则、预览与生成" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="规则名称" prop="ruleName">
         <el-input
           v-model="queryParams.ruleName"
@@ -41,7 +42,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -106,19 +107,19 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="220" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button size="small" link @click="openCode(scope.row)" v-hasPermi="['system:autocode:rule:query']">验证规则</el-button>
           <el-button
             size="small"
-            type="link"
+            link type="primary"
             icon="Edit"
             @click="handleUpdate(scope.row)"
             v-hasPermi="['system:autocode:rule:edit']"
           >修改</el-button>
           <el-button
             size="small"
-            type="link"
+            link type="primary"
             icon="Delete"
             @click="handleDelete(scope.row)"
             v-hasPermi="['system:autocode:rule:remove']"

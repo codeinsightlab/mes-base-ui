@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="任务日志" description="任务执行记录与结果" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="任务名称" prop="jobName">
         <el-input
           v-model="queryParams.jobName"
@@ -58,7 +59,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="danger"
@@ -118,7 +119,7 @@
       <el-table-column label="日志信息" align="center" prop="jobMessage" :show-overflow-tooltip="true" />
       <el-table-column label="执行状态" align="center" prop="status">
         <template #default="scope">
-          <dict-tag :options="dict.type.sys_common_status" :value="scope.row.status"/>
+          <dict-tag status :options="dict.type.sys_common_status" :value="scope.row.status"/>
         </template>
       </el-table-column>
       <el-table-column label="执行时间" align="center" prop="createTime" width="180">
@@ -126,12 +127,12 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="110" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
             size="small"
             link
-            icon="el-icon-view"
+            icon="View"
             @click="handleView(scope.row)"
             v-hasPermi="['monitor:job:query']"
           >详细</el-button>

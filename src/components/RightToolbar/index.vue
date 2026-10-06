@@ -2,13 +2,13 @@
   <div class="top-right-btn">
     <el-row>
       <el-tooltip class="item" effect="dark" :content="showSearch ? '隐藏搜索' : '显示搜索'" placement="top">
-        <el-button size="small" circle icon="Search" @click="toggleSearch()" />
+        <el-button size="small" circle icon="Search" @click="toggleSearch()" :aria-label="showSearch ? '隐藏搜索' : '显示搜索'" />
       </el-tooltip>
       <el-tooltip class="item" effect="dark" content="刷新" placement="top">
-        <el-button size="small" circle icon="Refresh" @click="refresh()" />
+        <el-button size="small" circle icon="Refresh" @click="refresh()" aria-label="刷新列表" />
       </el-tooltip>
       <el-tooltip class="item" effect="dark" content="显隐列" placement="top" v-if="columns">
-        <el-button size="small" circle icon="el-icon-menu" @click="showColumn()" />
+        <el-button size="small" circle icon="Menu" @click="showColumn()" aria-label="显示或隐藏列" />
       </el-tooltip>
     </el-row>
     <el-dialog :title="title" v-model="open" append-to-body>

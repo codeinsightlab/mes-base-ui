@@ -1,7 +1,8 @@
 <template>
   <div class="app-container">
+    <PageHeader title="编码规则组成" description="规则组成、顺序与格式" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form class="filter-panel" :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
       <el-form-item label="组成编码" prop="partCode">
         <el-input
           v-model="queryParams.partCode"
@@ -24,7 +25,7 @@
       </el-form-item>
     </el-form>
 
-    <el-row :gutter="10" class="mb8">
+    <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
         <el-button
           type="primary"
@@ -86,18 +87,18 @@
           <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+      <el-table-column label="操作" align="center" min-width="150" fixed="right" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button
             size="small"
-            type="link"
+            link type="primary"
             icon="Edit"
             @click="handleUpdate(scope.row)"
             v-hasPermi="['system:autocode:part:edit']"
           >修改</el-button>
           <el-button
             size="small"
-            type="link"
+            link type="primary"
             icon="Delete"
             @click="handleDelete(scope.row)"
             v-hasPermi="['system:autocode:part:remove']"
@@ -116,7 +117,7 @@
 
     <!-- 添加或修改参数配置对话框 -->
     <el-dialog :title="title" v-model="open" width="900px" append-to-body>
-      <el-form ref="form" :model="form" :inline="true" :rules="rules" label-width="100px">
+      <el-form class="filter-panel" ref="form" :model="form" :inline="true" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="12">
             <el-form-item label="分段编码" prop="partCode">

@@ -1,19 +1,57 @@
 # MES Base UI
 
-Vue3 / TypeScript / Router4 / Pinia / Element Plus / Vite。RuoYi 通用交互模式重建；没有复制公司页面或生产配置。
+当前前端由 Source 系统页面的 Vue3/Element Plus PORT 与既有 Base 自写框架组成。用户、组织岗位、角色菜单等页面迁入了旧模板和操作逻辑；App/Shell、侧栏、路由、Pinia
+会话、登录外观及请求适配仍有 Base 重写实现，尚未完整迁入 Source Layout/Navbar/TagsView/Settings。不能将页面迁入等同于整个前端按原架构迁移完成。当前
+Phase1 在真实环境验收，未迁正式 MES Domain。
+
+本轮 `http://127.0.0.1:15174` 代理本轮后端18081和远程测试 MySQL 的独立 Schema；admin 已建立，凭证不入文档。原15173/18080服务保留。
+
+使用 .nvmrc 已安装 Node22，不改全局默认 Node：
 
 ```sh
 nvm use 22
-npm ci
-npm test
+npm run test
 npm run build
-npm run dev
+MES_DEV_API_TARGET=http://127.0.0.1:18081 npm run dev -- --host 127.0.0.1 --port 15174 --strictPort
 ```
 
-开发代理默认 loopback `8080`，可用 `MES_DEV_API_TARGET=http://127.0.0.1:<port>` 指定本地后端，生产使用同源反向代理，不包含客户部署地址。
-后端必须显式启用 Platform 并由管理员开通账号；没有默认账号/密码。会话只驻内存，刷新需重新登录。
-菜单来自后端授权 Navigation；工厂切换清空 Factory 权限，Platform 权限独立。前端展示不替代后端授权。
+启动前核对端口归属；依赖已安装时无需反复 npm ci。Vite 路由修改/依赖优化可能整页重载，Token 仅在内存，重载后重新登录。
 
-生成页面位于 `src/views/<module>/<class>/index.vue`；构建时进入编译 catalog，运行期由授权菜单路径匹配组件并动态注册/撤销路由，无需逐页手工注册。管理员仍需配置 Menu/Role；生成器不自动创建菜单或赋权。仅匹配已编译的两级视图路径，不能按服务端 URL 任意导入组件。
-TEST ONLY Codegen 验收输出在 `target/`（忽略），不进入生产路由或生产包。
-# mes-base-ui
+## 代码格式化
+
+使用项目本地 Prettier，统一为两空格缩进、单引号、无分号、LF 换行，建议行宽 100。Vue 模板保留有意义的空白，script/style 不额外缩进。
+
+```sh
+nvm use
+npm run format:check # 只检查，不修改文件
+npm run format       # 格式化整个项目，请先核对工作区改动
+npm exec prettier -- --write src/views/Home.vue # 仅格式化指定文件
+```
+
+VS Code 安装推荐的 Prettier 扩展后，项目设置会对 Vue、TypeScript、CSS 等文件启用保存时格式化。IDEA/WebStorm 可在 Prettier
+设置中选择本项目的 `node_modules/prettier`，启用保存时运行；EditorConfig 统一编辑器缩进和换行。
+
+忽略依赖、构建产物、IDEA 本地文件、lockfile、环境配置和迁入的 SVG
+图标。配置接入时没有批量格式化已有源码，历史文件可能使 `format:check` 报告不符合格式；可按修改范围逐步格式化。
+
+现有功能页面包括用户/组织岗位/角色菜单/字典参数/公告消息/自动编码、日志在线用户/Quartz/Server/Cache/Druid、系统接口及个人资料/文件/消息。具体来源及迁移缺口见相邻
+Base 的迁移报告“前端迁移来源复核”章节；功能列表不代表每项前端实现均直接来自 Source。Source data/rows/total 经
+src/utils/request.ts 按真实成功契约读取；HTTP 错误保留 requestId，无多结构猜测。
+
+动态菜单仅注册已编译 views catalog；PLATFORM/FACTORY 权限独立。切厂清旧权限、数据、弹窗和过期响应。按钮和菜单不承担最终授权。公告图片、头像、个人文件走认证私有资源
+policy，文件下载使用 FileSaver；API 字节验证与浏览器下载产物分别记录。
+
+/tool/swagger 从授权接口读取 SDK 生成的真实 OpenAPI，关闭外部 validator、持久化认证及跨源请求，鉴权来自当前内存会话。注册由
+Source 参数开关控制且默认关闭；密码规则来自后端 profile。浏览器输入/修改新凭证需用户接手。
+
+迁移阶段不调用 Codegen；后续新增开发才使用相邻 Base CRUD
+Skill。详见 [交接入口](../mes-base/docs/development/next-stage-plan.md)、[功能矩阵](../mes-base/docs/development/MES_MIGRATION_MATRIX.md)、[实际验收](../mes-base/docs/reviews/2026-10-06-phase1-verification.json)
+。本轮未提交、推送或部署。
+
+## OpenAPI 应用
+
+`/system/openApiClient` PORT Source 提交中的应用列表/详情、默认禁用的新建表单、一次性凭证、启停、Secret重置、分组接口授权和权限按钮。读取实际
+API catalog，不提供工艺路线范围表单；业务数据范围开关状态由后端返回。凭证不持久化，离开/关闭销毁。
+
+系统接口页包含外部 Token/诊断契约；外部请求使用单独 OpenApiBearer，后台 Token/工厂头不会自动注入。开发代理 /open-api 与
+/api 共用显式 loopback MES_DEV_API_TARGET。实际 Token/API/限流/撤销/数据库隔离已由HTTP验收，浏览器列表/详情/目录已验证；浏览器创建/重置凭证需用户亲自完成，未自动点击赋权保存。
