@@ -1,5 +1,5 @@
 import { request } from '@/lib/request'
-export interface DruidSource { id: string; name: string; kind: 'PLATFORM' | 'BUSINESS' | 'EXTERNAL'; factoryId: string | null; factoryName: string | null; state: string; databaseType: string; poolName: string | null }
+export interface DruidSource { id: string; name: string; kind: 'PLATFORM' | 'BUSINESS'; factoryId: string | null; factoryName: string | null; state: string; databaseType: string; poolName: string | null }
 export interface DruidCatalog { rows: DruidSource[]; total: number; nodeId: string }
 export interface DruidPool { name: string; initialSize: number; minIdle: number; maxActive: number; activeCount: number; poolingCount: number; activePeak: number; poolingPeak: number; waitingThreads: number; waitingPeak: number; maxWaitMillis: string; waitCount: string; waitMillis: string; connectCount: string; closeCount: string; createCount: string; destroyCount: string; connectErrorCount: string; errorCount: string; queryCount: string; transactionCount: string; commitCount: string; rollbackCount: string; sqlStatisticsEnabled: boolean }
 export interface DruidSql { id: string; sql: string; executeCount: string; errorCount: string; totalMillis: string; maxMillis: string; updateCount: string; fetchRowCount: string; runningCount: string; concurrentMax: string; lastExecuteAt: string | null; lastErrorAt: string | null }

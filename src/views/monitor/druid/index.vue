@@ -8,7 +8,7 @@ const auth = useAuth()
 const { catalog, snapshot, selected, pageNum, pageSize, loading, detailLoading, error, detailError, select, reload } = useDruidMonitor(auth)
 const active = ref('pool'), sqlDetail = ref<DruidSql | null>(null)
 watch(() => [selected.value, auth.revision], () => { sqlDetail.value = null;active.value = 'pool' })
-const kinds = { PLATFORM: '中心库', BUSINESS: '工厂业务库', EXTERNAL: '外部数据库' }
+const kinds = { PLATFORM: '中心库', BUSINESS: '工厂业务库' }
 const states: Record<string, { label: string; tone: 'success' | 'disabled' | 'warning' }> = { INITIALIZED: { label: '已初始化', tone: 'success' }, NOT_INITIALIZED: { label: '未初始化', tone: 'disabled' }, DISABLED: { label: '已停用', tone: 'disabled' }, UNBOUND: { label: '未绑定工厂', tone: 'warning' }, CLOSED: { label: '已关闭', tone: 'disabled' }}
 const poolFields = [
   ['initialSize', '初始连接数'], ['minIdle', '最小空闲连接'], ['maxActive', '最大连接数'], ['maxWaitMillis', '最大等待时间 (ms)'],

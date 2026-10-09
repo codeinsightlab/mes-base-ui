@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('server-controlled captcha requests', () => {
   function setup(enabled: boolean) {
     configureRequests(() => ({ token: '', factoryId: '', revision: 0 }), () => {})
-    const options = { captchaOnOff: enabled, registrationEnabled: false, passwordPolicy: { minLength: 12, maxLength: 128, maxBytes: 72 } }
+    const options = { captchaOnOff: enabled, registrationEnabled: false, passwordPolicy: { minLength: 12, maxLength: 128, maxBytes: 72 }}
     const fetcher = vi.fn(async(path: string) => new Response(JSON.stringify(path === '/api/login-options' ? options : { ...options, uuid: 'TEST_ONLY', img: 'TEST_ONLY' })))
     vi.stubGlobal('fetch', fetcher)
     return { options, fetcher }

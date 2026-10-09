@@ -8,7 +8,7 @@ router.beforeEach(async to => {
   try { await auth.restoreSession() } catch(error) {
     if (auth.loggedIn) throw error // A network failure must not discard a still-valid credential.
   }
-  if (!['/login', '/register'].includes(to.path) && !auth.loggedIn) return { path: '/login', query: { redirect: to.fullPath } }
+  if (!['/login', '/register'].includes(to.path) && !auth.loggedIn) return { path: '/login', query: { redirect: to.fullPath }}
   if (['/login', '/register'].includes(to.path) && auth.loggedIn) return '/'
   if (to.matched.some(record => record.path === '/:pathMatch(.*)*') && !router.resolve(to.fullPath).matched.some(record => record.path === '/:pathMatch(.*)*')) return { path: to.fullPath, replace: true }
   return true

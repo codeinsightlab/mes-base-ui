@@ -169,7 +169,8 @@
         align="center"
         prop="operIp"
         width="130"
-        :show-overflow-tooltip="true"><template #default="{ row }"><CodeText :value="row.operIp" /></template></el-table-column>
+        :show-overflow-tooltip="true"
+      ><template #default="{ row }"><CodeText :value="row.operIp" /></template></el-table-column>
       <el-table-column
         label="操作地点"
         min-width="100"
@@ -201,7 +202,9 @@
       <el-table-column
         label="操作"
         align="center"
-        width="96" fixed="right" class-name="small-padding fixed-width"
+        width="96"
+        fixed="right"
+        class-name="small-padding fixed-width"
       >
         <template #default="scope">
           <el-button

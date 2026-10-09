@@ -5,7 +5,7 @@ import { configureRequests } from '../src/lib/request'
 import { SESSION_KEY, readSession, saveSession } from '../src/lib/sessionStorage'
 
 const expiresAt = () => new Date(Date.now() + 3600000).toISOString()
-const info = { user: { userName: 'server-user', avatar: '' }, permissions: ['system:user:list'], workspaces: { platform: true, factoryIds: ['A'] }, passwordPolicy: { minLength: 5, maxLength: 128, maxBytes: 72 } }
+const info = { user: { userName: 'server-user', avatar: '' }, permissions: ['system:user:list'], workspaces: { platform: true, factoryIds: ['A'] }, passwordPolicy: { minLength: 5, maxLength: 128, maxBytes: 72 }}
 function store() {
   setActivePinia(createPinia())
   const auth = useAuth()
