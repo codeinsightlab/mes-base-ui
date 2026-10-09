@@ -6,4 +6,5 @@ target/
 docs
 .vscode
 .idea
-deploy
+deploy/*
+!deploy/nginx.conf.template

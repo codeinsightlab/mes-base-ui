@@ -1,0 +1,34 @@
+# Source template: backend address is replaced from .env.[mode] during build.
+# Deploy target/deploy/nginx.conf alongside dist/. Set site domain/root/HTTPS.
+server {
+    listen 80;
+    server_name mes.example.com;
+    root /var/www/mes-base-ui;
+    index index.html;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_ssl_server_name on;
+
+    # Keep the /api/ backend contract, including private files and SSE.
+    location /api/ {
+        proxy_pass __MES_API_TARGET__;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+    }
+
+    # External Open API keeps its separate bearer identity.
+    location /open-api/ {
+        proxy_pass __MES_API_TARGET__;
+    }
+
+    location = /health {
+        proxy_pass __MES_API_TARGET__;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
