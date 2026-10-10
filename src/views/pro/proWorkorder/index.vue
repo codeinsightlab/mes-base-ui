@@ -316,7 +316,7 @@ const fields: Field[] = [
 
 <template>
   <CrudPage
-    title="生产工单"
+    title="生产工单表"
     permission="business:pro:workorder"
     :api="api"
     :fields="fields"

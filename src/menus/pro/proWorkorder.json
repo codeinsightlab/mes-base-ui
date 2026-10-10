@@ -1,7 +1,7 @@
 {
   "_generatedBy": "MES-CODEGEN",
   "id": "pro:proWorkorder",
-  "name": "生产工单",
+  "name": "生产工单表",
   "path": "/pro/proWorkorder",
   "component": "pro/proWorkorder/index",
   "permission": "business:pro:workorder:read",

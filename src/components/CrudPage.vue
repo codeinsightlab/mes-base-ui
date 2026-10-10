@@ -62,7 +62,7 @@ async function load() {
     }
     rows.value = result.items
     total.value = result.total
-  } catch(e) {
+  } catch (e) {
     if (current === generation) {
       rows.value = []
       total.value = 0
@@ -84,7 +84,7 @@ async function open(row?: Row) {
       const detail = props.api.detail ? await props.api.detail(editId.value!) : row
       if (auth.revision !== revision) return
       Object.assign(draft, detail)
-    } catch(e) {
+    } catch (e) {
       error.value = e instanceof Error ? e.message : '资源加载失败'
       return
     }
@@ -112,7 +112,7 @@ async function save() {
     dialog.value = false
     ElMessage.success('已保存')
     await load()
-  } catch(e) {
+  } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '保存失败')
   } finally {
     saving.value = false
@@ -126,14 +126,14 @@ async function remove(row: Row) {
     await ElMessageBox.confirm('删除后无法恢复，请确认当前记录。', '删除确认', {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
     })
     if (auth.revision !== revision || !can('delete')) return
     await props.api.remove(String(row[props.idKey]))
     if (rows.value.length === 1 && page.value > 1) page.value--
     ElMessage.success('已删除')
     await load()
-  } catch(e) {
+  } catch (e) {
     if (e === 'cancel' || e === 'close') return
     ElMessage.error(e instanceof Error ? e.message : '删除失败')
   }
@@ -149,7 +149,7 @@ async function delids() {
   const ids = [...selectedIds.value]
   try {
     await ElMessageBox.confirm('确认删除选中的 ' + ids.length + ' 条记录？删除后无法恢复。', '批量删除确认', {
-      confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning'
+      confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning',
     })
     if (auth.revision !== revision || !can('delete')) return
     deleting.value = true
@@ -158,7 +158,7 @@ async function delids() {
     if (ids.length === rows.value.length && page.value > 1) page.value--
     ElMessage.success('已批量删除')
     await load()
-  } catch(e) {
+  } catch (e) {
     if (e === 'cancel' || e === 'close') return
     ElMessage.error(e instanceof Error ? e.message : '批量删除失败')
   } finally {
@@ -167,7 +167,9 @@ async function delids() {
 }
 
 watch(() => can('read'), load)
-watch(() => can('delete'), () => { selectedIds.value = [] })
+watch(() => can('delete'), () => {
+  selectedIds.value = []
+})
 
 function searchNow() {
   page.value = 1
@@ -221,7 +223,8 @@ defineExpose({ load })
         :disabled="!selectedIds.length"
         :loading="deleting"
         @click="delids"
-      >批量删除</el-button>
+      >批量删除
+      </el-button>
       <RightToolbar v-if="searchFields.length && can('read')" v-model:show-search="showSearch" @query-table="load" />
       <el-button v-else-if="can('read')" :loading="loading" icon="Refresh" @click="load">刷新</el-button>
     </div>
@@ -229,7 +232,8 @@ defineExpose({ load })
       <el-button @click="load">重试</el-button>
     </el-alert>
     <el-alert v-if="!can('read')" title="当前范围没有读取权限" type="warning" :closable="false" show-icon />
-    <el-table v-if="can('read')" v-loading="loading" :data="rows" :row-key="idKey" size="default" empty-text="暂无记录" style="width:100%" @selection-change="selectRows">
+    <el-table v-if="can('read')" v-loading="loading" :data="rows" :row-key="idKey" size="default" empty-text="暂无记录"
+              style="width:100%" @selection-change="selectRows">
       <el-table-column v-if="!readonly && can('delete') && api.delids" type="selection" width="48" />
       <el-table-column
         v-for="field in columns"
@@ -250,9 +254,10 @@ defineExpose({ load })
             v-else
             :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
           >{{ formatValue(row[field.key], field.kind)
-          }}</span></template>
+            }}</span></template>
       </el-table-column>
-      <el-table-column v-if="!readonly && (can('update') || can('delete') || $slots.actions)" label="操作" fixed="right" width="180">
+      <el-table-column v-if="!readonly && (can('update') || can('delete') || $slots.actions)" label="操作" fixed="right"
+                       width="180">
         <template #default="{row}">
           <el-button v-if="can('update')" text type="primary" @click="open(row)">编辑</el-button>
           <el-button v-if="can('delete')" text type="danger" @click="remove(row)">删除</el-button>
@@ -279,7 +284,7 @@ defineExpose({ load })
     >
       <p class="form-caption">基础信息
         <span>{{ resolvedPermissionScope === 'factory' ? '带 * 的字段为必填；工厂身份由当前上下文确定。' : '带 * 的字段为必填；平台对象的范围按字段配置。'
-        }}</span></p>
+          }}</span></p>
       <el-form label-position="top" class="form-grid" @submit.prevent="save">
         <el-form-item
           v-for="field in editable"
