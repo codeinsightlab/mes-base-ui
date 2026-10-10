@@ -9,6 +9,8 @@ Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改�
 
 ## Base Design System（2026-10-06）
 
+2026-10-11 请求语义：允许 A 请求未完成时选 B 并发起 B 请求，后端 A 保持原上下文；前端在 fetch 返回、错误 body、JSON/text 和 blob body 读取后检查 token/factoryId/revision，拒绝旧响应回填。过期的 A 请求 401 不得清除 B 或新登录态。SESSION_REVOCATION_PENDING 表示账号修改已提交、会话撤销待恢复，不以响应失败误称数据库已回滚；有效期与本地登录恢复契约保持。
+
 新增及迁入 MES 页面必须复用 [`docs/UI_DESIGN_SYSTEM.md`](docs/UI_DESIGN_SYSTEM.md)。主题 token 唯一入口 `src/assets/styles/tokens.css`，公共布局样式 `src/styles.css`；禁止页面自行创造颜色、status 映射、spacing 或 card 体系。默认浅色现代工业工作区，保留高信息密度，不引入假生产数据、展示型大屏或阻塞操作的装饰动画。
 
 优先复用 PageHeader、StatusTag、ScopeTag、RightToolbar、Pagination、CrudPage；FilterPanel / TableToolbar / ContentCard 当前分别为 `.filter-panel` / `.table-toolbar` / `.panel` 样式协议，保留 Source 表单 ref 与操作流程。仅多个明确场景存在行为复用时再抽组件，不提前造空组件库。状态按原业务标签或显式 tone，禁止把所有领域数值 0/1 当作同一状态。移动到“更多”的操作必须保留各自权限、可发现入口和确认流程。
@@ -22,3 +24,15 @@ Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改�
 第二轮数据语言（2026-10-06）：复用 CodeText / MethodBadge / MetricValue / StatusTag / ScopeTag；ID 字符串不转数字，日期不改格式，耗时分级只表达 latency，不能推断 timeout。数据表 / Monitor 使用全部可用宽度，设置页按具体需要限宽。Navbar 60px、Tags 34px，移除重复页面技术标签。Home 复用现有 5 个只读监控 API，按平台权限分别读取，context revision / 卸载拒绝过期回填；不轮询，不以已读取冒充健康，不以任务启用冒充执行。授权入口和个人链接降为次要区域。第一轮主题及 Login 保持稳定。
 
 用户授权的工作台扩展（2026-10-06）：上述 Home 不造生产指标的约束继续适用于真实数据模式；用户明确授权 BusinessWorkspace 的独立示例视图。上下文、指标、列表与详情持续标明“示例数据”，禁止作为真实业务请求失败的兜底，禁止业务提交或写入。服务端 workspaces 契约决定工作台：有有效工厂角色或平台角色已授予业务权限（platformBusiness）默认业务；仅持有平台权限默认平台，无角色展示个人入口；双范围可切换，不由可选工厂推断授权，默认选厂按服务端规则：有效偏好优先，否则从启用且绑定启用业务库的工厂选择工厂 ID 最小值，纯数字按数值比较；选厂不授予角色或权限。平台账号可显式预览业务示例，预览不改变 Factory 或权限。侧栏一级模块默认只展开活动分支、手动展开一个模块时收起其他一级模块。Druid 目录仅覆盖当前节点中心库与工厂业务池（2026-10-09 收敛）；未初始化明确表达，不因监控主动加载业务池。验收追加到 docs/acceptance/ui-industrial-upgrade/ROUND2.md。
+
+
+## 业务人员 / 部门 / 岗位嵌入组件（2026-10-10）
+
+业务模块需要人员、部门、岗位搜索或选择时，优先复用 mes-base-ui 的
+`src/components/business/directory/PersonnelSelect.vue`、`DepartmentSelect.vue`、`PostSelect.vue`。
+接口统一为 `/api/business/directory/{personnel|departments|posts}` 与 `/{id}`，仅提供 GET 列表和单个查询；禁止在这组能力中增加新增、修改、删除或角色分配。
+复用中心库 sys_user/sys_dept/sys_post 的平台 Mapper，使用 masterTransactionManager 只读事务；不新增表、不复制目录到业务库。
+HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:read 权限，不能让组件调用平台管理 API 或要求 system 权限。
+中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等 SysUser 敏感字段。
+组件 ID 使用字符串，切厂/撤权清理已选项与候选数据、拒绝过期响应。平台管理页面保持原有管理能力。
+契约与使用方式见 mes-base 的 docs/development/business-directory.md。
