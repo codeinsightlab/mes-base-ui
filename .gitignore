@@ -8,3 +8,4 @@ docs
 .idea
 deploy/*
 !deploy/nginx.conf.template
+.DS_Store
