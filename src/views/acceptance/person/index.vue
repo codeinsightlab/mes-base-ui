@@ -28,7 +28,6 @@ const fields: Field[] = [
   <CrudPage
     title="人员"
     permission="business:person"
-    permission-scope="factory"
     :api="api"
     :fields="fields"
     id-key="id"

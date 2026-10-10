@@ -73,7 +73,7 @@ export function changeUserStatus(userId: any, status: any) {
 // 查询用户个人信息
 export function getUserProfile() {
   return request({
-    scope: 'platform', url: '/system/user/profile',
+    scope: 'platform', url: '/personal/profile',
     method: 'get'
   })
 }
@@ -81,7 +81,7 @@ export function getUserProfile() {
 // 修改用户个人信息
 export function updateUserProfile(data: any) {
   return request({
-    scope: 'platform', url: '/system/user/profile',
+    scope: 'platform', url: '/personal/profile',
     method: 'put',
     data: { nickName: data.nickName, phonenumber: data.phonenumber, email: data.email, sex: data.sex }
   })
@@ -94,7 +94,7 @@ export function updateUserPwd(oldPassword: any, newPassword: any) {
     newPassword
   }
   return request({
-    scope: 'platform', url: '/system/user/profile/updatePwd',
+    scope: 'platform', url: '/personal/profile/updatePwd',
     method: 'put',
     data: data
   })
@@ -103,7 +103,7 @@ export function updateUserPwd(oldPassword: any, newPassword: any) {
 // 用户头像上传
 export function uploadAvatar(data: any) {
   return request({
-    scope: 'platform', url: '/system/user/profile/avatar',
+    scope: 'platform', url: '/personal/profile/avatar',
     method: 'post',
     data: data
   })

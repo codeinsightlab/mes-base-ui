@@ -3,7 +3,7 @@
 
 Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改变用户全局 Node16。保持 API/VO 真实契约、损失为零的 bigint/decimal 字符串；源项目 Vue2 页面是迁移产品资产，保留字段、查询、列、按钮、弹窗/联动、权限、字典和实际用户流程，适配 Vue3，不带客户数据/身份/Secret。
 
-迁移阶段不调用 Codegen Skill，先 COPY / PORT 源页面与 API，不能用重新生成 CRUD 替代已有功能。后续新增开发的标准表驱动页面才先读取 `../mes-base/.agents/skills/mes-crud-codegen/SKILL.md`，通过 Base CLI 自动放置，再做 UI review/优化/test/build。公共 shell、CrudPage、dict、request 与 permission 在 src；使用已有视觉系统。菜单仅能指向已编译模块，客户端按钮和路由不承担最终授权。平台请求明确 scope=platform；厂请求传当前 Factory，切换清除旧数据/权限，过期响应不能回填。按用户2026-10-06明确要求保留刷新登录态：localStorage只保存Token、有效期与选厂偏好，不保存密码、用户资料、菜单或权限；初始化从后端重新校验身份/权限/启用厂，过期、401或注销清除保存值，网络失败保留并允许重试。文件走带认证的私有下载。
+迁移阶段不调用 Codegen Skill，先 COPY / PORT 源页面与 API，不能用重新生成 CRUD 替代已有功能。后续新增开发的标准表驱动页面才先读取 `../mes-base/.agents/skills/mes-crud-codegen/SKILL.md`，通过 Base CLI 自动放置，再做 UI review/优化/test/build。公共 shell、CrudPage、dict、request 与 permission 在 src；使用已有视觉系统。菜单仅能指向已编译模块，客户端按钮和路由不承担最终授权。请求可声明预期 scope；有已选 Factory 时所有请求携带 X-Factory-Id，接口归属由后端 URL 判断，平台/个人请求不因请求头进入业务库；切换清除旧数据/权限，过期响应不能回填。按用户2026-10-06明确要求保留刷新登录态：localStorage只保存Token、有效期与选厂偏好，不保存密码、用户资料、菜单或权限；初始化从后端重新校验身份/权限/启用厂，过期、401或注销清除保存值，网络失败保留并允许重试。文件走带认证的私有下载。
 
 `npm run test`、`npm run build`；页面需真实浏览器和窄屏/错误/删除取消检查，单元或构建通过不冒充业务验收。源码优先 src，TEST ONLY 生成页 target/codegen-acceptance 不进正式路由。保留用户已有修改；提交/推送/部署按已有授权。
 
@@ -21,4 +21,4 @@ Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改�
 
 第二轮数据语言（2026-10-06）：复用 CodeText / MethodBadge / MetricValue / StatusTag / ScopeTag；ID 字符串不转数字，日期不改格式，耗时分级只表达 latency，不能推断 timeout。数据表 / Monitor 使用全部可用宽度，设置页按具体需要限宽。Navbar 60px、Tags 34px，移除重复页面技术标签。Home 复用现有 5 个只读监控 API，按平台权限分别读取，context revision / 卸载拒绝过期回填；不轮询，不以已读取冒充健康，不以任务启用冒充执行。授权入口和个人链接降为次要区域。第一轮主题及 Login 保持稳定。
 
-用户授权的工作台扩展（2026-10-06）：上述 Home 不造生产指标的约束继续适用于真实数据模式；用户明确授权 BusinessWorkspace 的独立示例视图。上下文、指标、列表与详情持续标明“示例数据”，禁止作为真实业务请求失败的兜底，禁止业务提交或写入。服务端 workspaces 契约决定工作台：有有效工厂角色默认业务，仅平台角色默认平台，无角色展示个人入口；双范围可切换，不由可选工厂推断授权，不自动选择首厂。平台账号可显式预览业务示例，预览不改变 Factory 或权限。侧栏一级模块默认只展开活动分支、手动展开一个模块时收起其他一级模块。Druid 目录仅覆盖当前节点中心库与工厂业务池（2026-10-09 收敛）；未初始化明确表达，不因监控主动加载业务池。验收追加到 docs/acceptance/ui-industrial-upgrade/ROUND2.md。
+用户授权的工作台扩展（2026-10-06）：上述 Home 不造生产指标的约束继续适用于真实数据模式；用户明确授权 BusinessWorkspace 的独立示例视图。上下文、指标、列表与详情持续标明“示例数据”，禁止作为真实业务请求失败的兜底，禁止业务提交或写入。服务端 workspaces 契约决定工作台：有有效工厂角色或平台角色已授予业务权限（platformBusiness）默认业务；仅持有平台权限默认平台，无角色展示个人入口；双范围可切换，不由可选工厂推断授权，默认选厂按服务端规则：有效偏好优先，否则从启用且绑定启用业务库的工厂选择工厂 ID 最小值，纯数字按数值比较；选厂不授予角色或权限。平台账号可显式预览业务示例，预览不改变 Factory 或权限。侧栏一级模块默认只展开活动分支、手动展开一个模块时收起其他一级模块。Druid 目录仅覆盖当前节点中心库与工厂业务池（2026-10-09 收敛）；未初始化明确表达，不因监控主动加载业务池。验收追加到 docs/acceptance/ui-industrial-upgrade/ROUND2.md。

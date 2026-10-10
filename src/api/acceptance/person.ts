@@ -17,6 +17,9 @@ export interface Page {
 export type CreateCommand = Pick<PersonVo, 'name'>
 export type UpdateCommand = Pick<PersonVo, 'name'>
 
+const removeIds = (ids: string[]) =>
+  request<void>('/api/acceptance/person', { method: 'DELETE', body: ids, scope: 'factory' })
+
 export const api = {
   list: (query: Record<string, string | number>) =>
     request<Page>('/api/acceptance/person', { query, scope: 'factory' }),
@@ -32,6 +35,7 @@ export const api = {
       method: 'PUT', body, scope: 'factory'
     }),
 
-  remove: (id: string) =>
-    request<void>('/api/acceptance/person/' + encodeURIComponent(id), { method: 'DELETE', scope: 'factory' })
+  remove: (id: string) => removeIds([id]),
+
+  delids: removeIds
 }

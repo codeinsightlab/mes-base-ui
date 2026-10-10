@@ -4,14 +4,14 @@ import { useAuth } from '@/stores/auth'
 import PageHeader from '@/components/PageHeader.vue'
 import PlatformWorkspace from '@/components/PlatformWorkspace.vue'
 import BusinessWorkspace from '@/components/BusinessWorkspace.vue'
-import { availableWorkspaces, defaultWorkspace, type WorkspaceKind } from '@/lib/workspaces'
+import { availableWorkspaces, defaultWorkspace, hasBusinessWorkspace, type WorkspaceKind } from '@/lib/workspaces'
 const auth = useAuth()
 const choices = computed(() => availableWorkspaces(auth.workspaceAccess))
 const selected = ref<WorkspaceKind>('personal'), preview = ref(false)
 watch(() => [auth.revision, auth.workspaceAccess] as const, () => { preview.value = false;selected.value = defaultWorkspace(auth.workspaceAccess) }, { immediate: true })
 const title = computed(() => preview.value ? '业务工作台示例' : selected.value === 'business' ? '业务工作台' : selected.value === 'platform' ? '平台工作台' : '我的工作台')
 const factory = computed(() => auth.factories.find(item => item.factoryId === auth.factoryId))
-const businessFactory = computed(() => !!auth.factoryId && auth.workspaceAccess?.factoryIds.includes(auth.factoryId))
+const businessFactory = computed(() => hasBusinessWorkspace(auth.workspaceAccess, auth.factoryId))
 </script>
 <template>
   <section class="page home-page">
@@ -30,7 +30,7 @@ const businessFactory = computed(() => !!auth.factoryId && auth.workspaceAccess?
       </section>
       <BusinessWorkspace v-if="preview" factory-name="演示工厂" />
       <template v-else-if="selected === 'business'">
-        <el-alert v-if="!businessFactory" :title="auth.factoryId ? '当前工厂没有业务角色，请选择你拥有业务角色的工厂' : '尚未选择工厂，请在顶部选择你拥有业务角色的工厂'" type="info" :closable="false" show-icon />
+        <el-alert v-if="!businessFactory" :title="auth.factoryId ? '当前工厂没有已分配的业务访问范围' : '尚未选择工厂，请在顶部选择工厂'" type="info" :closable="false" show-icon />
         <BusinessWorkspace :key="auth.factoryId" :factory-name="businessFactory ? (factory?.name || auth.factoryId) : '演示工厂'" />
       </template>
       <PlatformWorkspace v-else-if="selected === 'platform'" @preview-business="preview = true" />

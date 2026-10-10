@@ -18,9 +18,10 @@ export function getMenu(menuId: any) {
 }
 
 // 查询菜单下拉树结构
-export function treeselect() {
+export function treeselect(roleKind?: string) {
   return request({
     scope: 'platform', url: '/system/menu/treeselect',
+    params: roleKind ? { roleKind } : undefined,
     method: 'get'
   })
 }

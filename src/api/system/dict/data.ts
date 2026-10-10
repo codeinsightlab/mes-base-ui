@@ -20,7 +20,7 @@ export function getData(dictCode: any) {
 // 根据字典类型查询字典数据信息
 export function getDicts(dictType: any) {
   return request({
-    scope: 'platform', url: '/system/dict/data/type/' + dictType,
+    scope: 'platform', url: '/common/dict/' + dictType,
     method: 'get'
   })
 }

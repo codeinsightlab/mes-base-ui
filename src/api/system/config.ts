@@ -20,7 +20,7 @@ export function getConfig(configId: any) {
 // 根据参数键名查询参数值
 export function getConfigKey(configKey: any) {
   return request({
-    scope: 'platform', url: '/system/config/configKey/' + configKey,
+    scope: 'platform', url: '/common/config/' + configKey,
     method: 'get'
   })
 }

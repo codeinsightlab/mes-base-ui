@@ -11,7 +11,7 @@ async function load(code:string):Promise<void> {
   const version = epoch
   const work = (async() => {
     try {
-      const response = await request<{ data: DictionaryOption['raw'][] }>('/api/system/dict/data/type/' + encodeURIComponent(code), { scope: 'platform' });if (version !== epoch) return
+      const response = await request<{ data: DictionaryOption['raw'][] }>('/api/common/dict/' + encodeURIComponent(code), { scope: 'platform' });if (version !== epoch) return
       dictionaryState.types[code].splice(0, Infinity, ...response.data.map(raw => ({ label: raw.dictLabel, value: raw.dictValue, raw })));loaded.add(code);delete dictionaryState.errors[code]
     } catch(error) { if (version === epoch)dictionaryState.errors[code] = error instanceof Error ? error.message : '字典加载失败' } finally { if (version === epoch)pending.delete(code) }
   })()

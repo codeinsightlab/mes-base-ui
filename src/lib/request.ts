@@ -9,7 +9,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<Respons
   if (!path.startsWith('/api/') && path !== '/health') throw new ApiError('INVALID_PATH', '请求路径无效')
   const snapshot = { ...context() }; const headers = new Headers()
   if (!options.public && snapshot.token) headers.set('Authorization', 'Bearer ' + snapshot.token)
-  if (options.scope !== 'platform' && snapshot.factoryId) headers.set('X-Factory-Id', snapshot.factoryId)
+  if (snapshot.factoryId) headers.set('X-Factory-Id', snapshot.factoryId)
   const query = options.query ? '?' + new URLSearchParams(Object.entries(options.query).map(([k, v]) => [k, String(v)])).toString() : ''
   const multipart = options.body instanceof FormData
   if (options.body !== undefined && !multipart) headers.set('Content-Type', 'application/json')

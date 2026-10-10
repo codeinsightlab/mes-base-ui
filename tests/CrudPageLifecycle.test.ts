@@ -50,3 +50,39 @@ describe('generated CRUD scope and permission lifecycle', () => {
     expect(wrapper.find('[data-test="dialog"]').exists()).toBe(false)
   })
 })
+
+describe('generated batch deletion', () => {
+  it('sends selected IDs in one call and does not use single deletion', async() => {
+    const service = api();service.delids = vi.fn().mockResolvedValue(undefined)
+    const { wrapper } = page(service);await flushPromises()
+    vi.mocked(ElMessageBox.confirm).mockResolvedValueOnce(undefined as never)
+    const exposed = wrapper.vm as unknown as { selectRows(rows: Row[]): void; delids(): Promise<void> }
+    exposed.selectRows([{ id: '9007199254740993' }, { id: '9007199254740994' }])
+    await exposed.delids()
+    expect(service.delids).toHaveBeenCalledWith(['9007199254740993', '9007199254740994'])
+    expect(service.remove).not.toHaveBeenCalled()
+  })
+
+  it('does not batch delete after changing context during confirmation', async() => {
+    let confirm!: () => void
+    vi.mocked(ElMessageBox.confirm).mockImplementationOnce(() => new Promise<void>(done => { confirm = done }) as never)
+    const service = api();service.delids = vi.fn()
+    const { wrapper, auth } = page(service);await flushPromises()
+    const exposed = wrapper.vm as unknown as { selectRows(rows: Row[]): void; delids(): Promise<void> }
+    exposed.selectRows([{ id: '9007199254740993' }])
+    const pending = exposed.delids()
+    auth.revision++;await flushPromises();confirm();await pending
+    expect(service.delids).not.toHaveBeenCalled()
+  })
+
+  it('requires delete and a nonempty selection', async() => {
+    const service = api();service.delids = vi.fn()
+    const { wrapper, auth } = page(service);await flushPromises()
+    const exposed = wrapper.vm as unknown as { selectRows(rows: Row[]): void; delids(): Promise<void> }
+    await exposed.delids()
+    exposed.selectRows([{ id: '9007199254740993' }])
+    auth.platformPermissions = ['acceptance:person:read']
+    await exposed.delids()
+    expect(service.delids).not.toHaveBeenCalled()
+  })
+})

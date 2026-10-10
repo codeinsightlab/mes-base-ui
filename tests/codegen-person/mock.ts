@@ -20,7 +20,13 @@ export function createPersonMock() {
         return json({ items: filtered.slice(offset, offset + limit), total: filtered.length, offset, limit })
       }
       if (method === 'GET') return rows.find(row => row.id === id) ? json(rows.find(row => row.id === id)) : json({}, 404)
-      if (method === 'DELETE') { if (!rows.some(row => row.id === id)) return json({}, 404);rows = rows.filter(row => row.id !== id);return new Response(null, { status: 204 }) }
+      if (method === 'DELETE' && !id) {
+        const ids: unknown = JSON.parse(String(options.body))
+        if (!Array.isArray(ids) || !ids.length || ids.length > 100 || new Set(ids).size !== ids.length) return json({}, 400)
+        if (!ids.every(value => rows.some(row => row.id === value))) return json({}, 409)
+        rows = rows.filter(row => !ids.includes(row.id))
+        return new Response(null, { status: 204 })
+      }
       const body = JSON.parse(String(options.body)) as { name?: string }
       if (!body.name?.trim() || body.name.length > 64) return json({}, 400)
       if (method === 'POST') { const row = { id: String(nextId++), name: body.name };rows.unshift(row);return json(row) }

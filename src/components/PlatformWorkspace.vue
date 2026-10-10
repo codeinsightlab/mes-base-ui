@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useAuth, type Menu } from '@/stores/auth'
 import { menuQuery } from '@/lib/sourceMenus'
+import { availableWorkspaces } from '@/lib/workspaces'
 import { menuWorkspaces } from '@/lib/menuWorkspaces'
 import { operationStatus } from '@/lib/dataPresentation'
 import { parseTime } from '@/utils/ruoyi'
@@ -30,7 +31,7 @@ const metrics = computed(() => [
 </script>
 <template>
   <div class="operational-workspace">
-    <div class="workspace-refresh"><span class="section-note">平台范围 · 真实接口快照</span><div><el-button v-if="!auth.workspaceAccess?.factoryIds.length" @click="emit('previewBusiness')">查看业务工作台示例</el-button><el-button icon="Refresh" :loading="loading" @click="reload">刷新状态</el-button></div></div>
+    <div class="workspace-refresh"><span class="section-note">平台范围 · 真实接口快照</span><div><el-button v-if="!availableWorkspaces(auth.workspaceAccess).some(item => item.value === 'business')" @click="emit('previewBusiness')">查看业务工作台示例</el-button><el-button icon="Refresh" :loading="loading" @click="reload">刷新状态</el-button></div></div>
     <section class="system-snapshot" aria-label="平台系统状态">
       <div class="section-heading"><h2>系统状态</h2><span class="section-note">平台范围 · 手动刷新快照</span></div>
       <div class="snapshot-grid">

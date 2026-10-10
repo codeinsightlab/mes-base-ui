@@ -174,7 +174,7 @@
     <!-- 添加或修改角色配置对话框 -->
     <el-dialog v-model="open" :title="title" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="角色范围" prop="kind"><el-select v-model="form.kind" :disabled="!!form.roleId" @change="form.factoryId=null"><el-option label="平台" value="PLATFORM" /><el-option label="工厂" value="FACTORY" /></el-select></el-form-item>
+        <el-form-item label="角色范围" prop="kind"><el-select v-model="form.kind" :disabled="!!form.roleId" @change="handleRoleKindChange"><el-option label="平台" value="PLATFORM" /><el-option label="工厂" value="FACTORY" /></el-select></el-form-item>
         <el-form-item v-if="form.kind==='FACTORY'" label="所属工厂" prop="factoryId" :rules="[{required:true,message:'请选择工厂'}]"><el-select v-model="form.factoryId" :disabled="!!form.roleId"><el-option v-for="f in factories" :key="f.factoryId" :label="f.name" :value="f.factoryId" /></el-select></el-form-item>
         <el-form-item label="角色名称" prop="roleName">
           <el-input v-model="form.roleName" placeholder="请输入角色名称" />
@@ -201,6 +201,7 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="菜单权限">
+          <p class="secondary">{{ form.kind === 'PLATFORM' ? '平台角色可分配平台和业务权限；业务操作需先选择工厂。' : '工厂角色仅可分配业务权限，且仅在所属工厂生效。' }}</p>
           <el-checkbox v-model="menuExpand" @change="handleCheckedTreeExpand($event, 'menu')">展开/折叠</el-checkbox>
           <el-checkbox v-model="menuNodeAll" @change="handleCheckedTreeNodeAll($event, 'menu')">全选/全不选</el-checkbox>
           <el-checkbox v-model="form.menuCheckStrictly" title="上级节点始终批量勾选或取消全部下级；开启后，子项勾选同步上级状态" @change="handleCheckedTreeConnect($event, 'menu')">父子联动</el-checkbox>
@@ -380,9 +381,17 @@ export default {
     },
     /** 查询菜单树结构 */
     getMenuTreeselect() {
-      menuTreeselect().then(response => {
-        this.menuOptions = response.data
+      const kind = this.form.kind
+      menuTreeselect(kind).then(response => {
+        if (this.form.kind === kind) this.menuOptions = response.data
       })
+    },
+    handleRoleKindChange() {
+      this.form.factoryId = null
+      this.menuNodeAll = false
+      this.$refs.menu?.setCheckedKeys([])
+      this.menuOptions = []
+      this.getMenuTreeselect()
     },
     /** 查询部门树结构 */
     getDeptTreeselect() {

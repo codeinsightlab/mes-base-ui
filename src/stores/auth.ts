@@ -22,6 +22,7 @@ export interface Menu {
 }
 
 const restores = new WeakMap<object, Promise<void>>()
+const switches = new WeakMap<object, object>()
 export const useAuth = defineStore('auth', {
   state: () => {
     const saved = readSession()
@@ -33,6 +34,7 @@ export const useAuth = defineStore('auth', {
       username: '',
       factoryId: '',
       savedFactoryId: saved?.factoryId ?? '',
+      factorySwitching: false,
       sessionReady: false,
       sessionError: '',
       revision: 0,
@@ -41,7 +43,7 @@ export const useAuth = defineStore('auth', {
       platformPermissions: [] as string[],
       factoryPermissions: [] as string[],
       factories: [] as { factoryId: string; name: string }[],
-      expiresAt: saved?.expiresAt ?? '',
+      expiresAt: saved?.expiresAt ?? ''
     }
   },
   getters: { loggedIn: s => !!s.token }, actions: {
@@ -49,6 +51,7 @@ export const useAuth = defineStore('auth', {
       return (scope === 'platform' ? this.platformPermissions : this.factoryPermissions).includes(code)
     },
     clear() {
+      this.factorySwitching = false
       this.workspaceAccess = null
       removeSession()
       this.token = ''
@@ -78,28 +81,16 @@ export const useAuth = defineStore('auth', {
       }
       const pending = restores.get(this)
       if (pending) return pending
-      const task = (async () => {
+      const task = (async() => {
         this.sessionError = ''
-        const revision = this.revision
         await this.loadNavigation()
-        const factories = await request<typeof this.factories>('/api/foundation/factories', {
-          scope: 'platform',
-          query: { offset: 0, limit: 100 },
-        })
-        if (this.revision !== revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
-        this.factories = factories
-        const selected = this.savedFactoryId
-        if (selected && factories.some(factory => factory.factoryId === selected)) await this.selectFactory(selected)
-        else {
-          this.savedFactoryId = ''
-          this.persistSession()
-        }
+        await this.restoreFactory()
         this.sessionReady = true
       })()
       restores.set(this, task)
       try {
         await task
-      } catch (error) {
+      } catch(error) {
         if (this.token) this.sessionError = error instanceof Error ? error.message : '登录状态恢复失败，请重试'
         throw error
       } finally {
@@ -110,11 +101,11 @@ export const useAuth = defineStore('auth', {
       const session = await request<{
         accessToken: string;
         expiresAt: string
-      }>('/api/platform/session', {
+      }>('/api/session', {
         method: 'POST',
         body: { username, password, code, uuid },
         scope: 'platform',
-        public: true,
+        public: true
       })
       this.token = session.accessToken
       this.expiresAt = session.expiresAt
@@ -124,13 +115,10 @@ export const useAuth = defineStore('auth', {
       this.revision++
       try {
         await this.loadNavigation()
-        this.factories = await request('/api/foundation/factories', {
-          scope: 'platform',
-          query: { offset: 0, limit: 100 },
-        })
+        await this.restoreFactory()
         this.persistSession()
         this.sessionReady = true
-      } catch (e) {
+      } catch(e) {
         this.clear()
         throw e
       }
@@ -142,9 +130,9 @@ export const useAuth = defineStore('auth', {
         permissions: string[];
         passwordPolicy: PasswordPolicy;
         workspaces: WorkspaceAccess
-      }>('/api/system/info', { scope: 'platform' }), request<{
+      }>('/api/session/info', { scope: 'platform' }), request<{
         data: SourceRoute[]
-      }>('/api/system/getRouters', { scope: 'platform' })])
+      }>('/api/session/menus', { scope: 'platform' })])
       if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
       this.workspaceAccess = info.workspaces
       this.passwordPolicy = info.passwordPolicy
@@ -155,36 +143,66 @@ export const useAuth = defineStore('auth', {
       this.factoryMenus = []
       this.factoryPermissions = []
     },
-    async refreshNavigation() {
-      const factory = this.factoryId
-      await this.loadNavigation()
-      this.revision++
-      if (factory) await this.selectFactory(factory)
+    async restoreFactory() {
+      const revision = this.revision
+      const [factories, context] = await Promise.all([
+        request<typeof this.factories>('/api/foundation/factories', {
+          scope: 'platform', query: { offset: 0, limit: 100 }
+        }),
+        request<{ factoryId: string | null }>('/api/foundation/context', { scope: 'platform' })
+      ])
+      if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+      this.factories = factories
+      await this.selectFactory(context.factoryId ?? '', false)
     },
-    async selectFactory(id: string) {
-      this.factoryId = id
-      this.savedFactoryId = id
+    async refreshNavigation() {
+      await this.loadNavigation()
+      await this.restoreFactory()
+    },
+    async selectFactory(id: string, remember = true) {
+      if (this.factorySwitching) throw new ApiError('FACTORY_SWITCHING', '工厂切换正在进行')
+      this.factorySwitching = true
+      const switchMarker = {}
+      switches.set(this, switchMarker)
       this.factoryMenus = []
       this.factoryPermissions = []
-      this.revision++
-      this.persistSession()
-      if (id) {
-        const revision = this.revision
-        const value = await request<{
-          permissions: string[];
-          menus: SourceRoute[]
-        }>('/api/system/factory-navigation', { scope: 'factory' })
-        if (revision !== this.revision || this.factoryId !== id) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
-        this.factoryPermissions = value.permissions
-        this.factoryMenus = routeMenus(value.menus)
+      const revision = ++this.revision
+      try {
+        if (id && remember) {
+          const context = await request<{ factoryId: string }>('/api/foundation/preference', {
+            method: 'PUT', body: { factoryId: id }, scope: 'platform'
+          })
+          if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+          if (context.factoryId !== id) throw new ApiError('INVALID_RESPONSE', '工厂切换响应不一致')
+        }
+        if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+        this.factoryId = id
+        this.savedFactoryId = id
+        const selectedRevision = ++this.revision
+        this.persistSession()
+        if (id) {
+          const value = await request<{ permissions: string[]; menus: SourceRoute[] }>(
+            '/api/factory/navigation', { scope: 'factory' }
+          )
+          if (selectedRevision !== this.revision || this.factoryId !== id) {
+            throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+          }
+          this.factoryPermissions = value.permissions
+          this.factoryMenus = routeMenus(value.menus)
+        }
+      } finally {
+        if (switches.get(this) === switchMarker) {
+          this.factorySwitching = false
+          switches.delete(this)
+        }
       }
     },
     async logout() {
       try {
-        await request<void>('/api/platform/session', { method: 'DELETE', scope: 'platform' })
+        await request<void>('/api/session', { method: 'DELETE', scope: 'platform' })
       } finally {
         this.clear()
       }
-    },
-  },
+    }
+  }
 })
