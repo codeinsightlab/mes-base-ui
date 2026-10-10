@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "main.mts",
+    "mock.ts",
+    "../../src/**/*.ts",
+    "../../src/**/*.vue"
+  ]
+}

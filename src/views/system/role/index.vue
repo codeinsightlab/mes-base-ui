@@ -203,7 +203,7 @@
         <el-form-item label="菜单权限">
           <el-checkbox v-model="menuExpand" @change="handleCheckedTreeExpand($event, 'menu')">展开/折叠</el-checkbox>
           <el-checkbox v-model="menuNodeAll" @change="handleCheckedTreeNodeAll($event, 'menu')">全选/全不选</el-checkbox>
-          <el-checkbox v-model="form.menuCheckStrictly" @change="handleCheckedTreeConnect($event, 'menu')">父子联动</el-checkbox>
+          <el-checkbox v-model="form.menuCheckStrictly" title="上级节点始终批量勾选或取消全部下级；开启后，子项勾选同步上级状态" @change="handleCheckedTreeConnect($event, 'menu')">父子联动</el-checkbox>
           <el-tree
             ref="menu"
             class="tree-border"
@@ -213,6 +213,7 @@
             :check-strictly="!form.menuCheckStrictly"
             empty-text="加载中，请稍候"
             :props="defaultProps"
+            @check="handleMenuBranchCheck"
           />
         </el-form-item>
         <el-form-item label="备注">
@@ -518,12 +519,30 @@ export default {
         this.$refs.dept.setCheckedNodes(value ? this.deptOptions : [])
       }
     },
+    // A direct parent click is always a batch selection for its complete subtree.
+    handleMenuBranchCheck(node, state) {
+      const checked = state.checkedKeys.includes(node.id)
+      const apply = children => {
+        for (const child of children) {
+          this.$refs.menu.setChecked(child.id, checked, false)
+          apply(child.children ?? [])
+        }
+      }
+      apply(node.children ?? [])
+    },
     // 树权限（父子联动）
-    handleCheckedTreeConnect(value, type) {
+    async handleCheckedTreeConnect(value, type) {
+      const tree = this.$refs[type]
+      const checkedKeys = tree.getCheckedKeys()
       if (type == 'menu') {
-        this.form.menuCheckStrictly = value ? true : false
+        this.form.menuCheckStrictly = Boolean(value)
       } else if (type == 'dept') {
-        this.form.deptCheckStrictly = value ? true : false
+        this.form.deptCheckStrictly = Boolean(value)
+      }
+      if (value) {
+        // Wait for check-strictly to update before applying the selected parents to their children.
+        await this.$nextTick()
+        tree.setCheckedKeys(checkedKeys)
       }
     },
     /** 新增按钮操作 */

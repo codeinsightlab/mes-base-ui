@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { dictionaryState, refreshDictionaries } from '@/utils/dictionaries'
 import { useAuth, type Menu } from '@/stores/auth'
 import SidebarNode from '@/components/SidebarNode.vue'
+import { menuWorkspaces } from '@/lib/menuWorkspaces'
 import { workspaceTabs, visitTab, resetTabs, closeTabs } from '@/lib/workspaceTabs'
 const auth = useAuth(), route = useRoute(), router = useRouter(), collapsed = ref(false), mobile = ref(false), pageVisible = ref(true)
 const environment = import.meta.env.DEV ? 'DEV' : 'PROD BUILD'
@@ -12,10 +13,11 @@ const tagList = ref<HTMLElement>()
 watch(() => route.fullPath, async() => { await nextTick();tagList.value?.querySelector('.workspace-tag.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) })
 const publicPage = computed(() => ['/login', '/register'].includes(route.path))
 function findTrail(menus:Menu[], path:string):Menu[] { for (const menu of menus) { if (menu.path === path) return [menu];const children = findTrail(menu.children, path);if (children.length) return [menu, ...children] } return [] }
-const trail = computed(() => findTrail([...auth.platformMenus, ...auth.factoryMenus], route.path))
+const navigation = computed(() => menuWorkspaces(auth.platformMenus, auth.factoryMenus))
+const trail = computed(() => findTrail([...navigation.value.platform, ...navigation.value.factory], route.path))
 const expandedRoot = ref('')
 function activeRoot() {
-  for (const [scope, menus] of [['platform', auth.platformMenus], ['factory', auth.factoryMenus]] as const) {
+  for (const [scope, menus] of [['platform', navigation.value.platform], ['factory', navigation.value.factory]] as const) {
     const root = menus.find(menu => findTrail([menu], route.path).length)
     if (root) return scope + ':' + root.id
   }
@@ -47,13 +49,13 @@ function userCommand(command:string) { if (command === 'profile')router.push('/u
       <RouterLink to="/" class="brand" title="MES Base 概览"><el-icon class="brand-symbol"><Operation /></el-icon><span class="brand-name">MES <b>Base</b><small>MANUFACTURING / MES</small></span></RouterLink>
       <nav class="sidebar-navigation">
         <div class="nav-node"><RouterLink to="/" title="概览" class="nav-link" exact-active-class="is-active"><el-icon><Grid /></el-icon><span class="nav-text">工作台概览</span></RouterLink></div>
-        <p v-if="auth.platformMenus.length" class="nav-label">平台管理</p>
-        <SidebarNode v-for="menu in auth.platformMenus" :key="'platform:'+menu.id" :menu="menu" :collapsed="collapsed" root :expanded="expandedRoot==='platform:'+menu.id" @toggle="toggleRoot('platform:'+menu.id)" />
-        <p v-if="auth.factoryId" class="nav-label">工厂工作区</p>
-        <SidebarNode v-for="menu in auth.factoryMenus" :key="'factory:'+menu.id" :menu="menu" :collapsed="collapsed" root :expanded="expandedRoot==='factory:'+menu.id" @toggle="toggleRoot('factory:'+menu.id)" />
+        <p v-if="navigation.platform.length" class="nav-label">平台管理</p>
+        <SidebarNode v-for="menu in navigation.platform" :key="'platform:'+menu.id" :menu="menu" :collapsed="collapsed" root :expanded="expandedRoot==='platform:'+menu.id" @toggle="toggleRoot('platform:'+menu.id)" />
+        <p v-if="navigation.factory.length || auth.factoryId" class="nav-label">工厂工作区</p>
+        <SidebarNode v-for="menu in navigation.factory" :key="'factory:'+menu.id" :menu="menu" :collapsed="collapsed" root :expanded="expandedRoot==='factory:'+menu.id" @toggle="toggleRoot('factory:'+menu.id)" />
         <p class="nav-label">个人工作区</p>
         <div class="nav-node"><RouterLink to="/files" title="个人文件" class="nav-link"><el-icon><Folder /></el-icon><span class="nav-text">个人文件</span></RouterLink><RouterLink to="/inbox" title="我的消息" class="nav-link"><el-icon><Message /></el-icon><span class="nav-text">我的消息</span></RouterLink></div>
-        <p v-if="!auth.platformMenus.length&&!auth.factoryMenus.length" class="nav-empty">当前范围暂无授权菜单</p>
+        <p v-if="!navigation.platform.length&&!navigation.factory.length" class="nav-empty">当前范围暂无授权菜单</p>
       </nav>
       <div class="sidebar-footer"><el-icon><Operation /></el-icon><span class="nav-text">制造执行系统<small>CONTROL WORKSPACE</small></span></div>
     </aside>

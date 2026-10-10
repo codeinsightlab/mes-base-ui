@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "codegen:preview": "vite --config tests/codegen-person/vite.config.ts",
+    "codegen:preview:build": "vue-tsc --noEmit -p tests/codegen-person/tsconfig.json && vite build --config tests/codegen-person/vite.config.ts"
   },
   "dependencies": {
     "dompurify": "^3.4.16",

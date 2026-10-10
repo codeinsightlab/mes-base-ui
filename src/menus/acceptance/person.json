@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "acceptance:person",
+  "name": "人员",
+  "path": "/acceptance/person",
+  "component": "acceptance/person/index",
+  "permission": "business:person:read",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

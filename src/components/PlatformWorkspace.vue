@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useAuth, type Menu } from '@/stores/auth'
 import { menuQuery } from '@/lib/sourceMenus'
+import { menuWorkspaces } from '@/lib/menuWorkspaces'
 import { operationStatus } from '@/lib/dataPresentation'
 import { parseTime } from '@/utils/ruoyi'
 import { useWorkspaceStatus } from '@/composables/useWorkspaceStatus'
@@ -13,9 +14,10 @@ import MetricValue from '@/components/MetricValue.vue'
 const emit = defineEmits<{ previewBusiness: [] }>()
 const auth = useAuth()
 function entries(menu: Menu): Menu[] { return menu.hidden ? [] : menu.children.length ? menu.children.flatMap(entries) : [menu] }
+const navigation = computed(() => menuWorkspaces(auth.platformMenus, auth.factoryMenus))
 const groups = computed(() => [
-  ...auth.platformMenus.filter(menu => !menu.hidden).map(menu => ({ menu, kind: 'PLATFORM' })),
-  ...auth.factoryMenus.filter(menu => !menu.hidden).map(menu => ({ menu, kind: 'FACTORY' }))
+  ...navigation.value.platform.filter(menu => !menu.hidden).map(menu => ({ menu, kind: 'PLATFORM' })),
+  ...navigation.value.factory.filter(menu => !menu.hidden).map(menu => ({ menu, kind: 'FACTORY' }))
 ])
 const entryCount = computed(() => groups.value.reduce((count, group) => count + entries(group.menu).length, 0))
 const { online, jobs, server, cache, operations, loading, reload } = useWorkspaceStatus(auth)
