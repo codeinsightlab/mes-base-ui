@@ -77,14 +77,14 @@ Source 参数开关控制且默认关闭；密码规则来自后端 profile。�
 Skill。详见 [交接入口](../mes-base/docs/development/next-stage-plan.md)、[功能矩阵](../mes-base/docs/development/MES_MIGRATION_MATRIX.md)、[实际验收](../mes-base/docs/reviews/2026-10-06-phase1-verification.json)
 。本轮未提交、推送或部署。
 
-## OpenAPI 应用
+## OpenAPI 基础设施（2026-10-10）
 
-`/system/openApiClient` PORT Source 提交中的应用列表/详情、默认禁用的新建表单、一次性凭证、启停、Secret重置、分组接口授权和权限按钮。读取实际
-API catalog，不提供工艺路线范围表单；业务数据范围开关状态由后端返回。凭证不持久化，离开/关闭销毁。
-
-系统接口页包含外部 Token/诊断契约；外部请求使用单独 OpenApiBearer，后台 Token/工厂头不会自动注入。开发代理 /open-api 与
-/api 共用显式 loopback MES_API_TARGET。实际 Token/API/限流/撤销/数据库隔离已由HTTP验收，浏览器列表/详情/目录已验证；浏览器创建/重置凭证需用户亲自完成，未自动点击赋权保存。
+旧 OpenAPI 应用管理页/API、客户端凭证和接口授权入口已退役，不再编译。后端改为独立可选 `mes-openapi`，仅提供接口元数据、MVC 动态目录与文档能力，默认不装配、不提供 Token 或业务 API。代理 `/open-api` 是路径转发配置，不意味着存在业务能力；后续消费者认证与业务接口另立任务。此前 Token/诊断验收只属于历史版本。
 
 ## 2026-10-06 业务后置
 
 生产监控、人员分析的页面和 API 已移出当前源码与构建。备份位于相邻后端仓库 `mes-base/migration-backups/2026-10-06-deferred-production-analytics`，后续接入须重新审查。后端 V15 清理对应菜单/角色菜单关联；已有数据库需按迁移流程执行 V15，本次未连接或修改数据库。系统监控与基础工作区继续保留。
+
+### 2026-10-10 OpenAPI 退役验收
+
+只删除旧应用管理页、API 客户端与侧栏图标映射，保留系统 Swagger 和代理配置。`npm run test` 84 项通过，最终 `npm run build` 通过；先前并行 CRUD 测试类型错误不属于本任务修改，后续工作区已解决。没有浏览器或真实数据库迁移验收；旧菜单须由后端 V16 清理。

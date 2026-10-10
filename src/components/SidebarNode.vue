@@ -8,7 +8,7 @@ const pageIcons: Record<string, string> = {
   '/system': 'Setting', '/monitor': 'Monitor', '/tool': 'SetUp',
   '/system/user': 'User', '/system/role': 'Key', '/system/menu': 'Menu', '/system/dept': 'Share',
   '/system/post': 'Postcard', '/system/dict': 'Collection', '/system/config': 'SetUp',
-  '/system/notice': 'Bell', '/system/message': 'ChatLineSquare', '/system/openApiClient': 'Connection',
+  '/system/notice': 'Bell', '/system/message': 'ChatLineSquare',
   '/system/autocode': 'Tickets', '/system/factory': 'OfficeBuilding', '/system/datasource': 'Coin',
   '/monitor/operlog': 'Document', '/monitor/logininfor': 'Tickets', '/monitor/online': 'User',
   '/monitor/job': 'Timer', '/monitor/server': 'Monitor', '/monitor/cache': 'Coin',
