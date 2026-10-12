@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "qc:qcDefect",
+  "name": "质量缺陷",
+  "path": "/qc/qcDefect",
+  "component": "qc/qcDefect/index",
+  "permission": "business:qc:defect:read",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [{ "id": "qc:qcDefect:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:qc:defect:sync", "permissionScope": "factory" }]
+}

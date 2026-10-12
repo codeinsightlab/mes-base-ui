@@ -11,7 +11,7 @@ const auth = useAuth(), route = useRoute(), router = useRouter(), collapsed = re
 const environment = import.meta.env.DEV ? 'DEV' : 'PROD BUILD'
 const tagList = ref<HTMLElement>()
 watch(() => route.fullPath, async() => { await nextTick();tagList.value?.querySelector('.workspace-tag.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) })
-const publicPage = computed(() => ['/login', '/register'].includes(route.path))
+const publicPage = computed(() => ['/login', '/register', '/select-factory'].includes(route.path))
 function findTrail(menus:Menu[], path:string):Menu[] { for (const menu of menus) { if (menu.path === path) return [menu];const children = findTrail(menu.children, path);if (children.length) return [menu, ...children] } return [] }
 const navigation = computed(() => menuWorkspaces(auth.platformMenus, auth.factoryMenus))
 const trail = computed(() => findTrail([...navigation.value.platform, ...navigation.value.factory], route.path))
@@ -28,6 +28,9 @@ function toggleRoot(key:string) { expandedRoot.value = expandedRoot.value === ke
 
 const title = computed(() => String(route.meta.title ?? trail.value.at(-1)?.name ?? '工作页面'))
 watch(() => route.fullPath, () => { if (route.matched.length && !publicPage.value)visitTab(route.fullPath, title.value);mobile.value = false }, { immediate: true })
+watch(() => [auth.factorySelectionRequired, auth.sessionReady], () => {
+  if (auth.loggedIn && auth.sessionReady && auth.factorySelectionRequired && route.path !== '/select-factory') router.replace('/select-factory')
+})
 watch(() => auth.loggedIn, logged => { if (!logged) { resetTabs();router.replace('/login') } })
 watch(() => auth.revision, () => { resetTabs();if (auth.loggedIn && route.matched.length && !publicPage.value)visitTab(route.fullPath, title.value) })
 function toggleSidebar() { if (window.matchMedia('(max-width:800px)').matches)mobile.value = !mobile.value;else collapsed.value = !collapsed.value }

@@ -36,3 +36,17 @@ HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:
 中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等 SysUser 敏感字段。
 组件 ID 使用字符串，切厂/撤权清理已选项与候选数据、拒绝过期响应。平台管理页面保持原有管理能力。
 契约与使用方式见 mes-base 的 docs/development/business-directory.md。
+
+## 工厂上下文恢复（2026-10-12 用户确认）
+
+只处理服务端专用 `422 / FACTORY_SELECTION_REQUIRED`，不按任意 422 猜测工厂问题。
+保留 Token、平台授权，清空工厂 ID、业务菜单/权限及旧页面状态，路由到 `/select-factory`。
+选厂页和首页复用 `auth.loadFactoryOptions()` 与 `/api/foundation/factories`；服务端只返回启用且绑定启用数据源的候选。
+登录/刷新期间遇到此码不清登录态；过期响应不得触发新上下文恢复。不自动选其他工厂、不重放失败请求。
+零候选允许进入平台/个人工作台，不绑定默认数据库；重新选择成功才恢复业务授权。
+
+## OpenAPI 管理恢复（2026-10-12 用户明确要求）
+
+`src/views/system/openApiClient/index.vue` 与 `src/api/system/openApiClient.ts` 恢复客户端创建、启停、一次性 Secret 展示/重置与接口分组授权。
+复用平台 request/权限/菜单机制；凭证不写 localStorage，关闭对话框/离开页面清空 Secret，迟到响应不恢复凭证。
+后台用户 Token 与外部应用 Token 不互通，页面不保存外部 Token，不自动赋予角色或外部 API 权限。

@@ -71,3 +71,6 @@ export const api = {
 
   delids: removeIds
 }
+
+export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
+export const sync = () => request<SyncResult>('/api/pro/pro-workorder/actions/sync', { method: 'POST', scope: 'factory' })

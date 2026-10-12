@@ -1,12 +1,12 @@
 {
   "_generatedBy": "MES-CODEGEN",
   "id": "pro:proWorkorder",
-  "name": "生产工单表",
+  "name": "生产工单",
   "path": "/pro/proWorkorder",
   "component": "pro/proWorkorder/index",
   "permission": "business:pro:workorder:read",
   "permissionScope": "factory",
   "kind": "MENU",
   "icon": "List",
-  "children": []
+  "children": [{ "id": "pro:proWorkorder:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:pro:workorder:sync", "permissionScope": "factory" }]
 }

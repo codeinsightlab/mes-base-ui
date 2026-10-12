@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "material:safetyStock",
+  "name": "安全库存配置",
+  "path": "/material/safetyStock",
+  "component": "material/safetyStock/index",
+  "permission": "business:safety:stock:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [{ "id": "material:safetyStock:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:safety:stock:sync", "permissionScope": "factory" }]
+}

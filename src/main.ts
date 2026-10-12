@@ -20,7 +20,7 @@ configureRequests(() => ({
   token: auth.token,
   factoryId: auth.factoryId,
   revision: auth.revision
-}), () => auth.clear())
+}), () => auth.clear(), () => auth.requireFactorySelection())
 app.directive('permission', {
   mounted(el, binding) {
     const value = binding.value as { code: string; scope: 'platform' | 'factory' }

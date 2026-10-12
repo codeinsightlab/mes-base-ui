@@ -35,6 +35,7 @@ export const useAuth = defineStore('auth', {
       factoryId: '',
       savedFactoryId: saved?.factoryId ?? '',
       factorySwitching: false,
+      factorySelectionRequired: false,
       sessionReady: false,
       sessionError: '',
       revision: 0,
@@ -52,6 +53,7 @@ export const useAuth = defineStore('auth', {
     },
     clear() {
       this.factorySwitching = false
+      this.factorySelectionRequired = false
       this.workspaceAccess = null
       removeSession()
       this.token = ''
@@ -68,6 +70,23 @@ export const useAuth = defineStore('auth', {
       this.factoryPermissions = []
       this.factories = []
       this.revision++
+    },
+    requireFactorySelection() {
+      this.factorySelectionRequired = true
+      this.factoryId = ''
+      this.savedFactoryId = ''
+      this.factoryMenus = []
+      this.factoryPermissions = []
+      this.revision++
+      this.persistSession()
+    },
+    async loadFactoryOptions() {
+      const revision = this.revision
+      const factories = await request<typeof this.factories>('/api/foundation/factories', {
+        scope: 'platform', query: { offset: 0, limit: 100 }
+      })
+      if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+      this.factories = factories
     },
     persistSession() {
       if (this.token) saveSession({ token: this.token, expiresAt: this.expiresAt, factoryId: this.factoryId })
@@ -91,6 +110,11 @@ export const useAuth = defineStore('auth', {
       try {
         await task
       } catch(error) {
+        if (this.token && this.factorySelectionRequired) {
+          this.sessionReady = true
+          this.sessionError = ''
+          return
+        }
         if (this.token) this.sessionError = error instanceof Error ? error.message : '登录状态恢复失败，请重试'
         throw error
       } finally {
@@ -112,6 +136,7 @@ export const useAuth = defineStore('auth', {
       this.username = username
       this.factoryId = ''
       this.savedFactoryId = ''
+      this.factorySelectionRequired = false
       this.revision++
       try {
         await this.loadNavigation()
@@ -119,6 +144,11 @@ export const useAuth = defineStore('auth', {
         this.persistSession()
         this.sessionReady = true
       } catch(e) {
+        if (this.token && this.factorySelectionRequired) {
+          this.persistSession()
+          this.sessionReady = true
+          return
+        }
         this.clear()
         throw e
       }
@@ -145,14 +175,11 @@ export const useAuth = defineStore('auth', {
     },
     async restoreFactory() {
       const revision = this.revision
-      const [factories, context] = await Promise.all([
-        request<typeof this.factories>('/api/foundation/factories', {
-          scope: 'platform', query: { offset: 0, limit: 100 }
-        }),
+      const [, context] = await Promise.all([
+        this.loadFactoryOptions(),
         request<{ factoryId: string | null }>('/api/foundation/context', { scope: 'platform' })
       ])
       if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
-      this.factories = factories
       await this.selectFactory(context.factoryId ?? '', false)
     },
     async refreshNavigation() {
@@ -190,6 +217,7 @@ export const useAuth = defineStore('auth', {
           this.factoryPermissions = value.permissions
           this.factoryMenus = routeMenus(value.menus)
         }
+        this.factorySelectionRequired = false
       } finally {
         if (switches.get(this) === switchMarker) {
           this.factorySwitching = false

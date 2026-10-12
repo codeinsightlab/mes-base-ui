@@ -39,7 +39,9 @@ export default defineConfig(({ command, mode }) => {
       proxy: command === 'serve' ? {
         '/api': { target: apiTarget },
         '/health': { target: apiTarget },
-        '/open-api': { target: apiTarget }
+        '/open-api': { target: apiTarget },
+        '/openapi-docs': { target: apiTarget },
+        '/v3/api-docs/open-api': { target: apiTarget }
       } : undefined
     },
     test: { environment: 'jsdom', restoreMocks: true }

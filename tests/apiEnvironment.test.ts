@@ -10,7 +10,7 @@ describe('environment backend configuration', () => {
     if (typeof configExport !== 'function') throw new Error('Expected mode-aware Vite configuration')
     const config = await configExport({ command: 'serve', mode: 'development' })
     const proxy = config.server?.proxy
-    for (const path of ['/api', '/open-api', '/health']) {
+    for (const path of ['/api', '/open-api', '/health', '/openapi-docs', '/v3/api-docs/open-api']) {
       expect(proxy?.[path]).toMatchObject({ target: 'http://127.0.0.1:18081' })
       expect(proxy?.[path]).not.toHaveProperty('rewrite')
     }

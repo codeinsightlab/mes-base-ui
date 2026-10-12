@@ -9,7 +9,7 @@ const info = { user: { userName: 'server-user', avatar: '' }, permissions: ['sys
 function store() {
   setActivePinia(createPinia())
   const auth = useAuth()
-  configureRequests(() => ({ token: auth.token, factoryId: auth.factoryId, revision: auth.revision }), () => auth.clear())
+  configureRequests(() => ({ token: auth.token, factoryId: auth.factoryId, revision: auth.revision }), () => auth.clear(), () => auth.requireFactorySelection())
   return auth
 }
 function responses(factories = [{ factoryId: 'A', name: 'Factory A' }], factoryId: string | null = 'A') {
@@ -127,6 +127,45 @@ describe('persisted login restoration', () => {
     expect(auth.factoryPermissions).toEqual([])
     expect(fetcher).toHaveBeenCalledTimes(4)
     expect(readSession()?.factoryId).toBe('')
+  })
+  it.each(['login', 'restore'])('keeps identity and platform grants when %s finds an unavailable factory', async mode => {
+    if (mode === 'restore') saveSession({ token: 'TEST', expiresAt: expiresAt(), factoryId: 'A' })
+    const auth = store()
+    const fetcher = responses()
+    fetcher.mockImplementation(async(path: string) => {
+      if (path === '/api/session') return new Response(JSON.stringify({ accessToken: 'TEST', expiresAt: expiresAt() }))
+      if (path === '/api/factory/navigation') return new Response('{"errorCode":"FACTORY_SELECTION_REQUIRED"}', { status: 422 })
+      return new Response(JSON.stringify(path.includes('/info') ? info : path.includes('/menus') ? { data: [] } : path.includes('/context') ? { factoryId: 'A' } : [{ factoryId: 'B', name: 'B' }]))
+    })
+    if (mode === 'login') await auth.login('TEST', 'TEST ONLY password')
+    else await auth.restoreSession()
+    expect(auth.loggedIn).toBe(true)
+    expect(auth.sessionReady).toBe(true)
+    expect(auth.factorySelectionRequired).toBe(true)
+    expect(auth.factoryId).toBe('')
+    expect(auth.platformPermissions).toEqual(info.permissions)
+    expect(auth.factoryPermissions).toEqual([])
+    expect(readSession()?.factoryId).toBe('')
+    await auth.loadFactoryOptions()
+    expect(new Headers(fetcher.mock.calls.at(-1)![1].headers).has('X-Factory-Id')).toBe(false)
+    fetcher.mockImplementation(async(path: string) => new Response(path.includes('/preference') ? '{"factoryId":"B"}' : '{"menus":[],"permissions":["B:read"]}'))
+    await auth.selectFactory('B')
+    expect(auth.factorySelectionRequired).toBe(false)
+    expect(auth.factoryId).toBe('B')
+    expect(auth.factoryPermissions).toEqual(['B:read'])
+  })
+  it('allows the platform workspace when no factories remain', async() => {
+    const auth = store()
+    auth.token = 'TEST'
+    auth.expiresAt = expiresAt()
+    auth.requireFactorySelection()
+    const fetcher = responses([], null)
+    await auth.loadFactoryOptions()
+    await auth.selectFactory('', false)
+    expect(auth.loggedIn).toBe(true)
+    expect(auth.factorySelectionRequired).toBe(false)
+    expect(auth.factoryId).toBe('')
+    expect(fetcher).toHaveBeenCalledTimes(1)
   })
   it('persists login without passwords or cached privileges, and removes it on logout', async() => {
     const auth = store()

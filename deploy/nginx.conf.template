@@ -24,6 +24,14 @@ server {
         proxy_pass __MES_API_TARGET__;
     }
 
+    location /openapi-docs/ {
+        proxy_pass __MES_API_TARGET__;
+    }
+
+    location = /v3/api-docs/open-api {
+        proxy_pass __MES_API_TARGET__;
+    }
+
     location = /health {
         proxy_pass __MES_API_TARGET__;
     }

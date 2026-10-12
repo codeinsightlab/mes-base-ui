@@ -9,7 +9,12 @@ function assertCurrent(snapshot: RequestContext) {
   }
 }
 let unauthenticated: () => void = () => {}
-export function configureRequests(provider: () => RequestContext, on401: () => void) { context = provider; unauthenticated = on401 }
+let factorySelectionRequired: () => void = () => {}
+export function configureRequests(provider: () => RequestContext, on401: () => void, onFactorySelection: () => void = () => {}) {
+  context = provider
+  unauthenticated = on401
+  factorySelectionRequired = onFactorySelection
+}
 export class ApiError extends Error { constructor(public code: string, message: string, public requestId = '', public status = 0) { super(message) } }
 export interface RequestOptions { method?: string; body?: unknown; query?: Record<string, string | number>; scope?: PermissionScope; public?: boolean }
 async function send(path: string, options: RequestOptions = {}): Promise<Response> {
@@ -29,8 +34,9 @@ async function send(path: string, options: RequestOptions = {}): Promise<Respons
     try { error = await response.json() } catch { /* Non-JSON upstream error is a transport failure, never success. */ }
     assertCurrent(snapshot)
     if (response.status === 401 && !options.public) unauthenticated()
+    if (response.status === 422 && error.errorCode === 'FACTORY_SELECTION_REQUIRED' && !options.public) factorySelectionRequired()
     const messages: Record<number, string> = { 400: '输入不符合要求，请检查字段', 401: '登录已失效，请重新登录', 403: '当前范围没有此操作权限', 404: '资源不存在或不在当前范围', 409: '数据冲突，请刷新后重试', 422: '当前操作不可执行' }
-    throw new ApiError(error.errorCode ?? 'HTTP_ERROR', (error.errorCode === 'SESSION_REVOCATION_PENDING' ? '账号变更已保存，会话撤销正在重试；请勿重复提交' : error.errorCode === 'BUSINESS_REJECTED' ? error.message : undefined) ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status)
+    throw new ApiError(error.errorCode ?? 'HTTP_ERROR', (error.errorCode === 'FACTORY_SELECTION_REQUIRED' ? '当前工厂不可用，请重新选择工厂' : error.errorCode === 'SESSION_REVOCATION_PENDING' ? '账号变更已保存，会话撤销正在重试；请勿重复提交' : error.errorCode === 'ERP_SYNC_NOT_CONFIGURED' ? '暂未配置 ERP 同步数据来源' : error.errorCode === 'BUSINESS_REJECTED' ? error.message : undefined) ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status)
   }
   responseContexts.set(response, snapshot)
   return response
