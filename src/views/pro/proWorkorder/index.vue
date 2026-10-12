@@ -3,6 +3,10 @@
 import CrudPage from '@/components/CrudPage.vue'
 import { api } from '@/api/pro/proWorkorder'
 import type { Field } from '@/lib/crud'
+import { ref } from 'vue'
+import { sync } from '@/api/pro/proWorkorder'
+import SyncButton from '@/components/business/SyncButton.vue'
+const page = ref<InstanceType<typeof CrudPage> | null>(null)
 
 const fields: Field[] = [
   {
@@ -316,10 +320,15 @@ const fields: Field[] = [
 
 <template>
   <CrudPage
-    title="生产工单表"
+    ref="page"
+    title="生产工单"
     permission="business:pro:workorder"
     :api="api"
     :fields="fields"
     id-key="workorderId"
-  />
+  >
+    <template #toolbar>
+      <SyncButton permission="business:pro:workorder:sync" scope="factory" :run="sync" @completed="page?.load()" />
+    </template>
+  </CrudPage>
 </template>

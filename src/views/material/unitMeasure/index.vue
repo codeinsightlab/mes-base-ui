@@ -3,7 +3,8 @@
 import { computed, ref } from 'vue'
 import CrudPage from '@/components/CrudPage.vue'
 import SyncButton from '@/components/business/SyncButton.vue'
-import { api, sync } from '@/api/material/unitMeasure'
+import { api } from '@/api/material/unitMeasure'
+import { sync } from '@/api/material/unitMeasure'
 import type { Field } from '@/lib/crud'
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 const fields = computed<Field[]>(() => [
@@ -15,7 +16,7 @@ const fields = computed<Field[]>(() => [
 ])
 </script>
 <template>
-  <CrudPage list-action="list" detail-action="query" ref="page" title="计量单位" permission="business:unit:measure" :api="api" :fields="fields" id-key="id">
+  <CrudPage table-key="business:unit:measure:list" list-action="list" detail-action="query" ref="page" title="计量单位" permission="business:unit:measure" :api="api" :fields="fields" id-key="id">
     <template #toolbar>
       <SyncButton permission="business:unit:measure:sync" scope="factory" :run="sync" @completed="page?.load()" />
     </template>

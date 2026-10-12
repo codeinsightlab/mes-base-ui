@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import ColumnSettings from '@/components/ColumnSettings.vue'
+import { useTableColumns } from '@/lib/useTableColumns'
+import { tableRouteUrl } from '@/lib/tableColumns'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import CodeText from '@/components/CodeText.vue'
@@ -14,15 +17,20 @@ import type { CrudApi, Field, Row } from '@/lib/crud'
 import type { PermissionScope } from '@/lib/request'
 
 const props = withDefaults(defineProps<{
+  tableKey?: string;
+  tableConfigUrl?: string;
   title: string;
   permission: string;
   permissionScope?: PermissionScope;
+  listAction?: string;
+  detailAction?: string;
   api: CrudApi;
   fields: Field[];
   idKey?: string;
   readonly?: boolean;
   searchable?: boolean
-}>(), { idKey: 'id', permissionScope: undefined, searchable: true })
+}>(), { idKey: 'id', permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
+const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth()
 const route = inject(routeLocationKey, undefined)
 const resolvedPermissionScope = computed<PermissionScope>(() => props.permissionScope ??
@@ -32,18 +40,21 @@ const rows = ref<Row[]>([]), total = ref(0), page = ref(1), limit = ref(20), loa
 const showSearch = ref(true)
 const draft = reactive<Row>({}), search = reactive<Record<string, string>>({})
 let generation = 0
-const columns = computed(() => props.fields.filter(f => !f.hidden && f.kind !== 'password' && f.key !== 'factoryId'))
+const defaultColumns = computed(() => props.fields.filter(f => !f.hidden && f.kind !== 'password' && f.key !== 'factoryId'))
+const columnSettings = useTableColumns(defaultColumns, () => props.tableKey, () => tableRouteUrl(route, props.tableConfigUrl))
+const columns = columnSettings.columns
 const searchFields = computed(() => props.searchable ? props.fields.filter(f => f.searchable ?? ['code', 'name'].includes(f.key)) : [])
 const editable = computed(() => props.fields.filter(f => !f.readonly && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value) && !(editId.value && f.kind === 'password')))
 const selectedIds = ref<string[]>([])
 const deleting = ref(false)
+watch(() => columns.value.map(column => column.key).join('|'), () => { selectedIds.value = [] })
 const can = (action: string) => auth.hasPermission(props.permission + ':' + action, resolvedPermissionScope.value)
 const writeAllowed = computed(() => editId.value ? can('update') : can('create'))
 
 async function load() {
   const current = ++generation
   selectedIds.value = []
-  if (!can('read')) {
+  if (!can(props.listAction)) {
     rows.value = []
     total.value = 0
     error.value = ''
@@ -74,11 +85,12 @@ async function load() {
 }
 
 async function open(row?: Row) {
-  if (props.readonly || (row ? !can('update') : !can('create'))) return
+  if (props.readonly || (row ? !can('update') || !can(props.detailAction) : !can('create'))) return
   const revision = auth.revision
   error.value = ''
   editId.value = row ? String(row[props.idKey]) : null
   Object.keys(draft).forEach(k => delete draft[k])
+  if (!row) Object.assign(draft, Object.fromEntries(props.fields.filter(field => field.defaultValue !== undefined).map(field => [field.key, field.defaultValue])))
   if (row) {
     try {
       const detail = props.api.detail ? await props.api.detail(editId.value!) : row
@@ -111,6 +123,7 @@ async function save() {
     }
     dialog.value = false
     ElMessage.success('已保存')
+    emit('changed')
     await load()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '保存失败')
@@ -132,6 +145,7 @@ async function remove(row: Row) {
     await props.api.remove(String(row[props.idKey]))
     if (rows.value.length === 1 && page.value > 1) page.value--
     ElMessage.success('已删除')
+    emit('changed')
     await load()
   } catch (e) {
     if (e === 'cancel' || e === 'close') return
@@ -166,7 +180,7 @@ async function delids() {
   }
 }
 
-watch(() => can('read'), load)
+watch(() => can(props.listAction), load)
 watch(() => can('delete'), () => {
   selectedIds.value = []
 })
@@ -198,7 +212,7 @@ defineExpose({ load })
   <section class="app-container">
     <PageHeader :title="title" />
     <el-form
-      v-if="searchFields.length && can('read')"
+      v-if="searchFields.length && can(props.listAction)"
       v-show="showSearch"
       :inline="true"
       class="filter-panel"
@@ -225,14 +239,18 @@ defineExpose({ load })
         @click="delids"
       >批量删除
       </el-button>
-      <RightToolbar v-if="searchFields.length && can('read')" v-model:show-search="showSearch" @query-table="load" />
-      <el-button v-else-if="can('read')" :loading="loading" icon="Refresh" @click="load">刷新</el-button>
+      <slot name="toolbar" />
+      <ColumnSettings v-if="tableKey && can(props.listAction)" :controller="columnSettings" />
+      <RightToolbar v-if="searchFields.length && can(props.listAction)" v-model:show-search="showSearch" @query-table="load" />
+      <el-button v-else-if="can(props.listAction)" :loading="loading" icon="Refresh" @click="load">刷新</el-button>
     </div>
-    <el-alert v-if="error && can('read')" :title="error" type="error" :closable="false" show-icon class="error">
+    <el-alert v-if="tableKey && columnSettings.state.error && !columnSettings.state.open && can(props.listAction)"
+              :title="columnSettings.state.error" type="warning" :closable="false" show-icon />
+    <el-alert v-if="error && can(props.listAction)" :title="error" type="error" :closable="false" show-icon class="error">
       <el-button @click="load">重试</el-button>
     </el-alert>
-    <el-alert v-if="!can('read')" title="当前范围没有读取权限" type="warning" :closable="false" show-icon />
-    <el-table v-if="can('read')" v-loading="loading" :data="rows" :row-key="idKey" size="default" empty-text="暂无记录"
+    <el-alert v-if="!can(props.listAction)" title="当前范围没有读取权限" type="warning" :closable="false" show-icon />
+    <el-table :key="columns.map(column => column.key).join('|')" v-if="can(props.listAction)" v-loading="loading" :data="rows" :row-key="idKey" size="default" empty-text="暂无记录"
               style="width:100%" @selection-change="selectRows">
       <el-table-column v-if="!readonly && can('delete') && api.delids" type="selection" width="48" />
       <el-table-column
@@ -240,6 +258,7 @@ defineExpose({ load })
         :key="field.key"
         :label="field.label"
         :prop="field.key"
+        :fixed="field.columnFixed"
         :min-width="field.kind==='datetime'?180:field.key===idKey?180:120"
         show-overflow-tooltip
       >
@@ -253,7 +272,7 @@ defineExpose({ load })
           <span
             v-else
             :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
-          >{{ formatValue(row[field.key], field.kind)
+          >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? formatValue(row[field.key], field.kind)
             }}</span></template>
       </el-table-column>
       <el-table-column v-if="!readonly && (can('update') || can('delete') || $slots.actions)" label="操作" fixed="right"
@@ -266,7 +285,7 @@ defineExpose({ load })
       </el-table-column>
     </el-table>
     <Pagination
-      v-if="can('read')"
+      v-if="can(props.listAction)"
       v-model:page="page"
       v-model:limit="limit"
       :total="total"

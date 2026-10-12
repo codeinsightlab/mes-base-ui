@@ -3,7 +3,8 @@
 import { computed, ref } from 'vue'
 import CrudPage from '@/components/CrudPage.vue'
 import SyncButton from '@/components/business/SyncButton.vue'
-import { api, sync } from '@/api/material/materialCategory'
+import { api } from '@/api/material/materialCategory'
+import { sync } from '@/api/material/materialCategory'
 import type { Field } from '@/lib/crud'
 import { useBasicDataReferences } from '@/lib/basicDataReferences'
 import { api as parentIdApi } from '@/api/material/materialCategory'
@@ -20,7 +21,7 @@ const fields = computed<Field[]>(() => [
 ])
 </script>
 <template>
-  <CrudPage list-action="list" detail-action="query" @changed="parentIdReload()" ref="page" title="物料分类" permission="business:material:category" :api="api" :fields="fields" id-key="id">
+  <CrudPage table-key="business:material:category:list" list-action="list" detail-action="query" @changed="parentIdReload()" ref="page" title="物料分类" permission="business:material:category" :api="api" :fields="fields" id-key="id">
     <template #toolbar>
       <SyncButton permission="business:material:category:sync" scope="factory" :run="sync" @completed="page?.load()" />
     </template>
