@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "md:mdWorkshop",
+  "name": "车间",
+  "path": "/basic/mdWorkshop",
+  "component": "md/mdWorkshop/index",
+  "permission": "business:md:workshop:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [{ "id": "md:mdWorkshop:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:md:workshop:sync", "permissionScope": "factory" }]
+}
