@@ -1,15 +1,25 @@
-// TEST ONLY: generated page + API + real CrudPage; no server/database access.
+// TEST ONLY: shared CrudPage/request; no server/database access.
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
-import Workorder from '../src/views/pro/proWorkorder/index.vue'
+import CrudPage from '../src/components/CrudPage.vue'
+import { request } from '../src/lib/request'
+import type { CrudApi, Field } from '../src/lib/crud'
+const api: CrudApi = {
+  list: query => request('/api/pro/pro-workorder', { query }),
+  create: vi.fn(), update: vi.fn(), remove: vi.fn()
+}
+const props = { title: 'TEST ONLY', permission: 'business:pro:workorder', api, idKey: 'workorderId',
+  fields: [{ key: 'workorderId', label: '编号', kind: 'text' }, { key: 'workorderCode', label: '编码', kind: 'text' },
+    { key: 'workorderName', label: '名称', kind: 'text' }, { key: 'quantity', label: '数量', kind: 'number' }] as Field[] }
+
 import { useAuth } from '../src/stores/auth'
 import { configureRequests } from '../src/lib/request'
 
 afterEach(() => { vi.unstubAllGlobals();configureRequests(() => ({ token: '', factoryId: '', revision: 0 }), () => {}) })
-describe('generated workorder list response', () => {
-  it('renders nonempty items through the generated API without response fallbacks', async() => {
+describe('Shared CRUD list response', () => {
+  it('renders nonempty items through the request contract without response fallbacks', async() => {
     vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}})
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       items: [{ workorderId: '9007199254740993', workorderCode: 'TEST-WO-001',
@@ -20,7 +30,7 @@ describe('generated workorder list response', () => {
     const pinia = createPinia(), auth = useAuth(pinia)
     auth.factoryPermissions = ['business:pro:workorder:read']
     configureRequests(() => ({ token: '', factoryId: 'TEST-ONLY', revision: 0 }), () => {})
-    const wrapper = mount(Workorder, { global: { plugins: [pinia, ElementPlus] }})
+    const wrapper = mount(CrudPage, { props, global: { plugins: [pinia, ElementPlus] }})
     try {
       await flushPromises()
       expect(fetch).toHaveBeenCalledOnce()

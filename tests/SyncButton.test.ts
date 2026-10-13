@@ -4,10 +4,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { useAuth } from '../src/stores/auth'
 import Button from '../src/components/business/SyncButton.vue'
-import { sync } from '../src/api/material/material'
+const sync = vi.fn<() => Promise<{ fetched: number; created: number; updated: number; skipped: number }>>()
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { MessageBoxData } from 'element-plus'
-vi.mock('../src/api/material/material', () => ({ sync: vi.fn() }))
 vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn(), error: vi.fn() }, ElMessageBox: { confirm: vi.fn() }}))
 afterEach(() => vi.resetAllMocks())
 function page(permission = true) {
@@ -16,7 +15,7 @@ function page(permission = true) {
   const wrapper = mount(Button, { props: { permission: 'business:material:sync', scope: 'factory', run: sync }, global: { plugins: [pinia], stubs: { ElButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' }}}})
   return { wrapper, auth }
 }
-describe('Material sync', () => {
+describe('Shared synchronization button', () => {
   it('create permission alone does not expose sync', () => {
     const { wrapper } = page(false)
     expect(wrapper.find('button').exists()).toBe(false)

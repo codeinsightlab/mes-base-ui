@@ -1,10 +1,26 @@
-// TEST ONLY: generated page, real CrudPage/API, synthetic HTTP responses; no live ERP/database.
+// TEST ONLY: shared CrudPage/request, synthetic HTTP responses; no live ERP/database.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ElementPlus, { ElMessageBox } from 'element-plus'
 import type { MessageBoxData } from 'element-plus'
-import Material from '../src/views/material/material/index.vue'
+import CrudPage from '../src/components/CrudPage.vue'
+import SyncButton from '../src/components/business/SyncButton.vue'
+import { h } from 'vue'
+import { request } from '../src/lib/request'
+import type { CrudApi, Field } from '../src/lib/crud'
+
+const api: CrudApi = {
+  list: query => request('/api/material/material', { query }),
+  detail: id => request('/api/material/material/' + encodeURIComponent(id)),
+  create: body => request('/api/material/material', { method: 'POST', body }),
+  update: (id, body) => request('/api/material/material/' + encodeURIComponent(id), { method: 'PUT', body }),
+  remove: id => request('/api/material/material', { method: 'DELETE', body: [id] })
+}
+const props = { title: 'TEST ONLY', permission: 'business:material', listAction: 'list', detailAction: 'query', api,
+  fields: [{ key: 'id', label: '编号', kind: 'text', readonly: true }, { key: 'code', label: '编码', kind: 'text' },
+    { key: 'name', label: '名称', kind: 'text' }] as Field[] }
+
 import { useAuth } from '../src/stores/auth'
 import { configureRequests } from '../src/lib/request'
 
@@ -12,7 +28,7 @@ afterEach(() => {
   vi.restoreAllMocks(); vi.unstubAllGlobals()
   configureRequests(() => ({ token: '', factoryId: '', revision: 0 }), () => {})
 })
-describe('Material generated page and synchronization', () => {
+describe('Shared CRUD request and synchronization', () => {
   it('binds current factory, refreshes the real list after sync, and leaves CRUD rendering intact', async() => {
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as MessageBoxData)
@@ -25,7 +41,7 @@ describe('Material generated page and synchronization', () => {
     const pinia = createPinia(), auth = useAuth(pinia)
     auth.factoryPermissions = ['business:material:list', 'business:material:sync']
     configureRequests(() => ({ token: '', factoryId: 'TEST_ONLY_A', revision: 0 }), () => {})
-    const wrapper = mount(Material, { global: { plugins: [pinia, ElementPlus] }})
+    const wrapper = mount(CrudPage, { props, slots: { toolbar: () => h(SyncButton, { permission: 'business:material:sync', scope: 'factory', run: () => request<{ fetched: number; created: number; updated: number; skipped: number }>('/api/material/material/actions/sync', { method: 'POST' }), onCompleted: () => wrapper.vm.load() }) }, global: { plugins: [pinia, ElementPlus] }})
     try {
       await flushPromises()
       const sync = wrapper.findAll('button').find(button => button.text() === '同步')!
@@ -43,8 +59,8 @@ describe('Material generated page and synchronization', () => {
   })
 })
 
-describe('Material detail loading', () => {
-  it('loads edit and read-only detail from the ID endpoint instead of reusing list fields', async() => {
+describe('Shared CRUD detail loading', () => {
+  it('loads fresh edit data from the ID endpoint and clears it on context change', async() => {
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
     const id = '9007199254740993'
     const fetch = vi.fn().mockImplementation(async(path: string) => new Response(JSON.stringify(
@@ -56,7 +72,7 @@ describe('Material detail loading', () => {
     const pinia = createPinia(), auth = useAuth(pinia)
     auth.factoryPermissions = ['business:material:list', 'business:material:query', 'business:material:update']
     configureRequests(() => ({ token: '', factoryId: 'TEST_ONLY_A', revision: 0 }), () => {})
-    const wrapper = mount(Material, { global: { plugins: [pinia, ElementPlus], stubs: { teleport: true, ElSelect: true, ElOption: true } } })
+    const wrapper = mount(CrudPage, { props, global: { plugins: [pinia, ElementPlus], stubs: { teleport: true, ElSelect: true, ElOption: true } } })
     try {
       await flushPromises()
       expect(wrapper.text()).toContain('STALE LIST')
@@ -67,10 +83,10 @@ describe('Material detail loading', () => {
         .some(input => input.props('modelValue') === 'DETAIL ONLY')).toBe(true)
       await wrapper.findAll('button').find(button => button.text() === '取消')!.trigger('click')
       await flushPromises()
-      await wrapper.findAll('button').find(button => button.text() === '详情')!.trigger('click')
+      await wrapper.findAll('button').find(button => button.text().replaceAll(' ', '') === '编辑')!.trigger('click')
       await flushPromises()
       expect(fetch.mock.calls.filter(call => call[0] === '/api/material/material/' + id)).toHaveLength(2)
-      expect(wrapper.text()).toContain('DETAIL ONLY')
+      expect(wrapper.findAllComponents({ name: 'ElInput' }).some(input => input.props('modelValue') === 'DETAIL ONLY')).toBe(true)
       auth.revision++
       await flushPromises()
       expect(wrapper.findAllComponents({ name: 'ElDialog' }).every(dialog => !dialog.props('modelValue'))).toBe(true)
