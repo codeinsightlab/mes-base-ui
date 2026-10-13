@@ -1,6 +1,10 @@
 # MES Base UI
 2026-10-05 Active。先读个人 `/Users/user/Documents/agents/AGENTS.md`、前端专项规范，以及相邻 `../mes-base/AGENTS.md` 的公共/范围/工作区规则。
 
+## 手工修改生成文件的保护（2026-10-13 用户要求）
+
+修改代码前检查目标文件是否包含 `MES-CODEGEN` 生成归属标记；手工修改带标记的生成页面或其他生成代码时，必须同时移除该文件的生成归属标记，防止未来重新生成覆盖手工改动。仅阅读不移除，不清理未修改文件的标记。通用生成模板、标记检测逻辑和测试样例保留必要标记字符串。移除后生成冲突不得通过擅自恢复标记解决；恢复生成器维护须有用户明确授权。完整规则见 `../mes-base/AGENTS.md` 第 11.1 节。
+
 Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改变用户全局 Node16。保持 API/VO 真实契约、损失为零的 bigint/decimal 字符串；源项目 Vue2 页面是迁移产品资产，保留字段、查询、列、按钮、弹窗/联动、权限、字典和实际用户流程，适配 Vue3，不带客户数据/身份/Secret。
 
 迁移阶段不调用 Codegen Skill，先 COPY / PORT 源页面与 API，不能用重新生成 CRUD 替代已有功能。后续新增开发的标准表驱动页面才先读取 `../mes-base/.agents/skills/mes-crud-codegen/SKILL.md`，通过 Base CLI 自动放置，再做 UI review/优化/test/build。公共 shell、CrudPage、dict、request 与 permission 在 src；使用已有视觉系统。菜单仅能指向已编译模块，客户端按钮和路由不承担最终授权。请求可声明预期 scope；有已选 Factory 时所有请求携带 X-Factory-Id，接口归属由后端 URL 判断，平台/个人请求不因请求头进入业务库；切换清除旧数据/权限，过期响应不能回填。按用户2026-10-06明确要求保留刷新登录态：localStorage只保存Token、有效期与选厂偏好，不保存密码、用户资料、菜单或权限；初始化从后端重新校验身份/权限/启用厂，过期、401或注销清除保存值，网络失败保留并允许重试。文件走带认证的私有下载。

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import { defineComponent, reactive } from 'vue'
+import { defineComponent, reactive, h, KeepAlive } from 'vue'
 import ElementPlus from 'element-plus'
 import CrudPage from '../src/components/CrudPage.vue'
 import ColumnSettings from '../src/components/ColumnSettings.vue'
@@ -11,6 +11,7 @@ import { mergeColumns, normalizeTableUrl, tableRouteUrl } from '../src/lib/table
 import { useTableColumns } from '../src/lib/useTableColumns'
 import type { Field } from '../src/lib/crud'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import { createRouter, createMemoryHistory, RouterView, useRoute } from 'vue-router'
 
 const fields: Field[] = [{ key: 'id', label: '编号', kind: 'text', columnHideable: false, columnMovable: false },
   { key: 'code', label: '编码', kind: 'text' }, { key: 'name', label: '名称', kind: 'text' }]
@@ -57,6 +58,54 @@ describe('column identity and merge', () => {
 })
 
 describe('personal column lifecycle', () => {
+  it('loads only the active cached page with its own URL and table key', async() => {
+    const { pinia, auth } = login()
+    const requests: Array<{ url: string | null; tableKey: string | null; factory: string | null }> = []
+    let finishFirst!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((path, options) => {
+      const query = new URL(path, 'http://localhost').searchParams
+      requests.push({ url: query.get('url'), tableKey: query.get('tableKey'), factory: options.headers.get('X-Factory-Id') })
+      if (requests.length === 1) return new Promise<Response>(resolve => { finishFirst = resolve })
+      return Promise.resolve(json({ columns: [{ key: 'code', visible: false }] }))
+    }))
+    const controllers = new Map<string, ReturnType<typeof useTableColumns<Field>>>()
+    const page = (key: string) => defineComponent({ setup() {
+      const route = useRoute()
+      controllers.set(key, useTableColumns(() => fields, () => key, () => tableRouteUrl(route)))
+      return () => h('div', key)
+    } })
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/one', component: page('one:list') }, { path: '/two', component: page('two:list') },
+      { path: '/other', component: defineComponent({ render: () => h('div', 'other') }) }
+    ] })
+    await router.push('/one'); await router.isReady()
+    const wrapper = mount(defineComponent({ setup: () => () => h(RouterView, {}, {
+      default: ({ Component, route }: { Component: any; route: RouteLocationNormalizedLoaded }) =>
+        h(KeepAlive, {}, { default: () => h(Component, { key: route.fullPath }) })
+    }) }), { global: { plugins: [pinia, router] } })
+    try {
+      await flushPromises()
+      expect(requests).toEqual([{ url: '/one', tableKey: 'one:list', factory: 'A' }])
+      await router.push('/two'); await flushPromises()
+      expect(requests).toHaveLength(2)
+      expect(requests[1]).toEqual({ url: '/two', tableKey: 'two:list', factory: 'A' })
+      expect(controllers.get('one:list')!.available.value).toBe(false)
+      finishFirst(json({ columns: [{ key: 'name', visible: false }] })); await flushPromises()
+      expect(controllers.get('one:list')!.state.saved).toBeNull()
+      auth.factoryId = 'B'; auth.revision++; await flushPromises()
+      expect(requests).toHaveLength(3)
+      expect(requests[2]).toEqual({ url: '/two', tableKey: 'two:list', factory: 'B' })
+      await router.push('/one'); await flushPromises()
+      expect(requests).toHaveLength(4)
+      expect(requests[3]).toEqual({ url: '/one', tableKey: 'one:list', factory: 'B' })
+      await router.push('/one?search=test'); await flushPromises()
+      expect(requests).toHaveLength(5)
+      expect(requests[4]).toEqual({ url: '/one', tableKey: 'one:list', factory: 'B' })
+      await router.push('/other'); await flushPromises()
+      auth.factoryId = 'C'; auth.revision++; await flushPromises()
+      expect(requests).toHaveLength(5)
+    } finally { wrapper.unmount() }
+  })
   it('loads defaults, uses independent drafts, persists refresh and resets by DELETE', async() => {
     let stored: unknown = null
     const fetch = vi.fn().mockImplementation(async(_path, options) => {
