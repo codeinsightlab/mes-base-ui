@@ -132,8 +132,11 @@ const fields: Field[] = [
 <template>
   <CrudPage
     ref="page"
+    table-key="business:dv:subject:list"
     title="设备点检保养项目"
     permission="business:dv:subject"
+    list-action="list"
+    detail-action="query"
     :api="api"
     :fields="fields"
     id-key="subjectId"

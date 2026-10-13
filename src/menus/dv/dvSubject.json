@@ -4,7 +4,7 @@
   "name": "设备点检保养项目",
   "path": "/dv/dvSubject",
   "component": "dv/dvSubject/index",
-  "permission": "business:dv:subject:read",
+  "permission": "business:dv:subject:list",
   "permissionScope": "factory",
   "kind": "MENU",
   "icon": "List",

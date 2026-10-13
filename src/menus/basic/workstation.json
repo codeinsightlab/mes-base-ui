@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "basic:workstation",
+  "name": "工作站",
+  "path": "/basic/workstation",
+  "component": "basic/workstation/index",
+  "permission": "business:workstation:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [{ "id": "basic:workstation:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:workstation:sync", "permissionScope": "factory" }]
+}

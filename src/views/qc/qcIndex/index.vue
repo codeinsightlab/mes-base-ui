@@ -114,8 +114,11 @@ const fields: Field[] = [
 <template>
   <CrudPage
     ref="page"
+    table-key="business:qc:index:list"
     title="质量检测项"
     permission="business:qc:index"
+    list-action="list"
+    detail-action="query"
     :api="api"
     :fields="fields"
     id-key="indexId"

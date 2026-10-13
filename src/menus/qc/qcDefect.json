@@ -4,7 +4,7 @@
   "name": "质量缺陷",
   "path": "/qc/qcDefect",
   "component": "qc/qcDefect/index",
-  "permission": "business:qc:defect:read",
+  "permission": "business:qc:defect:list",
   "permissionScope": "factory",
   "kind": "MENU",
   "icon": "List",

@@ -4,7 +4,7 @@
   "name": "质量检测项",
   "path": "/qc/qcIndex",
   "component": "qc/qcIndex/index",
-  "permission": "business:qc:index:read",
+  "permission": "business:qc:index:list",
   "permissionScope": "factory",
   "kind": "MENU",
   "icon": "List",

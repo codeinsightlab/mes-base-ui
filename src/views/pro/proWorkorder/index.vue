@@ -321,8 +321,11 @@ const fields: Field[] = [
 <template>
   <CrudPage
     ref="page"
+    table-key="business:pro:workorder:list"
     title="生产工单"
     permission="business:pro:workorder"
+    list-action="list"
+    detail-action="query"
     :api="api"
     :fields="fields"
     id-key="workorderId"
