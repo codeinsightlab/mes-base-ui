@@ -3,11 +3,12 @@ import ColumnSettings from '@/components/ColumnSettings.vue'
 import { useTableColumns } from '@/lib/useTableColumns'
 import { tableRouteUrl } from '@/lib/tableColumns'
 import PageHeader from '@/components/PageHeader.vue'
+import DocumentFields from '@/components/document/DocumentFields.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import CodeText from '@/components/CodeText.vue'
 import RightToolbar from '@/components/RightToolbar/index.vue'
 import Pagination from '@/components/Pagination/index.vue'
-import { computed, reactive, ref, watch, onMounted, inject } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { routeLocationKey } from 'vue-router'
 import { isPlatformMenu } from '@/lib/menuWorkspaces'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -17,6 +18,9 @@ import type { CrudApi, Field, Row } from '@/lib/crud'
 import type { PermissionScope } from '@/lib/request'
 
 const props = withDefaults(defineProps<{
+  embedded?: boolean;
+  managedEditing?: boolean;
+  fixedValues?: Record<string, string>;
   tableKey?: string;
   tableConfigUrl?: string;
   title: string;
@@ -29,7 +33,7 @@ const props = withDefaults(defineProps<{
   idKey?: string;
   readonly?: boolean;
   searchable?: boolean
-}>(), { idKey: 'id', permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
+}>(), { idKey: 'id', fixedValues: undefined, permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth()
 const route = inject(routeLocationKey, undefined)
@@ -39,12 +43,12 @@ const rows = ref<Row[]>([]), total = ref(0), page = ref(1), limit = ref(20), loa
   error = ref(''), dialog = ref(false), editId = ref<string | null>(null)
 const showSearch = ref(true)
 const draft = reactive<Row>({}), search = reactive<Record<string, string>>({})
-let generation = 0
-const defaultColumns = computed(() => props.fields.filter(f => !f.hidden && f.kind !== 'password' && f.key !== 'factoryId'))
+let generation = 0, contextGeneration = 0
+const defaultColumns = computed(() => props.fields.filter(f => !f.hidden && !(f.key in (props.fixedValues ?? {})) && f.kind !== 'password' && f.key !== 'factoryId'))
 const columnSettings = useTableColumns(defaultColumns, () => props.tableKey, () => tableRouteUrl(route, props.tableConfigUrl))
 const columns = columnSettings.columns
-const searchFields = computed(() => props.searchable ? props.fields.filter(f => f.searchable ?? ['code', 'name'].includes(f.key)) : [])
-const editable = computed(() => props.fields.filter(f => !f.readonly && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value) && !(editId.value && f.kind === 'password')))
+const searchFields = computed(() => props.searchable ? props.fields.filter(f => !(f.key in (props.fixedValues ?? {})) && (f.searchable ?? ['code', 'name'].includes(f.key))) : [])
+const editable = computed(() => props.fields.filter(f => !f.readonly && !(f.key in (props.fixedValues ?? {})) && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value) && !(editId.value && f.kind === 'password')))
 const selectedIds = ref<string[]>([])
 const deleting = ref(false)
 watch(() => columns.value.map(column => column.key).join('|'), () => { selectedIds.value = [] })
@@ -66,6 +70,7 @@ async function load() {
   try {
     const q: Record<string, string | number> = { offset: (page.value - 1) * limit.value, limit: limit.value }
     for (const [k, v] of Object.entries(search)) if (v.trim()) q[k] = v.trim()
+    Object.assign(q, props.fixedValues)
     const result = await props.api.list(q)
     if (current !== generation) return
     if (!result || !Array.isArray(result.items) || typeof result.total !== 'number') {
@@ -73,7 +78,7 @@ async function load() {
     }
     rows.value = result.items
     total.value = result.total
-  } catch (e) {
+  } catch(e) {
     if (current === generation) {
       rows.value = []
       total.value = 0
@@ -85,8 +90,9 @@ async function load() {
 }
 
 async function open(row?: Row) {
-  if (props.readonly || (row ? !can('update') || !can(props.detailAction) : !can('create'))) return
+  if (props.readonly || props.managedEditing || (row ? !can('update') || !can(props.detailAction) : !can('create'))) return
   const revision = auth.revision
+  const context = contextGeneration
   error.value = ''
   editId.value = row ? String(row[props.idKey]) : null
   Object.keys(draft).forEach(k => delete draft[k])
@@ -94,14 +100,15 @@ async function open(row?: Row) {
   if (row) {
     try {
       const detail = props.api.detail ? await props.api.detail(editId.value!) : row
-      if (auth.revision !== revision) return
+      if (auth.revision !== revision || context !== contextGeneration) return
       Object.assign(draft, detail)
-    } catch (e) {
+    } catch(e) {
       error.value = e instanceof Error ? e.message : '资源加载失败'
       return
     }
   }
-  if (auth.revision !== revision) return
+  if (auth.revision !== revision || context !== contextGeneration) return
+  Object.assign(draft, props.fixedValues)
   dialog.value = true
 }
 
@@ -113,41 +120,47 @@ async function save() {
       return
     }
   }
+  const revision = auth.revision
+  const context = contextGeneration
+  const scopeValues = JSON.stringify(props.fixedValues)
   saving.value = true
   try {
-    const body = commandFromDraft(props.fields, draft, !!editId.value, props.idKey)
+    const body = { ...commandFromDraft(props.fields, draft, !!editId.value, props.idKey), ...props.fixedValues }
     if (editId.value) {
       await props.api.update(editId.value, body)
     } else {
       await props.api.create(body)
     }
+    if (auth.revision !== revision || context !== contextGeneration || JSON.stringify(props.fixedValues) !== scopeValues) return
     dialog.value = false
     ElMessage.success('已保存')
     emit('changed')
     await load()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '保存失败')
+  } catch(e) {
+    if (auth.revision === revision && context === contextGeneration && JSON.stringify(props.fixedValues) === scopeValues) ElMessage.error(e instanceof Error ? e.message : '保存失败')
   } finally {
-    saving.value = false
+    if (context === contextGeneration) saving.value = false
   }
 }
 
 async function remove(row: Row) {
   if (props.readonly || !can('delete')) return
   const revision = auth.revision
+  const context = contextGeneration
   try {
     await ElMessageBox.confirm('删除后无法恢复，请确认当前记录。', '删除确认', {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
-      type: 'warning',
+      type: 'warning'
     })
-    if (auth.revision !== revision || !can('delete')) return
+    if (auth.revision !== revision || context !== contextGeneration || !can('delete')) return
     await props.api.remove(String(row[props.idKey]))
+    if (auth.revision !== revision || context !== contextGeneration) return
     if (rows.value.length === 1 && page.value > 1) page.value--
     ElMessage.success('已删除')
     emit('changed')
     await load()
-  } catch (e) {
+  } catch(e) {
     if (e === 'cancel' || e === 'close') return
     ElMessage.error(e instanceof Error ? e.message : '删除失败')
   }
@@ -160,19 +173,20 @@ function selectRows(selection: Row[]) {
 async function delids() {
   if (props.readonly || !can('delete') || !props.api.delids || !selectedIds.value.length || deleting.value) return
   const revision = auth.revision
+  const context = contextGeneration
   const ids = [...selectedIds.value]
   try {
     await ElMessageBox.confirm('确认删除选中的 ' + ids.length + ' 条记录？删除后无法恢复。', '批量删除确认', {
-      confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning',
+      confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning'
     })
-    if (auth.revision !== revision || !can('delete')) return
+    if (auth.revision !== revision || context !== contextGeneration || !can('delete')) return
     deleting.value = true
     await props.api.delids(ids)
-    if (auth.revision !== revision) return
+    if (auth.revision !== revision || context !== contextGeneration) return
     if (ids.length === rows.value.length && page.value > 1) page.value--
     ElMessage.success('已批量删除')
     await load()
-  } catch (e) {
+  } catch(e) {
     if (e === 'cancel' || e === 'close') return
     ElMessage.error(e instanceof Error ? e.message : '批量删除失败')
   } finally {
@@ -195,8 +209,10 @@ function reset() {
   searchNow()
 }
 
-watch(() => [props.api, auth.revision], () => {
+watch(() => [props.api, JSON.stringify(props.fixedValues), auth.revision], () => {
   generation++
+  contextGeneration++
+  saving.value = false
   rows.value = []
   total.value = 0
   dialog.value = false
@@ -205,12 +221,13 @@ watch(() => [props.api, auth.revision], () => {
   page.value = 1
   load()
 })
+onBeforeUnmount(() => { generation++; contextGeneration++ })
 onMounted(load)
 defineExpose({ load })
 </script>
 <template>
-  <section class="app-container">
-    <PageHeader :title="title" />
+  <section :class="embedded ? 'document-lines' : 'app-container'">
+    <PageHeader v-if="!embedded" :title="title" />
     <el-form
       v-if="searchFields.length && can(props.listAction)"
       v-show="showSearch"
@@ -232,9 +249,9 @@ defineExpose({ load })
       </el-form-item>
     </el-form>
     <div class="table-toolbar">
-      <el-button v-if="!readonly && can('create')" type="primary" icon="Plus" @click="open()">新增
+      <el-button v-if="!readonly && !managedEditing && can('create')" type="primary" icon="Plus" @click="open()">新增
       </el-button>
-      <span v-else class="secondary">{{ readonly ? '只读列表' : '记录列表' }}</span>
+      <span v-else-if="!$slots.toolbar" class="secondary">{{ readonly ? '只读列表' : '记录列表' }}</span>
       <el-button
         v-if="!readonly && can('delete') && api.delids"
         type="danger"
@@ -249,14 +266,28 @@ defineExpose({ load })
       <RightToolbar v-if="searchFields.length && can(props.listAction)" v-model:show-search="showSearch" @query-table="load" />
       <el-button v-else-if="can(props.listAction)" :loading="loading" icon="Refresh" @click="load">刷新</el-button>
     </div>
-    <el-alert v-if="tableKey && columnSettings.state.error && !columnSettings.state.open && can(props.listAction)"
-              :title="columnSettings.state.error" type="warning" :closable="false" show-icon />
+    <el-alert
+      v-if="tableKey && columnSettings.state.error && !columnSettings.state.open && can(props.listAction)"
+      :title="columnSettings.state.error"
+      type="warning"
+      :closable="false"
+      show-icon
+    />
     <el-alert v-if="error && can(props.listAction)" :title="error" type="error" :closable="false" show-icon class="error">
       <el-button @click="load">重试</el-button>
     </el-alert>
     <el-alert v-if="!can(props.listAction)" title="当前范围没有读取权限" type="warning" :closable="false" show-icon />
-    <el-table :key="columns.map(column => column.key).join('|')" v-if="can(props.listAction)" v-loading="loading" :data="rows" :row-key="idKey" size="default" empty-text="暂无记录"
-              style="width:100%" @selection-change="selectRows">
+    <el-table
+      v-if="can(props.listAction)"
+      :key="columns.map(column => column.key).join('|')"
+      v-loading="loading"
+      :data="rows"
+      :row-key="idKey"
+      size="default"
+      empty-text="暂无记录"
+      style="width:100%"
+      @selection-change="selectRows"
+    >
       <el-table-column v-if="!readonly && can('delete') && api.delids" type="selection" width="48" />
       <el-table-column
         v-for="field in columns"
@@ -278,13 +309,17 @@ defineExpose({ load })
             v-else
             :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
           >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? formatValue(row[field.key], field.kind)
-            }}</span></template>
+          }}</span></template>
       </el-table-column>
-      <el-table-column v-if="!readonly && (can('update') || can('delete') || $slots.actions)" label="操作" fixed="right"
-                       width="180">
+      <el-table-column
+        v-if="$slots.actions || (!readonly && (can('update') || can('delete')))"
+        label="操作"
+        fixed="right"
+        width="180"
+      >
         <template #default="{row}">
-          <el-button v-if="can('update')" text type="primary" @click="open(row)">编辑</el-button>
-          <el-button v-if="can('delete')" text type="danger" @click="remove(row)">删除</el-button>
+          <el-button v-if="!readonly && !managedEditing && can('update')" text type="primary" @click="open(row)">编辑</el-button>
+          <el-button v-if="!readonly && can('delete')" text type="danger" @click="remove(row)">删除</el-button>
           <slot name="actions" :row="row" />
         </template>
       </el-table-column>
@@ -308,38 +343,10 @@ defineExpose({ load })
     >
       <p class="form-caption">基础信息
         <span>{{ resolvedPermissionScope === 'factory' ? '带 * 的字段为必填；工厂身份由当前上下文确定。' : '带 * 的字段为必填；平台对象的范围按字段配置。'
-          }}</span></p>
-      <el-form label-position="top" class="form-grid" @submit.prevent="save">
-        <el-form-item
-          v-for="field in editable"
-          :key="field.key"
-          :label="field.label"
-          :required="field.required"
-          :class="{'span-2':field.kind==='textarea'||field.key==='remark'}"
-        >
-          <slot :name="`field-${field.key}`" :draft="draft" :field="field">
-          <el-select v-if="field.options" v-model="draft[field.key] as any" placeholder="请选择" clearable>
-            <el-option
-              v-for="option in field.options"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-          <el-switch v-else-if="field.kind==='boolean'" v-model="draft[field.key] as any" />
-          <el-input
-            v-else
-            v-model="draft[field.key] as any"
-            :type="field.kind==='password'?'password':field.kind==='textarea'||field.key==='remark'?'textarea':field.kind==='datetime'?'datetime-local':field.kind==='date'?'date':field.kind==='number'?'number':'text'"
-            :inputmode="field.kind==='decimal'?'decimal':undefined"
-            :show-password="field.kind==='password'"
-            :maxlength="field.maxLength"
-            :disabled="!!editId&&field.key===idKey"
-            :placeholder="'请输入'+field.label"
-          />
-          </slot>
-        </el-form-item>
-      </el-form>
+        }}</span></p>
+      <DocumentFields :fields="editable" :draft="draft" :disabled="saving" :disabled-keys="editId ? [idKey] : []" @submit="save">
+        <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
+      </DocumentFields>
       <template #footer>
         <el-button :disabled="saving" @click="dialog=false">取消</el-button>
         <el-button type="primary" :loading="saving" :disabled="!writeAllowed" @click="save">保存</el-button>

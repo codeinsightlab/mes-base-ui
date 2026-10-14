@@ -1,5 +1,4 @@
 {
-  "_generatedBy": "MES-CODEGEN",
   "id": "issue:mesMaterialIssueItem",
   "name": "领料出库明细",
   "path": "/issue/mesMaterialIssueItem",
@@ -7,6 +6,7 @@
   "permission": "business:mes:material:issue:item:list",
   "permissionScope": "factory",
   "kind": "MENU",
+  "hidden": true,
   "icon": "List",
   "children": []
 }

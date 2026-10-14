@@ -64,8 +64,10 @@ const fields: Field[] = [
   },
   {
     key: 'enableFlag',
-    label: '启用标识，Y为启用，N为停用',
-    kind: 'text',
+    label: '状态',
+    kind: 'select',
+    defaultValue: 'Y',
+    options: [{ label: '启用', value: 'Y', tone: 'success' }, { label: '停用', value: 'N', tone: 'info' }],
     readonly: false,
     required: true,
     searchable: false,

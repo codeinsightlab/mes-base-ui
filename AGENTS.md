@@ -1,4 +1,11 @@
 # MES Base UI
+
+## 2026-10-14 主子单据页面
+
+未来遇到主表带明细的单据结构，前端不沿用生成的单表页面或两张独立CRUD页面，优先复用 `src/components/document/MasterDetailDocument.vue`、`DocumentFields.vue`，采用上方主单、下方绑定当前主单的明细表。业务模块显式提供真实字段、API、权限、父单关联键和业务选择器，组件保持通用交互。前端组件复用不豁免后端生成：新增主表与明细表仍必须通过Codegen Skill生成完整基础后端（persistence + backend，通常同时test），生成配置不产出独立单表前端页面；基础后端生成与业务规则补齐遵守相邻 mes-base/AGENTS.md 第13/14节及迁移例外。
+
+本轮组件沿用现有CrudApi、API适配层、request及主单/明细CRUD后端；领料接口继续经业务Service调用生成Mapper/XML/Example，并保留引用校验、事务和父单删除保护。没有另建通用主子后端引擎，也不由前端执行后端业务规则。先保存主单再新增明细，明细查询和创建固定父单标识，避免手输父单或跨单操作。当前逐次保存与未来整单事务契约必须明确区分；切厂/撤权/卸载清理数据并拒绝迟到响应，保留分页、精确字符串ID/decimal和删除确认。旧独立页面只作必要地址跳转，不保留第二套实现。
+
 2026-10-05 Active。先读个人 `/Users/user/Documents/agents/AGENTS.md`、前端专项规范，以及相邻 `../mes-base/AGENTS.md` 的公共/范围/工作区规则。
 
 ## 手工修改生成文件的保护（2026-10-13 用户要求）

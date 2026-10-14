@@ -10,7 +10,7 @@ const page = ref<InstanceType<typeof CrudPage> | null>(null)
 const fields: Field[] = [
   {
     key: 'id',
-    label: '本地业务主键',
+    label: '车间编号',
     kind: 'text',
     readonly: true,
     required: true,
@@ -19,7 +19,7 @@ const fields: Field[] = [
   },
   {
     key: 'code',
-    label: '工厂内业务编码',
+    label: '车间编码',
     kind: 'text',
     readonly: false,
     required: true,
@@ -28,7 +28,7 @@ const fields: Field[] = [
   },
   {
     key: 'name',
-    label: '业务名称',
+    label: '车间名称',
     kind: 'text',
     readonly: false,
     required: true,
@@ -37,8 +37,10 @@ const fields: Field[] = [
   },
   {
     key: 'status',
-    label: '启用状态：ENABLED启用、DISABLED停用',
-    kind: 'text',
+    label: '状态',
+    kind: 'select',
+    defaultValue: 'ENABLED',
+    options: [{ label: '启用', value: 'ENABLED', tone: 'success' }, { label: '停用', value: 'DISABLED', tone: 'info' }],
     readonly: false,
     required: true,
     searchable: false,
@@ -46,7 +48,7 @@ const fields: Field[] = [
   },
   {
     key: 'remark',
-    label: '业务备注',
+    label: '备注',
     kind: 'text',
     readonly: false,
     required: false,

@@ -73,8 +73,10 @@ const fields: Field[] = [
   },
   {
     key: 'status',
-    label: '启用状态：ENABLED启用、DISABLED停用',
-    kind: 'text',
+    label: '状态',
+    kind: 'select',
+    defaultValue: 'ENABLED',
+    options: [{ label: '启用', value: 'ENABLED', tone: 'success' }, { label: '停用', value: 'DISABLED', tone: 'info' }],
     readonly: false,
     required: true,
     searchable: false,

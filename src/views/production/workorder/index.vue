@@ -172,7 +172,7 @@ onMounted(load)
           <div class="table-toolbar"><strong>{{ selectedBatch.batchNo }} · {{ label[selectedBatch.routeStatus] }}</strong><el-button v-if="routeEditable" :disabled="busy" @click="nodeIds=[]">重新选择</el-button></div>
           <div class="selected-path"><el-tag v-for="(id,i) in nodeIds" :key="id">{{ i+1 }} · {{ graph?.nodes.find(n=>n.id===id)?.nodeCode }} · {{ graph?.nodes.find(n=>n.id===id)?.operationName }}</el-tag><el-empty v-if="!nodeIds.length" description="尚未选择路径" :image-size="45" /></div>
           <template v-if="routeEditable"><p class="secondary">沿真实连接选择入口到出口的完整路径；领料出库确认成功后自动锁定。</p><div class="path-options"><el-button v-for="n in next" :key="n.id" :disabled="busy" @click="n.id && nodeIds.push(n.id)">{{ n.nodeCode }} · {{ n.operationName }}</el-button></div><el-button type="primary" :disabled="!complete" :loading="busy" @click="savePath">保存完整路径</el-button></template>
-          <el-alert v-else :title="detail.workorder.status==='DRAFT'?'先下达工单，才能选择批次路径':'当前路径为只读；出库处理中或待核实的路径不能重选'" type="info" :closable="false" />
+          <el-alert v-else :title="detail.workorder.status==='DRAFT'?'先下达工单，才能选择批次路径':selectedBatch.routeStatus==='LOCKED'?'领料出库已确认成功，路径已锁定':!canSelect?'当前账号没有选择批次路径的权限':'出库处理中或待核实的路径不能重选'" type="info" :closable="false" />
         </section>
       </template><el-empty v-else-if="!busy" description="未读取到工单" />
     </el-drawer>

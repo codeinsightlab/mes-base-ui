@@ -1,7 +1,6 @@
 {
-  "_generatedBy": "MES-CODEGEN",
   "id": "issue:mesMaterialIssue",
-  "name": "领料出库单",
+  "name": "领料出库",
   "path": "/issue/mesMaterialIssue",
   "component": "issue/mesMaterialIssue/index",
   "permission": "business:mes:material:issue:list",
