@@ -219,7 +219,12 @@ defineExpose({ load })
       @submit.prevent="searchNow"
     >
       <el-form-item v-for="field in searchFields" :key="field.key" :label="field.label">
-        <el-input v-model="search[field.key]" clearable :placeholder="'请输入'+field.label" />
+        <slot :name="`search-${field.key}`" :search="search" :field="field">
+          <el-select v-if="field.options" v-model="search[field.key]" clearable :placeholder="'请选择'+field.label">
+            <el-option v-for="option in field.options" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+          <el-input v-else v-model="search[field.key]" clearable :placeholder="'请输入'+field.label" />
+        </slot>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" native-type="submit" icon="Search">查询</el-button>
@@ -259,7 +264,7 @@ defineExpose({ load })
         :label="field.label"
         :prop="field.key"
         :fixed="field.columnFixed"
-        :min-width="field.kind==='datetime'?180:field.key===idKey?180:120"
+        :min-width="field.columnMinWidth ?? (field.kind==='datetime'?180:field.key===idKey?180:120)"
         show-overflow-tooltip
       >
         <template #default="{row}">
@@ -312,6 +317,7 @@ defineExpose({ load })
           :required="field.required"
           :class="{'span-2':field.kind==='textarea'||field.key==='remark'}"
         >
+          <slot :name="`field-${field.key}`" :draft="draft" :field="field">
           <el-select v-if="field.options" v-model="draft[field.key] as any" placeholder="请选择" clearable>
             <el-option
               v-for="option in field.options"
@@ -331,6 +337,7 @@ defineExpose({ load })
             :disabled="!!editId&&field.key===idKey"
             :placeholder="'请输入'+field.label"
           />
+          </slot>
         </el-form-item>
       </el-form>
       <template #footer>

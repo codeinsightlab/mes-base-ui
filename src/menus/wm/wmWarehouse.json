@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "wm:wmWarehouse",
+  "name": "仓库管理",
+  "path": "/stock/wmWarehouse",
+  "component": "wm/wmWarehouse/index",
+  "permission": "business:wm:warehouse:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [{ "id": "wm:wmWarehouse:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:wm:warehouse:sync", "permissionScope": "factory" }]
+}

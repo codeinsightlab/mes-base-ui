@@ -1,10 +1,9 @@
-// MES-CODEGEN: API 与生成的 Controller 使用同一请求契约。
 import { request } from '@/lib/request'
 
 export interface MdUnitMeasureVo {
   [key: string]: unknown;
   measureId: string;
-  factoryId: string;
+
   measureCode: string;
   measureName: string;
   primaryFlag: string;
@@ -25,8 +24,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<MdUnitMeasureVo, 'factoryId' | 'measureCode' | 'measureName' | 'primaryFlag' | 'primaryId' | 'changeRate' | 'enableFlag' | 'remark'>
-export type UpdateCommand = Pick<MdUnitMeasureVo, 'factoryId' | 'measureCode' | 'measureName' | 'primaryFlag' | 'primaryId' | 'changeRate' | 'enableFlag' | 'remark'>
+export type CreateCommand = Pick<MdUnitMeasureVo, 'measureCode' | 'measureName' | 'primaryFlag' | 'primaryId' | 'changeRate' | 'enableFlag' | 'remark'>
+export type UpdateCommand = Pick<MdUnitMeasureVo, 'measureCode' | 'measureName' | 'primaryFlag' | 'primaryId' | 'changeRate' | 'enableFlag' | 'remark'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/md/md-unit-measure', { method: 'DELETE', body: ids, scope: 'factory' })

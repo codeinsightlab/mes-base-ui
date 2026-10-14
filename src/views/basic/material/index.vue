@@ -1,4 +1,3 @@
-<!-- MES-CODEGEN: Base Design System; shared CRUD interactions and explicit field contract. -->
 <script setup lang="ts">
 import CrudPage from '@/components/CrudPage.vue'
 import { api } from '@/api/basic/material'
@@ -17,15 +16,6 @@ const fields: Field[] = [
     required: true,
     searchable: false,
     maxLength: 19
-  },
-  {
-    key: 'factoryId',
-    label: '所属工厂标识，由服务端上下文赋值',
-    kind: 'text',
-    readonly: true,
-    required: true,
-    searchable: false,
-    maxLength: 64
   },
   {
     key: 'code',

@@ -1,10 +1,9 @@
-// MES-CODEGEN: API 与生成的 Controller 使用同一请求契约。
 import { request } from '@/lib/request'
 
 export interface DvSubjectVo {
   [key: string]: unknown;
   subjectId: string;
-  factoryId: string;
+
   subjectCode: string;
   subjectName: string | null;
   subjectType: string | null;
@@ -25,8 +24,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<DvSubjectVo, 'factoryId' | 'subjectCode' | 'subjectName' | 'subjectType' | 'subjectContent' | 'subjectStandard' | 'enableFlag' | 'remark'>
-export type UpdateCommand = Pick<DvSubjectVo, 'factoryId' | 'subjectCode' | 'subjectName' | 'subjectType' | 'subjectContent' | 'subjectStandard' | 'enableFlag' | 'remark'>
+export type CreateCommand = Pick<DvSubjectVo, 'subjectCode' | 'subjectName' | 'subjectType' | 'subjectContent' | 'subjectStandard' | 'enableFlag' | 'remark'>
+export type UpdateCommand = Pick<DvSubjectVo, 'subjectCode' | 'subjectName' | 'subjectType' | 'subjectContent' | 'subjectStandard' | 'enableFlag' | 'remark'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/dv/dv-subject', { method: 'DELETE', body: ids, scope: 'factory' })

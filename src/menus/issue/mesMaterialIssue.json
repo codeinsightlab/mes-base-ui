@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "issue:mesMaterialIssue",
+  "name": "领料出库单",
+  "path": "/issue/mesMaterialIssue",
+  "component": "issue/mesMaterialIssue/index",
+  "permission": "business:mes:material:issue:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

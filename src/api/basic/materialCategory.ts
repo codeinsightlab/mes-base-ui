@@ -1,10 +1,9 @@
-// MES-CODEGEN: API 与生成的 Controller 使用同一请求契约。
 import { request } from '@/lib/request'
 
 export interface MaterialCategoryVo {
   [key: string]: unknown;
   id: string;
-  factoryId: string;
+
   code: string;
   name: string;
   parentId: string | null;

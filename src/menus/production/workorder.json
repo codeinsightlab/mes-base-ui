@@ -1,0 +1,5 @@
+{
+ "id":"production:workorder","name":"生产工单","path":"/production/workorder",
+ "component":"production/workorder/index","permission":"workorder:list","permissionScope":"factory",
+ "kind":"MENU","icon":"List","children":[]
+}

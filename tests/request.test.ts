@@ -58,6 +58,23 @@ describe('Base request contract', () => {
     expect(recover).not.toHaveBeenCalled()
     expect(unauthorized).not.toHaveBeenCalled()
   })
+  it.each([
+    ['SYNC_RUNNING', 409, '同步正在进行，请稍后重试'],
+    ['SYNC_EXECUTION_LOST', 409, '同步执行权已失效，请重新发起'],
+    ['ERP_OPERATION_NOT_CONFIGURED', 422, '暂未配置工序 ERP 同步数据来源'],
+    ['ERP_ROUTING_NOT_CONFIGURED', 422, '暂未配置工艺路线 ERP 同步数据来源'],
+    ['ROUTING_FROZEN', 409, '已发布路线内容已冻结，请创建新版本'],
+    ['ROUTING_GRAPH_INVALID', 422, '路线拓扑无效，请检查节点、连接、环路及孤立节点'],
+    ['WORKORDER_INVALID', 422, '工单、批次数量、工艺引用或完整路径不符合规则'],
+    ['BATCH_ROUTE_FROZEN', 409, '路径已锁定、正在出库或待核实，禁止更改']
+  ])('keeps identity and factory for production error %s', async(code, status, message) => {
+    const recover = vi.fn()
+    configureRequests(() => ({ token: 'TEST', factoryId: 'A', revision }), unauthorized, recover)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: code }), { status })))
+    await expect(request('/api/production/routing')).rejects.toMatchObject({ code, status, message })
+    expect(recover).not.toHaveBeenCalled()
+    expect(unauthorized).not.toHaveBeenCalled()
+  })
   it('a stale factory error cannot interrupt the new factory', async() => {
     const recover = vi.fn()
     configureRequests(() => ({ token: 'TEST', factoryId: 'A', revision }), unauthorized, recover)
@@ -74,4 +91,21 @@ describe('Base request contract', () => {
   })
   it('represents network failure explicitly', async() => { vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('TEST ONLY internal detail')));await expect(request('/api/demo')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });await expect(request('/api/demo')).rejects.not.toThrow('internal detail') })
   it('multipart upload leaves content-type boundary to browser', async() => { const fetcher = vi.fn().mockResolvedValue(new Response('{}'));vi.stubGlobal('fetch', fetcher);await request('/api/platform/files', { method: 'POST', body: new FormData() });expect(fetcher.mock.calls[0]![1].headers.has('Content-Type')).toBe(false) })
+})
+
+describe('warehouse and inventory business errors', () => {
+  it.each([
+    ['STOCK_KEY_DUPLICATE', 409, '当前工厂已有相同仓库编码或物料仓库库存记录'],
+    ['STOCK_REFERENCE_INVALID', 422, '物料和仓库必须存在且属于当前工厂'],
+    ['WAREHOUSE_REFERENCED', 409, '仓库已被库存引用，不能删除'],
+    ['MATERIAL_INVENTORY_REFERENCED', 409, '物料已被库存引用，不能删除'],
+    ['SYNC_QUERY_NOT_IMPLEMENTED', 422, '暂未接入外部同步查询接口']
+  ])('shows an explicit safe message for %s', async(code, status, message) => {
+    const recover = vi.fn()
+    configureRequests(() => ({ token: 'TEST ONLY', factoryId: 'A', revision }), unauthorized, recover)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: code, message: 'SQL INTERNAL SECRET', requestId: 'TEST' }), { status: status as number })))
+    await expect(request('/api/wm/wm-inventory')).rejects.toMatchObject({ code, status, message })
+    expect(recover).not.toHaveBeenCalled()
+    expect(unauthorized).not.toHaveBeenCalled()
+  })
 })

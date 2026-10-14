@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "basic:equipment",
+  "name": "设备",
+  "path": "/basic/equipment",
+  "component": "basic/equipment/index",
+  "permission": "business:equipment:read",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

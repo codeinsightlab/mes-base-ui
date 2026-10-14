@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "production:routing",
+  "name": "工艺路线",
+  "path": "/production/routing",
+  "component": "production/routing/index",
+  "permission": "routing:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

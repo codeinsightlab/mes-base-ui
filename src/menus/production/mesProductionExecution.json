@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "production:mesProductionExecution",
+  "name": "生产执行单元",
+  "path": "/production/mesProductionExecution",
+  "component": "production/mesProductionExecution/index",
+  "permission": "business:mes:production:execution:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}
