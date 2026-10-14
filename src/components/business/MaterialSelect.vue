@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { api, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
 
-const props = defineProps<{ modelValue?: string | null }>()
+const props = defineProps<{ modelValue?: string | null; disabled?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 const auth = useAuth()
 const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching
@@ -77,13 +77,13 @@ onBeforeUnmount(clear)
       remote
       :remote-method="search"
       :loading="loading"
-      :disabled="!allowed"
+      :disabled="!allowed || disabled"
       placeholder="搜索物料名称"
-      @update:model-value="emit('update:modelValue', $event || null)"
+      @update:model-value="!disabled && emit('update:modelValue', $event || null)"
     >
       <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name}`" :value="row.id" />
     </el-select>
-    <el-button v-if="rows.length < total" link :disabled="loading" @click="search(keyword, true)">加载更多</el-button>
-    <el-button v-if="error" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
+    <el-button v-if="rows.length < total" link :disabled="loading || disabled" @click="search(keyword, true)">加载更多</el-button>
+    <el-button :disabled="disabled" v-if="error" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
   </div>
 </template>

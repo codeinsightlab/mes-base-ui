@@ -13,6 +13,7 @@ const props = defineProps<{
   headerFields: Field[]; itemFields: Field[];
   headerPermission: string; itemPermission: string; parentKey: string;
   headerTableKey?: string; itemTableKey?: string;
+  headerReadonly?: (row: Row) => boolean;
 }>()
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
@@ -20,7 +21,8 @@ const draft = reactive<Row>({})
 let generation = 0
 let savedDraft = '{}'
 const can = (action: string) => auth.hasPermission(props.headerPermission + ':' + action, 'factory')
-const writable = computed(() => id.value ? can('update') : can('create'))
+const readonly = computed(() => !!id.value && !!props.headerReadonly?.(draft))
+const writable = computed(() => !readonly.value && (id.value ? can('update') : can('create')))
 const fixedValues = computed(() => id.value ? { [props.parentKey]: id.value } : {})
 function clear() {
   generation++
@@ -63,6 +65,14 @@ async function open(row?: Row) {
   } finally {
     if (current === generation) loading.value = false
   }
+}
+async function refresh() {
+  if (!id.value || !props.headerApi.detail) return
+  const current = generation
+  const result = await props.headerApi.detail(id.value)
+  if (current !== generation) return
+  Object.assign(draft, result)
+  savedDraft = JSON.stringify(draft)
 }
 async function save() {
   if (!writable.value || loading.value || saving.value) return
@@ -126,7 +136,8 @@ onBeforeUnmount(clear)
   <section v-else class="app-container">
     <PageHeader :title="title" :description="id ? '单据编号 ' + id : '新增单据'">
       <el-button :disabled="saving" @click="back">返回列表</el-button>
-      <el-button v-if="id && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除主单</el-button>
+      <el-button v-if="id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除主单</el-button>
+      <slot name="header-actions" :row="draft" :refresh="refresh" :dirty="JSON.stringify(draft) !== savedDraft" />
       <el-button v-if="writable" type="primary" :loading="saving" :disabled="loading" @click="save">保存主单</el-button>
     </PageHeader>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
@@ -143,6 +154,7 @@ onBeforeUnmount(clear)
         v-else
         :key="id"
         embedded
+        :readonly="readonly"
         title="明细"
         :api="itemApi"
         :fields="itemFields"

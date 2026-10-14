@@ -12,7 +12,7 @@ defineEmits<{ submit: [] }>()
       :required="field.required"
       :class="{ 'span-2': field.kind === 'textarea' || field.key === 'remark' }"
     >
-      <slot :name="`field-${field.key}`" :draft="draft" :field="field">
+      <slot :name="`field-${field.key}`" :draft="draft" :field="field" :disabled="disabled || disabledKeys?.includes(field.key)">
         <el-select v-if="field.options" v-model="draft[field.key] as any" clearable placeholder="请选择">
           <el-option v-for="option in field.options" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>

@@ -54,3 +54,22 @@ export const api = {
   delids: removeIds
 }
 
+
+export const voidMaterialIssue = (id: string, reconcile = false) => request<MesMaterialIssueVo>(
+  '/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/actions/' + (reconcile ? 'reconcile-void' : 'void'),
+  { method: 'POST', scope: 'factory' }
+)
+
+export interface ErpIssueQueryView {
+  result: { outcome: 'FOUND' | 'NOT_FOUND' | 'UNKNOWN'; documentStatus: string; executionMode: 'LOCAL_ONLY' | 'CONNECTED'; externalId: string | null; externalCode: string | null; message: string }
+  provider: string | null
+  lastOutcome: string | null
+  lastMessage: string | null
+  checkedAt: string | null
+}
+export const queryIssueErp = (id: string) => request<ErpIssueQueryView>(
+  '/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/erp-status', { scope: 'factory' }
+)
+export const reconcileIssueErp = (id: string) => request<ErpIssueQueryView>(
+  '/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/actions/reconcile-erp', { method: 'POST', scope: 'factory' }
+)
