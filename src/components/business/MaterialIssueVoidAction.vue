@@ -8,7 +8,7 @@ const props = defineProps<{ row: Row; refresh: () => Promise<void>; dirty: boole
 const auth = useAuth(), busy = ref(false), error = ref('')
 const allowed = computed(() => auth.hasPermission('business:mes:material:issue:void', 'factory'))
 const pending = computed(() => ['VOID_PENDING','VOID_UNKNOWN'].includes(String(props.row.status)))
-const available = computed(() => !!props.row.id && (pending.value || (!props.row.voidOperationId && ['DRAFT','RECORDED'].includes(String(props.row.status)))))
+const available = computed(() => !!props.row.id && (pending.value || (!props.row.voidOperationId && ['DRAFT','RECORDED','CONFIRMED'].includes(String(props.row.status)))))
 async function run() {
  if (!allowed.value || !available.value || busy.value || props.dirty) return
  const revision = auth.revision, factory = auth.factoryId, id = String(props.row.id)

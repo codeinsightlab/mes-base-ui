@@ -57,11 +57,11 @@ export const fields: Field[] = [
   },
   {
     key: 'status',
+    readonly: true,
     defaultValue: 'READY',
     options: [{ label: '待执行', value: 'READY', tone: 'info' }, { label: '执行中', value: 'RUNNING', tone: 'warning' }, { label: '已结束', value: 'COMPLETED', tone: 'success' }, { label: '已取消', value: 'CANCELLED', tone: 'danger' }],
     label: '执行状态',
     kind: 'text',
-    readonly: false,
     required: true,
     searchable: true,
     maxLength: 20
@@ -70,7 +70,7 @@ export const fields: Field[] = [
     key: 'startTime',
     label: '开始时间',
     kind: 'datetime',
-    readonly: false,
+    readonly: true,
     required: false,
     searchable: false,
     maxLength: 19
@@ -79,7 +79,7 @@ export const fields: Field[] = [
     key: 'endTime',
     label: '结束时间',
     kind: 'datetime',
-    readonly: false,
+    readonly: true,
     required: false,
     searchable: false,
     maxLength: 19

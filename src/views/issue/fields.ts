@@ -90,7 +90,7 @@ export const headerFields: Field[] = [
   {
     key: 'status',
     defaultValue: 'DRAFT',
-    options: [{ label: '草稿', value: 'DRAFT', tone: 'info' }, { label: '已记录', value: 'RECORDED', tone: 'success' }, { label: '作废处理中', value: 'VOID_PENDING', tone: 'warning' }, { label: '外部结果待核实', value: 'VOID_UNKNOWN', tone: 'warning' }, { label: '已作废', value: 'VOIDED', tone: 'info' }],
+    options: [{ label: '草稿', value: 'DRAFT', tone: 'info' }, { label: '提交中', value: 'SUBMITTING', tone: 'warning' }, { label: '提交待核实', value: 'SUBMIT_UNKNOWN', tone: 'warning' }, { label: '提交被拒绝', value: 'SUBMIT_REJECTED', tone: 'danger' }, { label: '领料已确认', value: 'CONFIRMED', tone: 'success' }, { label: '已记录', value: 'RECORDED', tone: 'success' }, { label: '作废处理中', value: 'VOID_PENDING', tone: 'warning' }, { label: '外部结果待核实', value: 'VOID_UNKNOWN', tone: 'warning' }, { label: '已作废', value: 'VOIDED', tone: 'info' }],
     label: '资料状态',
     kind: 'text',
     readonly: false,

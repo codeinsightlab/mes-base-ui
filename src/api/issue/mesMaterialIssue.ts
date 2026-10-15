@@ -61,6 +61,7 @@ export const voidMaterialIssue = (id: string, reconcile = false) => request<MesM
 )
 
 export interface ErpIssueQueryView {
+  mesStatus: string
   result: { outcome: 'FOUND' | 'NOT_FOUND' | 'UNKNOWN'; documentStatus: string; executionMode: 'LOCAL_ONLY' | 'CONNECTED'; externalId: string | null; externalCode: string | null; message: string }
   provider: string | null
   lastOutcome: string | null
@@ -73,3 +74,6 @@ export const queryIssueErp = (id: string) => request<ErpIssueQueryView>(
 export const reconcileIssueErp = (id: string) => request<ErpIssueQueryView>(
   '/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/actions/reconcile-erp', { method: 'POST', scope: 'factory' }
 )
+
+export const submitMaterialIssue = (id: string) => request<MesMaterialIssueVo>('/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/actions/submit', { method: 'POST', scope: 'factory' })
+export const reopenRejectedIssue = (id: string) => request<MesMaterialIssueVo>('/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/actions/reopen-rejected', { method: 'POST', scope: 'factory' })

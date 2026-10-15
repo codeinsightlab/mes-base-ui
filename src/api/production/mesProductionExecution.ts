@@ -39,12 +39,14 @@ export const api = {
     request<MesProductionExecutionVo>('/api/production/mes-production-execution/' + encodeURIComponent(id), { scope: 'factory' }),
 
   create: (body: unknown) =>
-    request<MesProductionExecutionVo>('/api/production/mes-production-execution', { method: 'POST', body, scope: 'factory' }),
+    request<MesProductionExecutionVo>('/api/production/mes-production-execution', { method: 'POST', body: { ...(body as object), status: 'READY', startTime: null, endTime: null }, scope: 'factory' }),
 
-  update: (id: string, body: unknown) =>
-    request<MesProductionExecutionVo>('/api/production/mes-production-execution/' + encodeURIComponent(id), {
-      method: 'PUT', body, scope: 'factory'
-    }),
+  update: async (id: string, body: unknown) => {
+    const previous = await api.detail(id)
+    return request<MesProductionExecutionVo>('/api/production/mes-production-execution/' + encodeURIComponent(id), {
+      method: 'PUT', body: { ...(body as object), status: previous.status, startTime: previous.startTime, endTime: previous.endTime }, scope: 'factory'
+    })
+  },
 
   remove: (id: string) => removeIds([id]),
 
