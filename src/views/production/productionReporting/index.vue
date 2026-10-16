@@ -66,7 +66,7 @@ async function submit() {
   <el-alert v-if="!allowed" title="当前账号没有正式生产报工权限，或尚未选择工厂" type="warning" :closable="false" />
   <template v-else>
    <el-form class="filter-panel" @submit.prevent="locate">
-    <el-form-item label="Execution 身份码"><el-input v-model="code" placeholder="扫码枪扫描或输入 EXE:100001" clearable aria-label="Execution 身份码" /></el-form-item>
+    <el-form-item label="Execution 身份码"><el-input v-model="code" placeholder="EXE:执行编号 或 MES1 生产身份码" clearable aria-label="Execution 身份码" /></el-form-item>
     <el-button type="primary" :loading="loading" @click="locate">定位执行</el-button>
    </el-form>
    <el-alert v-if="error" :title="error" type="error" :closable="false" role="alert" />
@@ -80,25 +80,27 @@ async function submit() {
      <el-descriptions-item label="实际工艺">{{ context.quantities.routingLabel || context.identity.routingCode + ' / V' + context.identity.routingVersion }} · {{ context.quantities.pathStatus }}</el-descriptions-item>
     </el-descriptions>
     <el-alert v-if="context.quantities.pathStatus !== 'LOCKED'" title="实际路径尚未锁定，不能正式报工。请在生产执行完成选路与领料确认。" type="warning" :closable="false" />
-    <el-collapse v-if="context.quantities.pathStatus !== 'UNSELECTED'"><el-collapse-item title="查看本次实际执行路径" name="path"><RoutingGraphPreview :nodes="graphNodes" :edges="graphEdges" :selected-node-ids="context.path.selectedNodeIds" /></el-collapse-item></el-collapse>
+    <el-collapse v-if="context.quantities.pathStatus !== 'UNSELECTED'"><el-collapse-item title="查看本次实际执行路径" name="path"><p class="secondary">突出节点与连线是本次已选路径，其余节点仅为同版本工艺定义参考。</p><RoutingGraphPreview :nodes="graphNodes" :edges="graphEdges" :selected-node-ids="context.path.selectedNodeIds" /></el-collapse-item></el-collapse>
     <div class="table-toolbar"><strong>实际路径工序</strong><el-switch v-model="showAll" active-text="查看其他节点状态" /></div>
     <el-table :data="visibleNodes" row-key="routingNodeId">
      <el-table-column label="顺序" prop="sequenceNo" width="75" />
      <el-table-column label="工序" min-width="190"><template #default="{row}">{{ row.code }} · {{ row.name || '工序名称未记录' }}</template></el-table-column>
      <el-table-column label="上游可用 / 输入" prop="inputQty" min-width="145" />
      <el-table-column label="累计报工" prop="reportedQty" min-width="130" />
+     <el-table-column label="有效不良" prop="defectQty" min-width="110" />
+     <el-table-column label="可流转产出" prop="effectiveOutputQty" min-width="130" />
      <el-table-column label="剩余可报" prop="availableQty" min-width="130" />
      <el-table-column label="状态 / 原因" min-width="230"><template #default="{row}">{{ statusNames[row.status] || row.status }}<span v-if="row.reason"> · {{ row.reason }}</span></template></el-table-column>
     </el-table>
     <el-empty v-if="!visibleNodes.length" description="暂无可报工序，可打开其他节点状态查看原因" :image-size="55" />
     <el-form class="report-form" label-position="top" @submit.prevent="submit">
      <el-form-item label="本次报工工序"><el-select v-model="selectedId" :disabled="busy || !!pending" placeholder="选择可报工序"><el-option v-for="n in nodes" :key="n.routingNodeId" :value="n.routingNodeId" :label="n.code + ' · ' + (n.name || '工序名称未记录') + (n.reason ? '（' + n.reason + '）' : '')" :disabled="n.status !== 'AVAILABLE'" /></el-select></el-form-item>
-     <p v-if="selected">上游输入 {{ selected.inputQty }} · 已报 {{ selected.reportedQty }} · 剩余 {{ selected.availableQty }}</p>
+     <p v-if="selected">上游输入 {{ selected.inputQty }} · 已报 {{ selected.reportedQty }} · 不良 {{ selected.defectQty }} · 可流转 {{ selected.effectiveOutputQty }} · 剩余 {{ selected.availableQty }}</p>
      <el-form-item label="本次完成数量"><el-input v-model="quantity" inputmode="decimal" :disabled="busy || !!pending" placeholder="输入大于0的完成数量" /></el-form-item>
      <el-button type="primary" size="large" :loading="busy" :disabled="!pending && selected?.status !== 'AVAILABLE'" @click="submit">{{ pending && !busy ? '结果未确认，安全重试原报工' : '确认报工' }}</el-button>
     </el-form>
     <p v-if="pending && !busy" class="secondary">原工序和数量已保留。重试复用同一请求标识；切换执行前请确认原请求结果。</p>
-    <p class="secondary">质量尚未接入：不良数量为预留值，不在此申报；本入口不自动完工或入库。待开工执行的首次报工还会校验正式领料确认。</p>
+    <p class="secondary">报工数量为加工完成总量（含不良），不良由质量申报独立记录并扣减可流转产出；本入口不自动完工或入库。待开工执行的首次报工还会校验正式领料确认。</p>
    </section>
    <el-empty v-else-if="!loading" description="请扫描或输入生产执行身份码" />
   </template>
@@ -109,6 +111,9 @@ async function submit() {
 .filter-panel .el-form-item { flex: 1; min-width: 220px; margin-bottom: 0; }
 .report-form { margin-top: var(--mes-space-5, 20px); max-width: 640px; }
 .report-form .el-select { width: 100%; }
-.report-form .el-button { min-height: 44px; }
+.report-form .el-button, .filter-panel .el-button { min-height: 44px; }
+.reporting-page :deep(.el-input__wrapper), .reporting-page :deep(.el-select__wrapper) { min-height: 44px; }
+.filter-panel :deep(.el-form-item__content) { flex: 1; }
+.filter-panel :deep(.el-input) { width: 100%; max-width: 640px; }
 .panel { padding: var(--mes-space-4, 16px); }
 </style>

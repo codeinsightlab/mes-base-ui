@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExecutionIdentityLookup from '@/components/business/production/ExecutionIdentityLookup.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
@@ -79,9 +80,10 @@ void load()
 </script>
 <template>
  <div class="app-container">
-  <PageHeader title="不良品管理" description="不良独立申报、完整版本留痕。仅登记去向，质量尚未接入生产数量。"><ScopeTag kind="FACTORY" :factory-id="auth.factoryId" /></PageHeader>
-  <el-alert title="Phase 1：仅本地登记，不执行返工、仓库库存移动或 ERP 报废；不扣减下一工序可报工量。" type="info" :closable="false" />
+  <PageHeader title="不良品管理" description="不良独立申报、完整版本留痕。有效不良扣减影响节点的正常流转产出。"><ScopeTag kind="FACTORY" :factory-id="auth.factoryId" /></PageHeader>
+  <el-alert title="有效不良参与下道工序可报工量校验；仅登记去向，不执行返工、仓库库存移动或 ERP 报废。" type="info" :closable="false" />
   <el-form class="filter-panel" inline @submit.prevent="page = 1; load()">
+   <ExecutionIdentityLookup selectable @selected="i => { workorder = i.workorderId; execution = i.executionId }" />
    <el-form-item label="工单"><WorkOrderSelect v-model="workorder" /></el-form-item><el-form-item label="执行单元"><ExecutionSelect v-model="execution" :workorder-id="workorder" /></el-form-item>
    <el-form-item><el-button :disabled="!can('read')" @click="page = 1; load()">查询</el-button></el-form-item>
   </el-form>

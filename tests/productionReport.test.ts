@@ -7,7 +7,7 @@ import Manager from '../src/components/business/production/ProductionReportManag
 const api = vi.hoisted(() => ({ quantities: vi.fn(), page: vi.fn(), detail: vi.fn(), history: vi.fn(), supplement: vi.fn(), adjust: vi.fn(), void: vi.fn(), users: vi.fn() }))
 vi.mock('../src/api/production/productionReport', async original => ({ ...await original<typeof import('../src/api/production/productionReport')>(), productionReport: api }))
 const id = '9007199254740993'
-const node = { executionId: id, routingNodeId: '9007199254740994', operationId: '7', code: 'A', name: '首工序', sequenceNo: 1, inputQty: '99999999999999.123456', reportedQty: '4.000001', defectQty: '0', effectiveOutputQty: '4.000001', availableQty: '99999999999995.123455', qualityIntegrated: false }
+const node = { executionId: id, routingNodeId: '9007199254740994', operationId: '7', code: 'A', name: '首工序', sequenceNo: 1, inputQty: '99999999999999.123456', reportedQty: '4.000001', defectQty: '1.000000', effectiveOutputQty: '3.000001', availableQty: '99999999999995.123455', qualityIntegrated: true }
 const ledger = { id, executionId: id, routingNodeId: node.routingNodeId, recordType: 'REPORT', quantityDelta: '4.000001', referenceReportId: null, operatorUserId: '100', recordedBy: '200', operatorName: '历史操作人员', recordedByName: '验收提交人员', reportTime: '2026-01-01T10:00:00', createTime: '2026-10-15T10:00:00', reason: '历史补录', workstationId: null }
 const wrappers: ReturnType<typeof mount>[] = []
 beforeEach(() => {
@@ -27,8 +27,8 @@ async function setup(actions = ['quantity', 'detail', 'supplement', 'adjust', 'v
 }
 describe('production report management', () => {
  it('shows exact quantities and explicit quality boundary without mutable CRUD', async() => {
-  await setup(); expect(document.body.textContent).toContain(node.inputQty); expect(document.body.textContent).toContain('暂未接入质量扣减，当前可报数量按报工数据计算。')
-  expect(document.body.textContent).toContain('历史操作人员'); expect(document.body.textContent).toContain('验收提交人员'); expect(document.body.textContent).not.toContain('实际操作人ID'); expect(document.body.textContent).toContain('未接入'); expect(document.body.textContent).not.toContain('质检合格')
+  await setup(); expect(document.body.textContent).toContain(node.inputQty); expect(document.body.textContent).toContain('报工为加工完成总量（含不良）；有效产出扣除不良后，作为下道工序的可报输入。')
+  expect(document.body.textContent).toContain('历史操作人员'); expect(document.body.textContent).toContain('验收提交人员'); expect(document.body.textContent).not.toContain('实际操作人ID'); expect(document.body.textContent).toContain('1.000000'); expect(document.body.textContent).not.toContain('未接入'); expect(document.body.textContent).not.toContain('质检合格')
   expect([...document.querySelectorAll('button')].some(b => b.textContent?.trim() === '删除')).toBe(false)
   expect(api.page).toHaveBeenCalledWith(id, node.routingNodeId, 0, 20)
  })

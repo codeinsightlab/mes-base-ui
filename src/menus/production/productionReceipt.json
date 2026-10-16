@@ -1,0 +1,5 @@
+{
+ "id": "production:productionReceipt", "name": "生产交接管理", "path": "/production/productionReceipt",
+ "component": "production/productionReceipt/index", "permission": "business:production:receipt:list",
+ "permissionScope": "factory", "kind": "MENU", "icon": "List", "children": []
+}

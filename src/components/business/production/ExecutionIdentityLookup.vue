@@ -4,7 +4,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { resolveProductionIdentity, type ProductionIdentity } from '@/api/production/productionIdentity'
 
-const props = defineProps<{ id?: string }>()
+const props = defineProps<{ id?: string; selectable?: boolean }>()
+const emit = defineEmits<{ selected: [identity: ProductionIdentity] }>()
 const auth = useAuth()
 const allowed = computed(() => auth.hasPermission('business:mes:production:execution:query', 'factory'))
 const visible = ref(false), loading = ref(false), code = ref(''), error = ref('')
@@ -50,7 +51,7 @@ function open() {
   <el-dialog v-model="visible" title="生产执行身份查询" width="min(640px, 94vw)" append-to-body @closed="clear">
     <el-form @submit.prevent="resolve">
       <el-form-item label="执行身份码">
-        <el-input v-model="code" placeholder="EXE:100001" maxlength="23" :disabled="loading" />
+        <el-input v-model="code" placeholder="EXE:100001 或 MES1 生产身份码" maxlength="2048" :disabled="loading" />
       </el-form-item>
       <el-button type="primary" :loading="loading" :disabled="!code || !allowed" @click="resolve">查询</el-button>
     </el-form>
@@ -65,6 +66,7 @@ function open() {
       <el-descriptions-item label="执行状态">{{ result.status }}</el-descriptions-item>
       <el-descriptions-item label="计划执行数量">{{ result.targetQty }}</el-descriptions-item>
     </el-descriptions>
-    <OperatorConfiguration v-if="result" :execution-id="result.executionId" :context-label="result.executionNo" />
+    <el-button v-if="selectable && result" type="primary" @click="emit('selected', result); clear()">使用此执行单元</el-button>
+    <OperatorConfiguration v-if="result && !selectable" :execution-id="result.executionId" :context-label="result.executionNo" />
   </el-dialog>
 </template>

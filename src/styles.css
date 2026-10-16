@@ -1658,3 +1658,12 @@ a,button{
 .druid-sql-template{white-space:pre-wrap;overflow-wrap:anywhere;font:var(--ui-text-xs)/1.7 var(--ui-font-mono);padding:var(--ui-space-4);background:var(--ui-surface-soft);border:1px solid var(--ui-border);max-height:280px;overflow:auto}
 @media(max-width:1300px){.business-console-grid{grid-template-columns:minmax(0,1fr) 280px}.druid-monitor-layout{grid-template-columns:240px minmax(0,1fr)}.druid-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1000px){.business-console-grid{grid-template-columns:minmax(0,1fr)}.druid-monitor-layout{grid-template-columns:minmax(0,1fr)}.druid-source-list{max-height:240px}.druid-detail-header{flex-wrap:wrap}.druid-snapshot-time{align-items:flex-start;max-width:none}.workspace-switch .el-radio-button__inner{padding:var(--ui-space-2)}}
+
+/* Compact factory/user controls keep touch reporting usable with long account names. */
+@media(max-width:600px){
+  .navbar-actions{flex:1;min-width:0;gap:8px;justify-content:flex-end}
+  .navbar-actions .factory-context{min-width:0;max-width:calc(100vw - 176px);padding:4px 6px}
+  .navbar-actions .factory-context .el-select{width:100%;min-width:0}
+  .user-menu>span:not(.user-avatar){max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .user-menu{flex-shrink:0}
+}

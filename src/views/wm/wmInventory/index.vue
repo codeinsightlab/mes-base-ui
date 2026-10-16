@@ -11,6 +11,8 @@ import SyncButton from '@/components/business/SyncButton.vue'
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 
 const fields: Field[] = [
+  { key: 'batchNo', label: '材料批次', kind: 'text', maxLength: 128 },
+  { key: 'binCode', label: '库位', kind: 'text', maxLength: 64 },
   { key: 'materialName', columnMinWidth: 260, label: '物料', kind: 'text', readonly: true, searchable: false },
   { key: 'warehouseName', columnMinWidth: 260, label: '仓库', kind: 'text', readonly: true, searchable: false },
   {
@@ -50,7 +52,7 @@ const fields: Field[] = [
     readonly: false,
     required: true,
     searchable: false,
-    maxLength: 18
+    maxLength: 20
   },
   {
     key: 'availableQuantity',
@@ -60,7 +62,7 @@ const fields: Field[] = [
     readonly: false,
     required: false,
     searchable: false,
-    maxLength: 18
+    maxLength: 20
   },
   {
     key: 'status',

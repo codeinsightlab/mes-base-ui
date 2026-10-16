@@ -93,8 +93,8 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
 <template>
  <section v-if="visible && can('quantity')" aria-label="生产数量与报工管理">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
-  <div class="table-toolbar"><strong>{{ quantity?.executionNo || '执行 ' + executionId }}</strong><span v-if="quantity">目标数量：{{ quantity.targetQty }} · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
-  <el-alert title="暂未接入质量扣减，当前可报数量按报工数据计算。" type="info" :closable="false" />
+  <div class="table-toolbar"><strong>{{ quantity?.executionNo || '执行 ' + executionId }}</strong><span v-if="quantity">计划数量：{{ quantity.targetQty }} · 确认投产：{{ quantity.confirmedInputQty }} · 撤销预留：{{ quantity.reservedInputQty }} · 可支用投产额度：{{ quantity.productionInputQty }} · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
+  <el-alert title="报工为加工完成总量（含不良）；有效产出扣除不良后，作为下道工序的可报输入。" type="info" :closable="false" />
   <el-alert v-if="quantity?.boundary" :title="quantity.boundary" type="warning" :closable="false" />
   <el-table v-loading="loading" :data="quantity?.nodes || []" row-key="routingNodeId" :current-row-key="nodeId" max-height="280" border highlight-current-row empty-text="暂无已确定的执行路径" @row-click="chooseNode">
    <el-table-column prop="sequenceNo" label="路径顺序" width="90" />

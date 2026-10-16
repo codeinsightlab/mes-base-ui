@@ -1,6 +1,7 @@
 import { request } from '@/lib/request'
 
 export interface ProductionIdentity {
+  identityType: 'EXECUTION' | 'SINGLE_MATERIAL_V1';
   executionId: string;
   executionNo: string;
   qrCode: string;

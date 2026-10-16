@@ -7,7 +7,7 @@ import { useAuth } from '../src/stores/auth'
 import { ApiError } from '../src/lib/request'
 const { context, submit } = vi.hoisted(() => ({ context: vi.fn(), submit: vi.fn() }))
 vi.mock('../src/api/production/productionReporting', () => ({ submitPermission: 'business:production:report:submit', productionReporting: { context, submit } }))
-const data = (id = '1') => ({ identity: { executionId: id, executionNo: 'EXE-' + id, workorderCode: 'TEST_WO', productCode: 'M', productName: '阶段物料', routingId: '7', routingCode: 'R', routingVersion: 2, status: 'READY', targetQty: '10.000001' }, quantities: { routingLabel: 'R / V2 · 工艺', executionId: id, pathStatus: 'LOCKED', nodes: [{ routingNodeId: '11', code: 'A', name: '钻孔', sequenceNo: 1, inputQty: '10.000001', reportedQty: '0', availableQty: '10.000001' }, { routingNodeId: '12', code: 'B', name: '铣削', sequenceNo: 2, inputQty: '0', reportedQty: '0', availableQty: '0' }] }, candidates: [{ routingNodeId: '11', status: 'AVAILABLE', reason: null }, { routingNodeId: '12', status: 'NOT_ASSIGNED', reason: '不在派工名单中' }], path: { nodes: [], edges: [], selectedNodeIds: [] } })
+const data = (id = '1') => ({ identity: { executionId: id, executionNo: 'EXE-' + id, workorderCode: 'TEST_WO', productCode: 'M', productName: '阶段物料', routingId: '7', routingCode: 'R', routingVersion: 2, status: 'READY', targetQty: '10.000001' }, quantities: { routingLabel: 'R / V2 · 工艺', executionId: id, pathStatus: 'LOCKED', nodes: [{ routingNodeId: '11', code: 'A', name: '钻孔', sequenceNo: 1, inputQty: '10.000001', reportedQty: '3.000001', defectQty: '1.000000', effectiveOutputQty: '2.000001', qualityIntegrated: true, availableQty: '7.000000' }, { routingNodeId: '12', code: 'B', name: '铣削', sequenceNo: 2, inputQty: '0', reportedQty: '0', defectQty: '0', effectiveOutputQty: '0', qualityIntegrated: true, availableQty: '0' }] }, candidates: [{ routingNodeId: '11', status: 'AVAILABLE', reason: null }, { routingNodeId: '12', status: 'NOT_ASSIGNED', reason: '不在派工名单中' }], path: { nodes: [], edges: [], selectedNodeIds: [] } })
 type State = { code: string; locate: () => Promise<void>; submit: () => Promise<void>; selectedId: string; quantity: string; context: ReturnType<typeof data> | null; result: { id: string } | null; pending: { requestId: string } | null; error: string; showAll: boolean }
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
@@ -23,7 +23,7 @@ async function setup() {
 }
 it('locates by scanner input without writing, shows quantities, and explains unavailable nodes', async() => {
  const { state } = await setup(); expect(context).toHaveBeenCalledWith('EXE:1'); expect(submit).not.toHaveBeenCalled()
- expect(wrapper.text()).toContain('阶段物料'); expect(wrapper.text()).toContain('10.000001')
+ expect(wrapper.text()).toContain('有效不良'); expect(wrapper.text()).toContain('2.000001'); expect(wrapper.text()).not.toContain('质量尚未接入'); expect(wrapper.text()).toContain('阶段物料'); expect(wrapper.text()).toContain('10.000001')
  state.showAll = true; await flushPromises(); expect(wrapper.text()).toContain('不在派工名单中')
  const option = wrapper.findAllComponents({ name: 'ElOption' }).find(n => n.props('value') === '12')
  expect(option?.props('disabled')).toBe(true)

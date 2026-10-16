@@ -1,0 +1,1 @@
+{"id":"production:productionInput","name":"扫码投产","path":"/production/productionInput","component":"production/productionInput/index","permission":"business:mes:material:issue:update","permissionScope":"factory","kind":"MENU","icon":"List","children":[]}

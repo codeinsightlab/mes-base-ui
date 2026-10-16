@@ -4,6 +4,8 @@ export interface WmInventoryVo {
   [key: string]: unknown;
   id: string;
 
+  batchNo: string | null;
+  binCode: string | null;
   materialId: string;
   warehouseId: string;
   materialName: string | null;
@@ -25,8 +27,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<WmInventoryVo, 'materialId' | 'warehouseId' | 'quantity' | 'availableQuantity' | 'status' | 'remark'>
-export type UpdateCommand = Pick<WmInventoryVo, 'materialId' | 'warehouseId' | 'quantity' | 'availableQuantity' | 'status' | 'remark'>
+export type CreateCommand = Pick<WmInventoryVo, 'materialId' | 'warehouseId' | 'quantity' | 'availableQuantity' | 'status' | 'remark' | 'batchNo' | 'binCode'>
+export type UpdateCommand = Pick<WmInventoryVo, 'materialId' | 'warehouseId' | 'quantity' | 'availableQuantity' | 'status' | 'remark' | 'batchNo' | 'binCode'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/wm/wm-inventory', { method: 'DELETE', body: ids, scope: 'factory' })
