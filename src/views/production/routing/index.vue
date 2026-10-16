@@ -11,6 +11,7 @@ import { api, sync, type ReferenceOption, type RoutingDetail, type RoutingVo } f
 import { contentError } from '@/lib/production/routingGraph'
 import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
 import type { RoutingNode } from '@/api/production/routing'
+import { parseTime } from '@/utils/ruoyi'
 import { useAuth } from '@/stores/auth'
 const auth = useAuth()
 const can = (action: string) => auth.hasPermission('routing:' + action, 'factory')
@@ -22,6 +23,7 @@ const detail = ref<RoutingDetail | null>(null)
 const materialIds = ref<string[]>([]), operationOptions = ref<ReferenceOption[]>([]), materialOptions = ref<ReferenceOption[]>([])
 const metadata = reactive({ name: '', description: '' }), createForm = reactive({ code: '', name: '', description: '' })
 const copyForm = reactive({ code: '', name: '' })
+const graphDialog = ref(false)
 const savedContent = ref('')
 const contentFingerprint = () => JSON.stringify({ materials: [...materialIds.value].sort(), nodes: detail.value?.nodes.map(({ nodeCode, displayOrder, operationId, isKey, description }) => ({ nodeCode, displayOrder, operationId, isKey, description })), edges: detail.value?.edges.map(({ fromNodeCode, toNodeCode }) => ({ fromNodeCode, toNodeCode })) })
 const connection = reactive({ from: '', to: '' })
@@ -36,7 +38,7 @@ const tone = (status: RoutingVo['status']) => status === 'PUBLISHED' ? 'success'
 function clear() {
   sequence++; listSequence++; operationSequence++; materialSequence++
   rows.value = []; total.value = 0; detail.value = null; materialIds.value = []
-  drawer.value = createDialog.value = copyDialog.value = false
+  drawer.value = createDialog.value = copyDialog.value = graphDialog.value = false
   operationOptions.value = []; materialOptions.value = []; loading.value = busy.value = false
   error.value = drawerError.value = ''; page.value = 1; connection.from = ''; connection.to = ''
 }
@@ -44,6 +46,19 @@ watch(() => [auth.revision, auth.factoryId, ...['list', 'query', 'create', 'upda
   clear(); if (can('list')) void load()
 }, { flush: 'sync' })
 onBeforeUnmount(clear)
+async function beforeCloseDetail(done: () => void) {
+  const attempt = sequence, revision = auth.revision
+  if (pendingContent.value || pendingMetadata.value) {
+    try { await ElMessageBox.confirm('有未保存修改，确认放弃并关闭？', '关闭工艺路线详情', { type: 'warning' }) } catch { return }
+  }
+  if (alive(attempt, revision)) done()
+}
+function closeDetail() {
+  sequence++; operationSequence++; materialSequence++
+  busy.value = false; detail.value = null
+  graphDialog.value = copyDialog.value = false
+  operationOptions.value = []; materialOptions.value = []
+}
 async function load() {
   if (!can('list')) return
   const attempt = ++listSequence, revision = auth.revision
@@ -216,14 +231,14 @@ onMounted(load)
       <el-table-column prop="version" label="版本" width="85"><template #default="{ row }">v{{ row.version }}</template></el-table-column>
       <el-table-column prop="status" label="状态" width="110"><template #default="{ row }"><StatusTag :label="labels[row.status as keyof typeof labels]" :tone="tone(row.status)" /></template></el-table-column>
       <el-table-column prop="description" label="说明" min-width="220" show-overflow-tooltip />
-      <el-table-column prop="publishedAt" label="发布时间" min-width="180"><template #default="{ row }">{{ row.publishedAt?.replace('T', ' ') ?? '—' }}</template></el-table-column>
+      <el-table-column prop="publishedAt" label="发布时间" min-width="180"><template #default="{ row }">{{ parseTime(row.publishedAt) || '—' }}</template></el-table-column>
       <el-table-column label="操作" width="180" fixed="right"><template #default="{ row }">
         <el-button v-if="can('query')" link type="primary" @click="open(row.id)">详情 / 工序</el-button>
         <el-button v-if="can('delete') && row.status === 'DRAFT'" link type="danger" :disabled="busy" @click="remove(row)">删除</el-button>
       </template></el-table-column>
     </el-table>
     <Pagination v-model:page="page" v-model:limit="pageSize" :total="total" @pagination="load" />
-    <el-drawer v-model="drawer" title="工艺路线详情" size="min(960px, 95vw)" :close-on-click-modal="false" @closed="sequence++; operationSequence++; materialSequence++; busy = false; detail = null">
+    <el-drawer v-model="drawer" title="工艺路线详情" size="min(960px, 95vw)" :close-on-click-modal="true" :before-close="beforeCloseDetail" @close="closeDetail">
       <el-alert v-if="drawerError" :title="drawerError" type="error" show-icon :closable="false" />
       <div v-if="detail" v-loading="busy">
         <div class="table-toolbar"><CodeText :value="detail.routing.code" /><strong>v{{ detail.routing.version }}</strong><StatusTag :label="labels[detail.routing.status]" :tone="tone(detail.routing.status)" /></div>
@@ -240,7 +255,10 @@ onMounted(load)
           </el-form-item>
         </el-form>
         <el-alert v-if="pendingContent || pendingMetadata" title="有未保存修改，请保存后再发布或复制。" type="warning" :closable="false" />
-        <RoutingGraphPreview :nodes="detail.nodes.map(node => ({ ...node, operationName: operationOptions.find(option => option.id === node.operationId)?.name ?? node.operationName }))" :edges="detail.edges" />
+        <div class="table-toolbar"><el-button @click="graphDialog = true">查看拓扑</el-button><span class="secondary">{{ detail.nodes.length }} 个节点 · {{ detail.edges.length }} 条连接</span></div>
+        <el-dialog v-model="graphDialog" title="工艺路线拓扑" width="min(1440px, 95vw)" append-to-body :close-on-click-modal="true" destroy-on-close>
+          <RoutingGraphPreview style="--routing-graph-max-height: 70vh" :nodes="detail.nodes.map(node => ({ ...node, operationName: operationOptions.find(option => option.id === node.operationId)?.name ?? node.operationName }))" :edges="detail.edges" />
+        </el-dialog>
         <div class="table-toolbar"><strong>工艺节点 · {{ detail.nodes.length }} 个</strong><el-button v-if="editable" :disabled="busy || detail.nodes.length >= 100" @click="addNode">新增节点</el-button></div>
         <el-table :data="detail.nodes" empty-text="尚未添加工艺节点">
           <el-table-column label="节点编码" min-width="110"><template #default="{ row }"><el-input v-if="editable" :model-value="row.nodeCode" maxlength="64" :disabled="busy" aria-label="节点编码" @update:model-value="(value: string) => renameNode(row, value)" /><CodeText v-else :value="row.nodeCode" /></template></el-table-column>

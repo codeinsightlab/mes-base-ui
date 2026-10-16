@@ -1,0 +1,12 @@
+{
+  "id": "production:mesOperationUser",
+  "name": "工序能力人员",
+  "path": "/production/mesOperationUser",
+  "component": "production/mesOperationUser/index",
+  "permission": "business:mes:operation:user:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [],
+  "hidden": true
+}

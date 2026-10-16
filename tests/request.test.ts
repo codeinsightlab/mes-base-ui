@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { request, configureRequests, ApiError } from '../src/lib/request'
+import { request, configureRequests, ApiError, requestStream } from '../src/lib/request'
 let revision = 0;const unauthorized = vi.fn()
 beforeEach(() => { revision = 0;unauthorized.mockClear();configureRequests(() => ({ token: 'TEST-ONLY-token', factoryId: 'A', revision }), unauthorized) })
 describe('Base request contract', () => {
@@ -31,6 +31,20 @@ describe('Base request contract', () => {
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
     revision++
     release('{"errorCode":"UNAUTHENTICATED"}')
+    await expect(pending).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
+    expect(unauthorized).not.toHaveBeenCalled()
+  })
+  it('an old token response cannot sign out a newly logged-in token', async() => {
+    let token = 'OLD_TOKEN'
+    configureRequests(() => ({ token, factoryId: 'A', revision }), unauthorized)
+    let release!: (value: unknown) => void
+    const response = new Response('{}', { status: 401 })
+    vi.spyOn(response, 'json').mockImplementation(() => new Promise(resolve => { release = resolve }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
+    const pending = request('/api/demo')
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+    token = 'NEW_TOKEN'
+    release({ errorCode: 'UNAUTHENTICATED' })
     await expect(pending).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
     expect(unauthorized).not.toHaveBeenCalled()
   })
@@ -90,6 +104,18 @@ describe('Base request contract', () => {
     expect(recover).not.toHaveBeenCalled()
   })
   it('represents network failure explicitly', async() => { vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('TEST ONLY internal detail')));await expect(request('/api/demo')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });await expect(request('/api/demo')).rejects.not.toThrow('internal detail') })
+  it('streaming requests retain the caller abort signal after headers are received', async() => {
+    const controller = new AbortController()
+    let signal!: AbortSignal
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async(_path, options: RequestInit) => {
+      signal = options.signal!; return new Response('data: TEST ONLY\n\n')
+    }))
+    const response = await requestStream('/api/personal/inbox/events', { signal: controller.signal })
+    expect(response.body).toBeTruthy()
+    expect(signal.aborted).toBe(false)
+    controller.abort()
+    expect(signal.aborted).toBe(true)
+  })
   it('multipart upload leaves content-type boundary to browser', async() => { const fetcher = vi.fn().mockResolvedValue(new Response('{}'));vi.stubGlobal('fetch', fetcher);await request('/api/platform/files', { method: 'POST', body: new FormData() });expect(fetcher.mock.calls[0]![1].headers.has('Content-Type')).toBe(false) })
 })
 

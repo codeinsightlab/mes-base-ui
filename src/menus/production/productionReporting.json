@@ -1,0 +1,11 @@
+{
+  "id": "production:productionReporting",
+  "name": "生产报工",
+  "path": "/production/productionReporting",
+  "component": "production/productionReporting/index",
+  "permission": "business:production:report:submit",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

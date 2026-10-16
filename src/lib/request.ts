@@ -16,7 +16,7 @@ export function configureRequests(provider: () => RequestContext, on401: () => v
   factorySelectionRequired = onFactorySelection
 }
 export class ApiError extends Error { constructor(public code: string, message: string, public requestId = '', public status = 0) { super(message) } }
-export interface RequestOptions { method?: string; body?: unknown; query?: Record<string, string | number>; scope?: PermissionScope; public?: boolean; parseResponse?: (text: string) => unknown }
+export interface RequestOptions { signal?: AbortSignal; method?: string; body?: unknown; query?: Record<string, string | number>; scope?: PermissionScope; public?: boolean; parseResponse?: (text: string) => unknown }
 async function send(path: string, options: RequestOptions = {}): Promise<Response> {
   if (!path.startsWith('/api/') && path !== '/health') throw new ApiError('INVALID_PATH', '请求路径无效')
   const snapshot = { ...context() }; const headers = new Headers()
@@ -27,7 +27,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<Respons
   if (options.body !== undefined && !multipart) headers.set('Content-Type', 'application/json')
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 15000)
   let response: Response
-  try { response = await fetch(path + query, { method: options.method ?? 'GET', headers, body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body), signal: controller.signal, credentials: 'same-origin' }) } catch { throw new ApiError('NETWORK_ERROR', '连接失败或超时，请重试') } finally { clearTimeout(timer) }
+  try { response = await fetch(path + query, { method: options.method ?? 'GET', headers, body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body), signal: options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal, credentials: 'same-origin' }) } catch { throw new ApiError('NETWORK_ERROR', '连接失败或超时，请重试') } finally { clearTimeout(timer) }
   assertCurrent(snapshot)
   if (!response.ok) {
     let error: { errorCode?: string; message?: string; requestId?: string } = {}
@@ -67,3 +67,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const text = await response.text(); assertCurrent(responseContexts.get(response)!); if (!text) return undefined as T;try { return (options.parseResponse ? options.parseResponse(text) : JSON.parse(text)) as T } catch { throw new ApiError('INVALID_RESPONSE', '服务响应格式无效', response.headers.get('X-Request-Id') ?? '', response.status) }
 }
 export async function requestBlob(path:string, options:RequestOptions = {}):Promise<Blob> { const response = await send(path, options); const blob = await response.blob(); assertCurrent(responseContexts.get(response)!); return blob }
+
+/** Streaming responses share authentication and stale-context guards with ordinary requests. */
+export async function requestStream(path: string, options: RequestOptions = {}): Promise<Response> { return send(path, options) }

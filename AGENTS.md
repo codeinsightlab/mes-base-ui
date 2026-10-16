@@ -14,7 +14,7 @@
 
 Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改变用户全局 Node16。保持 API/VO 真实契约、损失为零的 bigint/decimal 字符串；源项目 Vue2 页面是迁移产品资产，保留字段、查询、列、按钮、弹窗/联动、权限、字典和实际用户流程，适配 Vue3，不带客户数据/身份/Secret。
 
-迁移阶段不调用 Codegen Skill，先 COPY / PORT 源页面与 API，不能用重新生成 CRUD 替代已有功能。后续新增开发的标准表驱动页面才先读取 `../mes-base/.agents/skills/mes-crud-codegen/SKILL.md`，通过 Base CLI 自动放置，再做 UI review/优化/test/build。公共 shell、CrudPage、dict、request 与 permission 在 src；使用已有视觉系统。菜单仅能指向已编译模块，客户端按钮和路由不承担最终授权。请求可声明预期 scope；有已选 Factory 时所有请求携带 X-Factory-Id，接口归属由后端 URL 判断，平台/个人请求不因请求头进入业务库；切换清除旧数据/权限，过期响应不能回填。按用户2026-10-06明确要求保留刷新登录态：localStorage只保存Token、有效期与选厂偏好，不保存密码、用户资料、菜单或权限；初始化从后端重新校验身份/权限/启用厂，过期、401或注销清除保存值，网络失败保留并允许重试。文件走带认证的私有下载。
+迁移阶段不调用 Codegen Skill，先 COPY / PORT 源页面与 API，不能用重新生成 CRUD 替代已有功能。后续新增开发的标准表驱动页面才先读取 `../mes-base/.agents/skills/mes-crud-codegen/SKILL.md`，通过 Base CLI 自动放置，再做 UI review/优化/test/build。公共 shell、CrudPage、dict、request 与 permission 在 src；使用已有视觉系统。菜单仅能指向已编译模块，客户端按钮和路由不承担最终授权。请求可声明预期 scope；有已选 Factory 时所有请求携带 X-Factory-Id，接口归属由后端 URL 判断，平台/个人请求不因请求头进入业务库；切换清除旧数据/权限，过期响应不能回填。按用户2026-10-06明确要求保留刷新登录态：localStorage只保存Token与选厂偏好（2026-10-15用户更新：不保存或按本地时间判断有效期，由后端401确定会话失效），不保存密码、用户资料、菜单或权限；初始化从后端重新校验身份/权限/启用厂，后端401或注销清除保存值，网络失败保留并允许重试。文件走带认证的私有下载。
 
 `npm run test`、`npm run build`；页面需真实浏览器和窄屏/错误/删除取消检查，单元或构建通过不冒充业务验收。源码优先 src，TEST ONLY 生成页 target/codegen-acceptance 不进正式路由。保留用户已有修改；提交/推送/部署按已有授权。
 
@@ -61,3 +61,22 @@ HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:
 `src/views/system/openApiClient/index.vue` 与 `src/api/system/openApiClient.ts` 恢复客户端创建、启停、一次性 Secret 展示/重置与接口分组授权。
 复用平台 request/权限/菜单机制；凭证不写 localStorage，关闭对话框/离开页面清空 Secret，迟到响应不恢复凭证。
 后台用户 Token 与外部应用 Token 不互通，页面不保存外部 Token，不自动赋予角色或外部 API 权限。
+
+
+## 弹出层失焦关闭（2026-10-15 用户要求）
+
+后续新增或修改的弹窗、抽屉、浮层，默认在点击内容区域外（遮罩/外部区域）时隐藏，保留 Esc 与关闭按钮；不得无理由设置 `close-on-click-modal=false`。此处失焦指离开整个弹出区域的交互，不是表单内输入框之间切换焦点、操作下拉选择器或切换系统窗口就关闭。
+有未保存编辑时，先确认是否放弃，取消确认继续保留编辑；不能静默丢失。嵌套弹窗关闭只作用于当前层。开始关闭、切厂、撤权及卸载时及时失效请求序列并清理相关浮层，迟到响应不得重新填回或打开旧详情。凭证等特定资源继续遵守关闭即清理规则。
+
+
+## 2026-10-15 用户确认：统一业务目录与引用缓存
+
+工艺、工序、系统用户等跨页面通用选择及引用回显统一由 BusinessDirectory 提供：前端公共组件经 BusinessDirectoryController，后端业务 Service 调用 BusinessDirectoryService；禁止在各业务模块、Controller 或前端组件另建同对象的共享名称缓存。批量回显先收集本批去重 ID，统一批量读取缓存，仅对未命中 ID 执行参数化 IN 查询，再按 ID 回填；不能在行循环中逐条查询数据库或逐次远程缓存调用。
+
+同一对象的单对象缓存统一使用经审查的 Entity，通用层提供较宽、可复用的数据能力；具体业务需要更窄字段时，在上层按需求转换 DTO/VO，不为这些转换另建投影缓存。不缓存密码、联系方式、角色、权限或生产资格；敏感 Entity 必须在进入缓存前落实安全字段边界。状态仅用于展示，授权、人员可派工资格、存在性及工单适用工艺等规则仍由相应业务服务实时校验，不能由目录缓存替代。历史事实优先使用已有姓名/工序快照，当前目录名称不能伪装成历史快照。
+
+业务目录缓存按当前 Factory 与业务资源隔离，命中前后保留固定事务/租约检查；缺 Scope 不回退全局或中心库。中心用户目录为共享引用。对象写入成功提交后统一失效，回滚不失效；写事务不得向共享缓存发布未提交对象。Redis 故障可退回一次批量数据库查询，数据库失败必须传播。通用缓存实现仅作为目录服务的内部基础设施；原有完整实体业务缓存、认证会话和数据源路由缓存不属于名称回显，不因本约束复制或替代其规则。
+
+单对象缓存必须复用通用详情 Key：同一数据库范围、业务资源和 ID 只使用同一个 `<资源前缀>detail:<编码ID>`，由 DetailCacheKeys 统一生成。BusinessDirectoryService 可以保留批量缓存读取和未命中 IDs 一次 IN 查询，不强制循环调用 findById/selectById；但不得另建 reference/directory/label 或 IDs 组合形式的对象缓存 Key，也不得在同一 Key 下混存 Entity 与窄 DTO/VO。批量读取与通用详情查询必须能双向命中同一份 Entity 数据，使用同一提交后失效规则。资源级失效版本仅作为通用详情的写入屏障元数据，不是另一份对象缓存。
+
+新增目录对象时同时验证生成的新增/修改/删除及导入/同步入口均触发通用淘汰；中心用户等对象通过其统一写入边界失效。验收覆盖真实 Redis 的详情与批量双向复用、完整 Entity 字段保留、提交后刷新、回滚保留及迟到回填被拒绝，不仅验证 key 含有 detail 字样。

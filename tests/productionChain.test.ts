@@ -1,24 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
+import { routeLocationKey } from 'vue-router'
 import ElementPlus from 'element-plus'
 import { useAuth } from '../src/stores/auth'
 import WorkOrder from '../src/views/production/workorder/index.vue'
 import ExecutionList from '../src/components/business/production/ProductionExecutionList.vue'
 import CrudPage from '../src/components/CrudPage.vue'
-const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), release: vi.fn(), remove: vi.fn(), routings: vi.fn(), allocation: vi.fn() }))
+const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), release: vi.fn(), remove: vi.fn(), routings: vi.fn(), allocation: vi.fn(), batchHistory: vi.fn(), graph: vi.fn() }))
 const executions = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }))
 vi.mock('../src/api/production/workorder', () => ({ api: wo }))
 vi.mock('../src/api/production/mesProductionExecution', () => ({ api: executions }))
 vi.mock('../src/api/basic/material', () => ({ api: { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'P1', name: '产品一' }] }) } }))
 const allocation = { workorderId: '1', plannedQty: '1000.000000', allocatedTargetQty: '1300.000000', remainingTargetQty: '-300.000000', excessTargetQty: '300.000000', executionCount: 2 }
 const order = { id: '1', code: 'WO1', productId: '1', routingId: '1', plannedQty: '1000', status: 'DRAFT', revision: 0 }
-const detail = () => ({ workorder: order, productCode: 'P1', productName: '产品一', routing: { id: '1', code: 'R1', version: 1 }, allocation, batches: [{ id: '7', batchNo: 'LEGACY_ONLY', plannedQty: '1000', routeStatus: 'LOCKED', path: [{ routingNodeId: '99', executionOrder: 1 }] }] })
+const detail = () => ({ workorder: order, productCode: 'P1', productName: '产品一', routing: { id: '1', code: 'R1', version: 1 }, allocation, batches: [{ id: '7', batchNo: 'LEGACY_ONLY', plannedQty: '1000', routeStatus: 'LOCKED' }] })
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   for (const method of Object.values(wo)) method.mockReset()
   wo.list.mockResolvedValue({ items: [{ workorder: order, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
   wo.detail.mockResolvedValue(detail())
+  wo.graph.mockResolvedValue({ routing: { id: '1', code: 'R1', version: 1 }, nodes: [], edges: [] })
   wo.routings.mockResolvedValue([{ id: '1', code: 'R1', name: '发布版本', version: 1 }])
   executions.list.mockReset().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 20 })
 })
@@ -41,6 +43,29 @@ describe('single active execution chain', () => {
     expect(executions.list).not.toHaveBeenCalled()
     w.unmount()
   })
+  it('loads historical paths only on demand and rejects them after a factory switch', async() => {
+    let resolve!: (v: unknown) => void
+    wo.batchHistory.mockImplementationOnce(() => new Promise(r => { resolve = r }))
+    const c = setup(['workorder:list', 'workorder:query', 'batch:query']), w = mount(WorkOrder, { global: c.global })
+    await flushPromises()
+    await w.findAll('button').find(b => b.text() === '详情 / 执行')!.trigger('click'); await flushPromises()
+    expect(wo.batchHistory).not.toHaveBeenCalled()
+    const state = w.vm as unknown as { loadHistory: (id: string) => Promise<void>; histories: Record<string, unknown> }
+    const pending = state.loadHistory('7')
+    expect(wo.batchHistory).toHaveBeenCalledWith('7')
+    c.auth.factoryId = 'B'; c.auth.revision++; await flushPromises()
+    resolve({ id: '7', path: [{ routingNodeId: '99', executionOrder: 1 }] }); await pending; await flushPromises()
+    expect(state.histories).toEqual({})
+    w.unmount()
+  })
+  it('does not read historical paths without batch query permission', async() => {
+    const c = setup(['workorder:list', 'workorder:query']), w = mount(WorkOrder, { global: c.global })
+    await flushPromises()
+    const state = w.vm as unknown as { loadHistory: (id: string) => Promise<void> }
+    await state.loadHistory('7')
+    expect(wo.batchHistory).not.toHaveBeenCalled()
+    w.unmount()
+  })
   it('opens a demand form with no batch array or path step and saves the exact demand', async() => {
     const c = setup(['workorder:list', 'workorder:create']), w = mount(WorkOrder, { global: c.global })
     await flushPromises(); await w.findAll('button').find(b => b.text() === '新增工单')!.trigger('click'); await flushPromises()
@@ -59,7 +84,27 @@ describe('single active execution chain', () => {
     await flushPromises()
     expect(executions.list).toHaveBeenCalledWith(expect.objectContaining({ workorderId: '9007199254740993' }))
     expect(w.findComponent(CrudPage).props('fixedValues')).toEqual({ workorderId: '9007199254740993' })
-    expect(w.text()).toContain('实际工艺版本 ID')
+    expect(w.text()).toContain('实际工艺版本')
+    w.unmount()
+  })
+  it('opens an authorized bookmarked workorder without losing the string ID', async() => {
+    const c = setup(['workorder:list', 'workorder:query'])
+    const w = mount(WorkOrder, { global: { ...c.global, provide: { [routeLocationKey as symbol]: { query: { workorderId: '9007199254740993' } } } } })
+    await flushPromises()
+    expect(wo.detail).toHaveBeenCalledWith('9007199254740993')
+    expect(w.text()).toContain('工单需求与生产执行')
+    w.unmount()
+  })
+  it('closing the workorder invalidates pending details and unmounts its execution context', async() => {
+    let release!: (v: unknown) => void
+    wo.detail.mockImplementationOnce(() => new Promise(r => { release = r }))
+    const c = setup(['workorder:list', 'workorder:query']), w = mount(WorkOrder, { global: c.global })
+    await flushPromises()
+    const state = w.vm as unknown as { open: (id: string) => Promise<void>; closeHistory: () => void; detail: unknown }
+    const pending = state.open('1'); state.closeHistory()
+    release(detail()); await pending; await flushPromises()
+    expect(state.detail).toBeNull()
+    expect(w.findComponent(ExecutionList).exists()).toBe(false)
     w.unmount()
   })
   it('rejects late workorder details after factory switch', async() => {

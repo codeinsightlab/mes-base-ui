@@ -1,0 +1,114 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useAuth } from '@/stores/auth'
+import { ApiError } from '@/lib/request'
+import PageHeader from '@/components/PageHeader.vue'
+import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
+import { productionReporting, submitPermission, type ReportingContext, type ReportCommand } from '@/api/production/productionReporting'
+import type { Ledger } from '@/api/production/productionReport'
+import type { RoutingNode, RoutingEdge } from '@/api/production/routing'
+const auth = useAuth()
+const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission(submitPermission, 'factory'))
+const code = ref(''), context = ref<ReportingContext | null>(null), selectedId = ref(''), quantity = ref('')
+const loading = ref(false), busy = ref(false), error = ref(''), result = ref<Ledger | null>(null)
+const pending = ref<ReportCommand | null>(null), showAll = ref(false)
+let version = 0
+const nodes = computed(() => context.value?.quantities.nodes.map(n => ({ ...n, ...context.value?.candidates.find(c => c.routingNodeId === n.routingNodeId) })) ?? [])
+const visibleNodes = computed(() => nodes.value.filter(n => showAll.value || n.status === 'AVAILABLE'))
+const selected = computed(() => nodes.value.find(n => n.routingNodeId === selectedId.value))
+const graphNodes = computed<RoutingNode[]>(() => context.value?.path.nodes.map((n, i) => ({ id: n.id, nodeCode: n.nodeCode, operationId: n.operationId, operationCode: n.operationCode, operationName: n.operationName, isKey: n.required, displayOrder: i, description: null })) ?? [])
+const graphEdges = computed<RoutingEdge[]>(() => {
+ const codes = new Map(context.value?.path.nodes.map(n => [n.id, n.nodeCode]))
+ return context.value?.path.edges.map(e => ({ fromNodeCode: codes.get(e.fromNodeId)!, toNodeCode: codes.get(e.toNodeId)! })) ?? []
+})
+const statusNames: Record<string, string> = { READY: '待开工', RUNNING: '生产中', COMPLETED: '已完成', CANCELLED: '已取消', AVAILABLE: '可报工', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
+function clear() {
+ version++; context.value = null; selectedId.value = ''; quantity.value = ''; pending.value = null
+ result.value = null; error.value = ''; busy.value = loading.value = false; showAll.value = false
+}
+watch(() => [auth.factoryId, auth.revision, allowed.value], () => { clear(); code.value = '' }, { flush: 'sync' })
+onBeforeUnmount(clear)
+async function locate() {
+ if (!allowed.value) return
+ clear(); loading.value = true; const ticket = version
+ try {
+  const value = await productionReporting.context(code.value.trim())
+  if (ticket !== version) return
+  context.value = value
+ } catch(e) { if (ticket === version) error.value = e instanceof Error ? e.message : '执行查询失败' }
+ finally { if (ticket === version) loading.value = false }
+}
+async function submit() {
+ if (!allowed.value || busy.value || !context.value) return
+ if (!pending.value && (selected.value?.status !== 'AVAILABLE' || !/^\d{1,14}(\.\d{1,6})?$/.test(quantity.value) || !/[1-9]/.test(quantity.value))) { error.value = '请选择可报工序，输入正数量（最多6位小数）'; return }
+ if (!pending.value) pending.value = { executionId: context.value.identity.executionId, routingNodeId: selectedId.value, reportQty: quantity.value, workstationId: null, requestId: crypto.randomUUID() }
+ const command = { ...pending.value }, ticket = version
+ busy.value = true; error.value = ''
+ try {
+  const saved = await productionReporting.submit(command)
+  if (ticket !== version) return
+  result.value = saved; pending.value = null; quantity.value = ''; selectedId.value = ''
+  try {
+   const fresh = await productionReporting.context('EXE:' + command.executionId)
+   if (ticket === version) context.value = fresh
+  } catch(e) { if (ticket === version) error.value = '报工已成功，数量刷新失败，请重新定位执行单元：' + (e instanceof Error ? e.message : '读取失败') }
+ } catch(e) {
+  if (ticket !== version) return
+  // Unknown transport/5xx outcomes retain the exact command. Definite rejection allows corrected input with a new ID.
+  if (e instanceof ApiError && e.status >= 400 && e.status < 500) pending.value = null
+  error.value = e instanceof Error ? e.message : '报工结果未确认，请使用原请求重试'
+ } finally { if (ticket === version) busy.value = false }
+}
+</script>
+<template>
+ <div class="app-container reporting-page">
+  <PageHeader title="生产报工" description="扫描生产执行身份码，选择当前可报工序并确认完成数量。" />
+  <el-alert v-if="!allowed" title="当前账号没有正式生产报工权限，或尚未选择工厂" type="warning" :closable="false" />
+  <template v-else>
+   <el-form class="filter-panel" @submit.prevent="locate">
+    <el-form-item label="Execution 身份码"><el-input v-model="code" placeholder="扫码枪扫描或输入 EXE:100001" clearable aria-label="Execution 身份码" /></el-form-item>
+    <el-button type="primary" :loading="loading" @click="locate">定位执行</el-button>
+   </el-form>
+   <el-alert v-if="error" :title="error" type="error" :closable="false" role="alert" />
+   <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${result.quantityDelta}，时间 ${result.reportTime}`" type="success" :closable="false" />
+   <section v-if="context" class="panel" v-loading="loading">
+    <el-descriptions :column="1" border>
+     <el-descriptions-item label="生产执行">{{ context.identity.executionNo }} · {{ statusNames[context.identity.status] || context.identity.status }}</el-descriptions-item>
+     <el-descriptions-item label="工单">{{ context.identity.workorderCode }}</el-descriptions-item>
+     <el-descriptions-item label="产出物料">{{ context.identity.productCode }} · {{ context.identity.productName }}</el-descriptions-item>
+     <el-descriptions-item label="目标数量">{{ context.identity.targetQty }}</el-descriptions-item>
+     <el-descriptions-item label="实际工艺">{{ context.quantities.routingLabel || context.identity.routingCode + ' / V' + context.identity.routingVersion }} · {{ context.quantities.pathStatus }}</el-descriptions-item>
+    </el-descriptions>
+    <el-alert v-if="context.quantities.pathStatus !== 'LOCKED'" title="实际路径尚未锁定，不能正式报工。请在生产执行完成选路与领料确认。" type="warning" :closable="false" />
+    <el-collapse v-if="context.quantities.pathStatus !== 'UNSELECTED'"><el-collapse-item title="查看本次实际执行路径" name="path"><RoutingGraphPreview :nodes="graphNodes" :edges="graphEdges" :selected-node-ids="context.path.selectedNodeIds" /></el-collapse-item></el-collapse>
+    <div class="table-toolbar"><strong>实际路径工序</strong><el-switch v-model="showAll" active-text="查看其他节点状态" /></div>
+    <el-table :data="visibleNodes" row-key="routingNodeId">
+     <el-table-column label="顺序" prop="sequenceNo" width="75" />
+     <el-table-column label="工序" min-width="190"><template #default="{row}">{{ row.code }} · {{ row.name || '工序名称未记录' }}</template></el-table-column>
+     <el-table-column label="上游可用 / 输入" prop="inputQty" min-width="145" />
+     <el-table-column label="累计报工" prop="reportedQty" min-width="130" />
+     <el-table-column label="剩余可报" prop="availableQty" min-width="130" />
+     <el-table-column label="状态 / 原因" min-width="230"><template #default="{row}">{{ statusNames[row.status] || row.status }}<span v-if="row.reason"> · {{ row.reason }}</span></template></el-table-column>
+    </el-table>
+    <el-empty v-if="!visibleNodes.length" description="暂无可报工序，可打开其他节点状态查看原因" :image-size="55" />
+    <el-form class="report-form" label-position="top" @submit.prevent="submit">
+     <el-form-item label="本次报工工序"><el-select v-model="selectedId" :disabled="busy || !!pending" placeholder="选择可报工序"><el-option v-for="n in nodes" :key="n.routingNodeId" :value="n.routingNodeId" :label="n.code + ' · ' + (n.name || '工序名称未记录') + (n.reason ? '（' + n.reason + '）' : '')" :disabled="n.status !== 'AVAILABLE'" /></el-select></el-form-item>
+     <p v-if="selected">上游输入 {{ selected.inputQty }} · 已报 {{ selected.reportedQty }} · 剩余 {{ selected.availableQty }}</p>
+     <el-form-item label="本次完成数量"><el-input v-model="quantity" inputmode="decimal" :disabled="busy || !!pending" placeholder="输入大于0的完成数量" /></el-form-item>
+     <el-button type="primary" size="large" :loading="busy" :disabled="!pending && selected?.status !== 'AVAILABLE'" @click="submit">{{ pending && !busy ? '结果未确认，安全重试原报工' : '确认报工' }}</el-button>
+    </el-form>
+    <p v-if="pending && !busy" class="secondary">原工序和数量已保留。重试复用同一请求标识；切换执行前请确认原请求结果。</p>
+    <p class="secondary">质量尚未接入：不良数量为预留值，不在此申报；本入口不自动完工或入库。待开工执行的首次报工还会校验正式领料确认。</p>
+   </section>
+   <el-empty v-else-if="!loading" description="请扫描或输入生产执行身份码" />
+  </template>
+ </div>
+</template>
+<style scoped>
+.filter-panel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--mes-space-3, 12px); }
+.filter-panel .el-form-item { flex: 1; min-width: 220px; margin-bottom: 0; }
+.report-form { margin-top: var(--mes-space-5, 20px); max-width: 640px; }
+.report-form .el-select { width: 100%; }
+.report-form .el-button { min-height: 44px; }
+.panel { padding: var(--mes-space-4, 16px); }
+</style>

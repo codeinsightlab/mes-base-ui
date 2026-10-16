@@ -43,8 +43,7 @@ export const useAuth = defineStore('auth', {
       factoryMenus: [] as Menu[],
       platformPermissions: [] as string[],
       factoryPermissions: [] as string[],
-      factories: [] as { factoryId: string; name: string }[],
-      expiresAt: saved?.expiresAt ?? ''
+      factories: [] as { factoryId: string; name: string }[]
     }
   },
   getters: { loggedIn: s => !!s.token }, actions: {
@@ -61,7 +60,6 @@ export const useAuth = defineStore('auth', {
       this.username = ''
       this.factoryId = ''
       this.savedFactoryId = ''
-      this.expiresAt = ''
       this.sessionReady = true
       this.sessionError = ''
       this.platformMenus = []
@@ -89,10 +87,9 @@ export const useAuth = defineStore('auth', {
       this.factories = factories
     },
     persistSession() {
-      if (this.token) saveSession({ token: this.token, expiresAt: this.expiresAt, factoryId: this.factoryId })
+      if (this.token) saveSession({ token: this.token, factoryId: this.factoryId })
     },
     async restoreSession() {
-      if (this.token && Date.parse(this.expiresAt) <= Date.now()) this.clear()
       if (this.sessionReady) return
       if (!this.token) {
         this.sessionReady = true
@@ -123,8 +120,7 @@ export const useAuth = defineStore('auth', {
     },
     async login(username: string, password: string, code?: string, uuid?: string) {
       const session = await request<{
-        accessToken: string;
-        expiresAt: string
+        accessToken: string
       }>('/api/session', {
         method: 'POST',
         body: { username, password, code, uuid },
@@ -132,7 +128,6 @@ export const useAuth = defineStore('auth', {
         public: true
       })
       this.token = session.accessToken
-      this.expiresAt = session.expiresAt
       this.username = username
       this.factoryId = ''
       this.savedFactoryId = ''

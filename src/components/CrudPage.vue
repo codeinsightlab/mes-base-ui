@@ -20,6 +20,13 @@ import type { PermissionScope } from '@/lib/request'
 const props = withDefaults(defineProps<{
   embedded?: boolean;
   managedEditing?: boolean;
+  editorWidth?: string;
+  actionColumnWidth?: number;
+  editorAccess?: boolean;
+  keepEditorOpen?: boolean;
+  editorDirty?: boolean;
+  editorBusy?: boolean;
+  saveLabel?: string;
   fixedValues?: Record<string, string>;
   tableKey?: string;
   tableConfigUrl?: string;
@@ -44,6 +51,7 @@ const rows = ref<Row[]>([]), total = ref(0), page = ref(1), limit = ref(20), loa
 const showSearch = ref(true)
 const draft = reactive<Row>({}), search = reactive<Record<string, string>>({})
 let generation = 0, contextGeneration = 0
+let savedDraft = ''
 const defaultColumns = computed(() => props.fields.filter(f => !f.hidden && !(f.key in (props.fixedValues ?? {})) && f.kind !== 'password' && f.key !== 'factoryId'))
 const columnSettings = useTableColumns(defaultColumns, () => props.tableKey, () => tableRouteUrl(route, props.tableConfigUrl))
 const columns = columnSettings.columns
@@ -90,7 +98,7 @@ async function load() {
 }
 
 async function open(row?: Row) {
-  if (props.readonly || props.managedEditing || (row ? !can('update') || !can(props.detailAction) : !can('create'))) return
+  if (props.readonly || props.managedEditing || (row ? (!can('update') && !props.editorAccess) || !can(props.detailAction) : !can('create'))) return
   const revision = auth.revision
   const context = contextGeneration
   error.value = ''
@@ -109,6 +117,7 @@ async function open(row?: Row) {
   }
   if (auth.revision !== revision || context !== contextGeneration) return
   Object.assign(draft, props.fixedValues)
+  savedDraft = JSON.stringify(draft)
   dialog.value = true
 }
 
@@ -132,7 +141,9 @@ async function save() {
       await props.api.create(body)
     }
     if (auth.revision !== revision || context !== contextGeneration || JSON.stringify(props.fixedValues) !== scopeValues) return
-    dialog.value = false
+    if (props.keepEditorOpen && editId.value) {
+      savedDraft = JSON.stringify(draft)
+    } else dialog.value = false
     ElMessage.success('已保存')
     emit('changed')
     await load()
@@ -221,6 +232,15 @@ watch(() => [props.api, JSON.stringify(props.fixedValues), auth.revision], () =>
   page.value = 1
   load()
 })
+async function closeEditor(done: () => void = () => { dialog.value = false }) {
+  if (saving.value || props.editorBusy) return
+  const context = contextGeneration
+  if (props.editorDirty || JSON.stringify(draft) !== savedDraft) {
+    try { await ElMessageBox.confirm('尚有未保存的编辑，是否放弃？', '关闭编辑', { type: 'warning' }) } catch { return }
+  }
+  if (context !== contextGeneration) return
+  done()
+}
 onBeforeUnmount(() => { generation++; contextGeneration++ })
 onMounted(load)
 defineExpose({ load })
@@ -299,6 +319,7 @@ defineExpose({ load })
         show-overflow-tooltip
       >
         <template #default="{row}">
+          <slot :name="`cell-${field.key}`" :row="row" :field="field">
           <CodeText v-if="field.key===idKey" :value="row[field.key]" />
           <StatusTag
             v-else-if="field.key==='status'"
@@ -309,16 +330,17 @@ defineExpose({ load })
             v-else
             :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
           >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? formatValue(row[field.key], field.kind)
-          }}</span></template>
+          }}</span>
+          </slot></template>
       </el-table-column>
       <el-table-column
-        v-if="$slots.actions || (!readonly && (can('update') || can('delete')))"
+        v-if="$slots.actions || (!readonly && (can('update') || editorAccess || can('delete')))"
         label="操作"
         fixed="right"
-        width="180"
+        :width="actionColumnWidth ?? 180"
       >
         <template #default="{row}">
-          <el-button v-if="!readonly && !managedEditing && can('update')" text type="primary" @click="open(row)">编辑</el-button>
+          <el-button v-if="!readonly && !managedEditing && (can('update') || editorAccess)" text type="primary" @click="open(row)">编辑</el-button>
           <el-button v-if="!readonly && can('delete')" text type="danger" @click="remove(row)">删除</el-button>
           <slot name="actions" :row="row" />
         </template>
@@ -336,20 +358,24 @@ defineExpose({ load })
     <el-dialog
       v-model="dialog"
       :title="editId?'编辑'+title:'新增'+title"
-      width="min(640px,92vw)"
-      :close-on-click-modal="!saving"
-      :close-on-press-escape="!saving"
-      :show-close="!saving"
+      :width="editorWidth || 'min(640px,92vw)'"
+      destroy-on-close
+      :before-close="closeEditor"
+      :close-on-click-modal="!saving && !editorBusy"
+      :close-on-press-escape="!saving && !editorBusy"
+      :show-close="!saving && !editorBusy"
     >
+      <slot v-if="dialog" name="editor" :draft="draft" :edit-id="editId" :fields="editable" :saving="saving" :readonly="!writeAllowed" :save="save">
       <p class="form-caption">基础信息
         <span>{{ resolvedPermissionScope === 'factory' ? '带 * 的字段为必填；工厂身份由当前上下文确定。' : '带 * 的字段为必填；平台对象的范围按字段配置。'
         }}</span></p>
-      <DocumentFields :fields="editable" :draft="draft" :disabled="saving" :disabled-keys="editId ? [idKey] : []" @submit="save">
+      <DocumentFields :fields="editable" :draft="draft" :disabled="saving || !writeAllowed" :disabled-keys="editId ? [idKey] : []" @submit="save">
         <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
       </DocumentFields>
+      </slot>
       <template #footer>
-        <el-button :disabled="saving" @click="dialog=false">取消</el-button>
-        <el-button type="primary" :loading="saving" :disabled="!writeAllowed" @click="save">保存</el-button>
+        <el-button :disabled="saving || editorBusy" @click="closeEditor()">{{ keepEditorOpen ? '关闭' : '取消' }}</el-button>
+        <el-button type="primary" :loading="saving" :disabled="!writeAllowed || editorBusy" @click="save">{{ saveLabel || '保存' }}</el-button>
       </template>
     </el-dialog>
   </section>

@@ -1,0 +1,12 @@
+{
+  "id": "production:mesExecutionAssignment",
+  "name": "生产节点派工",
+  "path": "/production/mesExecutionAssignment",
+  "component": "production/mesExecutionAssignment/index",
+  "permission": "business:mes:execution:assignment:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": [],
+  "hidden": true
+}

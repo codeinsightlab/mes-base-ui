@@ -1,0 +1,11 @@
+{
+  "id": "production:productionReport",
+  "name": "生产数量管理",
+  "path": "/production/productionReport",
+  "component": "production/productionReport/index",
+  "permission": "business:production:report:quantity",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

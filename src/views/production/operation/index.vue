@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import OperatorConfigurationPanel from '@/components/business/production/OperatorConfigurationPanel.vue'
 import { ref, watch } from 'vue'
+import DocumentFields from '@/components/document/DocumentFields.vue'
 import CrudPage from '@/components/CrudPage.vue'
 import SyncButton from '@/components/business/SyncButton.vue'
 import { api as generatedApi } from '@/api/production/operation'
@@ -8,6 +10,7 @@ import type { Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 const auth = useAuth()
+const peoplePending = ref(false), peopleBusy = ref(false), editorTab = ref('information')
 let editingRevision: { id: string; revision: number } | null = null
 watch(() => auth.revision, () => { editingRevision = null }, { flush: 'sync' })
 const fields: Field[] = [
@@ -35,9 +38,11 @@ const api = {
     return generatedApi.create({ code: row.code, name: row.name, status: row.status, sort: row.sort,
       description: row.description, externalId: row.externalId })
   },
-  update: (id: string, body: unknown) => {
+  update: async(id: string, body: unknown) => {
     if (editingRevision?.id !== id) throw new Error('请重新打开记录后编辑')
-    return generatedApi.update(id, { ...(body as Row), revision: editingRevision.revision })
+    const result = await generatedApi.update(id, { ...(body as Row), revision: editingRevision.revision })
+    if (editingRevision?.id === id) editingRevision = { id, revision: result.revision }
+    return result
   }
 }
 const sync = () => request<{ fetched: number; created: number; updated: number; skipped: number }>(
@@ -54,7 +59,26 @@ const sync = () => request<{ fetched: number; created: number; updated: number; 
     detail-action="query"
     :api="api"
     :fields="fields"
+    editor-width="min(1040px, 94vw)"
+    keep-editor-open
+    :editor-access="auth.hasPermission('business:mes:operation:user:list', 'factory')"
+    :editor-dirty="peoplePending"
+    :editor-busy="peopleBusy"
+    save-label="保存工序信息"
   >
+    <template #editor="{ editId, draft, fields: editorFields, saving, readonly: metadataReadonly, save }">
+      <el-tabs v-model="editorTab">
+        <el-tab-pane label="工序信息" name="information">
+          <p class="secondary">带 * 的字段为必填。工序信息与人员配置分别保存。</p>
+          <DocumentFields :fields="editorFields" :draft="draft" :disabled="saving || metadataReadonly" @submit="save" />
+        </el-tab-pane>
+        <el-tab-pane label="可操作人员" name="people" lazy>
+          <p class="secondary">人员配置单独保存，保存后立即生效。</p>
+          <OperatorConfigurationPanel v-if="editId && auth.hasPermission('business:mes:operation:user:list', 'factory')" :key="editId" :operation-id="editId" :context-label="String(draft.code) + ' · ' + String(draft.name)" @pending="peoplePending = $event" @busy="peopleBusy = $event" />
+          <p v-else class="secondary">{{ editId ? '暂无查看工序能力人员的权限。' : '请先保存工序，再编辑并配置可操作人员。' }}</p>
+        </el-tab-pane>
+      </el-tabs>
+    </template>
     <template #toolbar><SyncButton permission="operation:sync" scope="factory" :run="sync" @completed="page?.load()" /></template>
   </CrudPage>
 </template>

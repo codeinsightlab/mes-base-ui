@@ -4,7 +4,7 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useAuth } from '../src/stores/auth'
 import Lookup from '../src/components/business/production/ExecutionIdentityLookup.vue'
-import Page from '../src/views/production/mesProductionExecution/index.vue'
+import Page from '../src/components/business/production/ProductionExecutionList.vue'
 
 const resolve = vi.hoisted(() => vi.fn())
 const api = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }))
@@ -27,7 +27,8 @@ describe('production execution identity', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('EXE-9007199254740993')
     expect(wrapper.text()).toContain('99,999,999,999,999.123456')
-    const buttons = wrapper.findAll('button').map(b => b.text())
+    await wrapper.findAll('button').find(b => b.text() === '更多操作')!.trigger('click'); await flushPromises()
+    const buttons = [...document.querySelectorAll('button'), ...wrapper.element.querySelectorAll('button')].map(b => b.textContent?.trim())
     expect(buttons).toContain('扫码查询')
     expect(buttons).toContain('身份码')
     for (const text of ['新增', '编辑', '删除', '同步']) expect(buttons).not.toContain(text)

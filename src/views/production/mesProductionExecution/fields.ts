@@ -12,6 +12,7 @@ export const fields: Field[] = [
   },
   {
     key: 'executionNo',
+    columnMinWidth: 200,
     label: '执行编号',
     kind: 'text',
     readonly: true,
@@ -39,7 +40,8 @@ export const fields: Field[] = [
   },
   {
     key: 'routingId',
-    label: '实际工艺版本 ID',
+    columnMinWidth: 360,
+    label: '实际工艺版本',
     kind: 'text',
     readonly: false,
     required: true,
@@ -95,7 +97,7 @@ export const fields: Field[] = [
   },
   {
     key: 'createBy',
-    label: '创建用户 ID',
+    label: '创建人',
     kind: 'text',
     readonly: true,
     required: false,
@@ -113,7 +115,7 @@ export const fields: Field[] = [
   },
   {
     key: 'updateBy',
-    label: '订正用户 ID',
+    label: '订正人',
     kind: 'text',
     readonly: true,
     required: false,

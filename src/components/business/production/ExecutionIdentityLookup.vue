@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OperatorConfiguration from './OperatorConfiguration.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { resolveProductionIdentity, type ProductionIdentity } from '@/api/production/productionIdentity'
@@ -64,5 +65,6 @@ function open() {
       <el-descriptions-item label="执行状态">{{ result.status }}</el-descriptions-item>
       <el-descriptions-item label="计划执行数量">{{ result.targetQty }}</el-descriptions-item>
     </el-descriptions>
+    <OperatorConfiguration v-if="result" :execution-id="result.executionId" :context-label="result.executionNo" />
   </el-dialog>
 </template>

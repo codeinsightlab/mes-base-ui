@@ -23,7 +23,7 @@ function responses(factories = [{ factoryId: 'A', name: 'Factory A' }], factoryI
 beforeEach(() => { localStorage.clear();vi.unstubAllGlobals() })
 describe('persisted login restoration', () => {
   it('restores a fresh store, validating credentials and refreshing permissions from server', async() => {
-    saveSession({ token: 'TEST_ONLY', expiresAt: expiresAt(), factoryId: 'A' })
+    saveSession({ token: 'TEST_ONLY', factoryId: 'A' })
     const auth = store(), fetcher = responses()
     expect(auth.factoryPermissions).toEqual([])
     await Promise.all([auth.restoreSession(), auth.restoreSession()])
@@ -34,10 +34,10 @@ describe('persisted login restoration', () => {
     expect(auth.factoryId).toBe('A')
     expect(auth.factoryPermissions).toEqual(['TEST_ONLY:factory:read'])
     expect(fetcher.mock.calls[0]![1].headers.get('Authorization')).toBe('Bearer TEST_ONLY')
-    expect(JSON.parse(localStorage.getItem(SESSION_KEY)!)).toEqual({ token: 'TEST_ONLY', expiresAt: auth.expiresAt, factoryId: 'A' })
+    expect(JSON.parse(localStorage.getItem(SESSION_KEY)!)).toEqual({ token: 'TEST_ONLY', factoryId: 'A' })
   })
   it('uses server preference even when absent from the first options page or local hint', async() => {
-    saveSession({ token: 'TEST', expiresAt: expiresAt(), factoryId: 'OLD' })
+    saveSession({ token: 'TEST', factoryId: 'OLD' })
     const auth = store(), fetcher = responses([], '200')
     await auth.restoreSession()
     expect(auth.factoryId).toBe('200')
@@ -47,7 +47,6 @@ describe('persisted login restoration', () => {
   it('saves only factory ID before applying a manual switch and loading its grants', async() => {
     const auth = store()
     auth.token = 'TEST'
-    auth.expiresAt = expiresAt()
     const fetcher = responses()
     fetcher.mockImplementation(async(path: string, init: RequestInit) => {
       if (path.includes('/preference')) {
@@ -77,7 +76,6 @@ describe('persisted login restoration', () => {
   it('rejects simultaneous switches and ignores a preference response after logout', async() => {
     const auth = store()
     auth.token = 'TEST'
-    auth.expiresAt = expiresAt()
     let complete!: (value: Response) => void
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise<Response>(resolve => { complete = resolve })))
     const first = auth.selectFactory('2')
@@ -88,8 +86,29 @@ describe('persisted login restoration', () => {
     expect(auth.factoryId).toBe('')
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
-  it('drops expired or malformed saved credentials without requests', async() => {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'TEST', expiresAt: '2000-01-01', factoryId: 'A' }))
+  it.each(['2000-01-01', 'not-a-date'])('ignores legacy expiresAt=%s and asks the server to validate the saved token', async expiresAt => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: 'TEST', expiresAt, factoryId: 'A' }))
+    const auth = store(), fetcher = responses()
+    await auth.restoreSession()
+    expect(auth.loggedIn).toBe(true)
+    expect(fetcher.mock.calls[0]![1].headers.get('Authorization')).toBe('Bearer TEST')
+    expect(fetcher.mock.calls.some(call => call[0] === '/api/session')).toBe(false)
+    expect(JSON.parse(localStorage.getItem(SESSION_KEY)!)).toEqual({ token: 'TEST', factoryId: 'A' })
+  })
+  it('does not expire an already restored session when the client clock advances', async() => {
+    saveSession({ token: 'TEST', factoryId: 'A' })
+    const auth = store(), fetcher = responses()
+    await auth.restoreSession()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 365 * 86400000)
+    try {
+      await auth.restoreSession()
+      expect(auth.loggedIn).toBe(true)
+      expect(readSession()?.token).toBe('TEST')
+      expect(fetcher.mock.calls.some(call => call[0] === '/api/session')).toBe(false)
+    } finally { clock.mockRestore() }
+  })
+  it('drops malformed saved credentials without requests', async() => {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: '', factoryId: 'A' }))
     const auth = store(), fetcher = responses()
     await auth.restoreSession()
     expect(auth.loggedIn).toBe(false)
@@ -99,15 +118,15 @@ describe('persisted login restoration', () => {
     expect(readSession()).toBeNull()
   })
   it('clears a server-revoked session on 401', async() => {
-    saveSession({ token: 'TEST', expiresAt: expiresAt(), factoryId: '' })
+    saveSession({ token: 'TEST', factoryId: '' })
     const auth = store()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 401 })))
     await expect(auth.restoreSession()).rejects.toMatchObject({ status: 401 })
     expect(auth.loggedIn).toBe(false)
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
-  it('retains an unexpired credential during network failure and can retry', async() => {
-    saveSession({ token: 'TEST', expiresAt: expiresAt(), factoryId: '' })
+  it('retains the credential during network failure and can retry', async() => {
+    saveSession({ token: 'TEST', factoryId: '' })
     const auth = store()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('TEST ONLY offline')))
     await expect(auth.restoreSession()).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
@@ -120,7 +139,7 @@ describe('persisted login restoration', () => {
     expect(auth.sessionError).toBe('')
   })
   it('uses an empty server context when there are no eligible factories', async() => {
-    saveSession({ token: 'TEST', expiresAt: expiresAt(), factoryId: 'REMOVED' })
+    saveSession({ token: 'TEST', factoryId: 'REMOVED' })
     const auth = store(), fetcher = responses([], null)
     await auth.restoreSession()
     expect(auth.factoryId).toBe('')
@@ -129,7 +148,7 @@ describe('persisted login restoration', () => {
     expect(readSession()?.factoryId).toBe('')
   })
   it.each(['login', 'restore'])('keeps identity and platform grants when %s finds an unavailable factory', async mode => {
-    if (mode === 'restore') saveSession({ token: 'TEST', expiresAt: expiresAt(), factoryId: 'A' })
+    if (mode === 'restore') saveSession({ token: 'TEST', factoryId: 'A' })
     const auth = store()
     const fetcher = responses()
     fetcher.mockImplementation(async(path: string) => {
@@ -157,7 +176,6 @@ describe('persisted login restoration', () => {
   it('allows the platform workspace when no factories remain', async() => {
     const auth = store()
     auth.token = 'TEST'
-    auth.expiresAt = expiresAt()
     auth.requireFactorySelection()
     const fetcher = responses([], null)
     await auth.loadFactoryOptions()
@@ -172,7 +190,7 @@ describe('persisted login restoration', () => {
     const fetcher = responses()
     fetcher.mockImplementation(async(path: string) => new Response(JSON.stringify(path === '/api/session' ? { accessToken: 'TEST', expiresAt: expiresAt() } : path.includes('/info') ? info : path === '/api/session/menus' ? { data: [] } : path.includes('/context') ? { factoryId: null } : [])))
     await auth.login('TEST-user', 'TEST ONLY password')
-    expect(Object.keys(JSON.parse(localStorage.getItem(SESSION_KEY)!)).sort()).toEqual(['expiresAt', 'factoryId', 'token'])
+    expect(Object.keys(JSON.parse(localStorage.getItem(SESSION_KEY)!)).sort()).toEqual(['factoryId', 'token'])
     await auth.logout()
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
     expect(auth.platformPermissions).toEqual([])

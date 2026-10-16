@@ -120,7 +120,7 @@ onBeforeUnmount(() => reset(false))
         v-for="row in visibleOptions"
         :key="row.id"
         :value="row.id"
-        :label="row.code ? row.name + '（' + row.code + '）' : row.name"
+        :label="row.code ? row.name + '（' + row.code + (row.version != null ? ' · V' + row.version : '') + '）' : row.name"
       />
       <template #footer>
         <el-button v-if="offset < total" text :loading="loading" @click="search(keyword, true)">加载更多</el-button>

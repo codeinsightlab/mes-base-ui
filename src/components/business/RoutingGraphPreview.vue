@@ -31,7 +31,7 @@ function path(edge: RoutingEdge) {
           <title>{{ node.nodeCode }} · {{ node.operationCode ?? node.operationId }} · {{ node.operationName }}</title>
           <rect width="160" height="58" rx="5" :class="['graph-node', { 'graph-key': node.isKey, 'selected-node': selectedCodes.includes(node.nodeCode) }]" />
           <text x="12" y="22" class="graph-code">{{ node.nodeCode }}</text>
-          <text x="12" y="43" class="graph-name">{{ (node.operationName || node.operationCode || '已选工序').slice(0, 13) }}</text>
+          <text x="12" y="43" class="graph-name">{{ (node.operationName || node.operationCode || '工序名称未记录').slice(0, 13) }}</text>
         </g>
       </svg>
     </div>
@@ -40,7 +40,7 @@ function path(edge: RoutingEdge) {
 </template>
 <style scoped>
 .graph-preview { margin-block: var(--ui-space-4); }
-.graph-scroll { overflow: auto; max-height: 420px; }
+.graph-scroll { overflow: auto; max-height: var(--routing-graph-max-height, 420px); }
 svg { min-width: 100%; display: block; }
 .graph-edge { fill: none; stroke: var(--mes-text-secondary); stroke-width: 1.8; }
 .graph-arrow { fill: var(--mes-text-secondary); }

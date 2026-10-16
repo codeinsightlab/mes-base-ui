@@ -11,7 +11,7 @@ router.beforeEach(async to => {
   if (!['/login', '/register'].includes(to.path) && !auth.loggedIn) return { path: '/login', query: { redirect: to.fullPath }}
   if (auth.loggedIn && auth.factorySelectionRequired && to.path !== '/select-factory') return '/select-factory'
   if (['/login', '/register'].includes(to.path) && auth.loggedIn) return '/'
-  if (to.matched.some(record => record.path === '/:pathMatch(.*)*') && !router.resolve(to.fullPath).matched.some(record => record.path === '/:pathMatch(.*)*')) return { path: to.fullPath, replace: true }
+  if (to.matched.some(record => record.path === '/:pathMatch(.*)*') && !router.resolve(to.fullPath).matched.some(record => record.path === '/:pathMatch(.*)*')) return { path: to.path, query: to.query, hash: to.hash, replace: true }
   return true
 })
 export function installMenuRoutes() { const auth = useAuth(), installed = new Set<string>(); const catalog = import.meta.glob('/src/views/**/index.vue'); watch(() => [auth.platformMenus, auth.factoryMenus, auth.loggedIn], () => synchronizeMenuRoutes(router, auth.loggedIn ? [...auth.platformMenus, ...auth.factoryMenus] : [], catalog, installed), { deep: true, immediate: true, flush: 'sync' }) }

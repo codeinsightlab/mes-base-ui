@@ -8,8 +8,9 @@ export interface Order {
 export interface Batch {
   id: string; workorderId: string; batchNo: string; plannedQty: string | number; status: 'PLANNED' | 'ISSUED'
   routeStatus: 'UNSELECTED' | 'SELECTED' | 'PENDING' | 'UNKNOWN' | 'LOCKED'; lockedAt: string | null
-  revision: number; remark: string | null; path: { routingNodeId: string; executionOrder: number }[]
+  revision: number; remark: string | null
 }
+export interface BatchHistory extends Batch { path: { routingNodeId: string; executionOrder: number }[] }
 export interface RoutingOption { id: string; code: string; name: string; version: number; status: string }
 export interface Allocation { workorderId: string; plannedQty: string; allocatedTargetQty: string; remainingTargetQty: string; excessTargetQty: string; executionCount: number }
 export interface Detail { workorder: Order; productCode: string; productName: string; routing: RoutingOption; batches: Batch[]; allocation: Allocation }
@@ -44,7 +45,8 @@ export function parseWorkOrderResponse(text: string): unknown {
 const base = '/api/production/workorder'
 const path = (id: string) => base + '/' + encodeURIComponent(id)
 export const api = {
-  list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; batchCount: number; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  batchHistory: (id: string) => request<BatchHistory>('/api/production/batch/' + encodeURIComponent(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; batchCount: number; erpExtraMissing: boolean; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   detail: (id: string) => request<Detail>(path(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   create: (body: Save) => request<Detail>(base, { method: 'POST', body: saveBody(body), scope: 'factory', parseResponse: parseWorkOrderResponse }),
   update: (id: string, body: Save) => request<Detail>(path(id), { method: 'PUT', body: saveBody(body), scope: 'factory', parseResponse: parseWorkOrderResponse }),

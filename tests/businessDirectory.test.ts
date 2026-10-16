@@ -50,6 +50,14 @@ describe('read-only business directory components', () => {
       expect(wrapper.emitted('change')?.at(-1)).toEqual([row])
       expect(wrapper.text()).not.toMatch(/新增|修改|删除/)
     })
+  it.each(['routings', 'operations'] as const)('uses the shared directory for %s and shows exact version metadata', async resource => {
+    vi.mocked(listDirectory).mockResolvedValue({ items: [{ ...row, name: '精加工', code: 'ROUTE', version: 2 }], total: 1, offset: 0, limit: 20 })
+    const component = defineComponent({ components: { BusinessDirectorySelect }, template: `<BusinessDirectorySelect resource="${resource}" />` })
+    const { wrapper } = setup(component)
+    await flushPromises()
+    expect(listDirectory).toHaveBeenCalledWith(resource, '', 0, undefined)
+    expect(wrapper.text()).toContain('精加工（ROUTE · V2）')
+  })
   it('makes no request without the exact business read grant or factory', async() => {
     const { wrapper, auth } = setup(PersonnelSelect, false)
     await flushPromises()

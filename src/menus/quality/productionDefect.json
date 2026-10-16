@@ -1,0 +1,1 @@
+{ "id": "quality:productionDefect", "name": "不良品管理", "path": "/quality/productionDefect", "component": "quality/productionDefect/index", "permission": "business:quality:defect:read", "permissionScope": "factory", "kind": "MENU", "icon": "List", "children": [] }
