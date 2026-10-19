@@ -3,6 +3,7 @@ import { request } from '@/lib/request'
 export interface WmWarehouseVo {
   [key: string]: unknown;
   id: string;
+  source?: 'LOCAL' | 'EXTERNAL' | null;
 
   code: string;
   name: string;

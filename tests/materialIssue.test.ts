@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import ElementPlus from 'element-plus'
 import { useAuth } from '../src/stores/auth'
 import Header from '../src/views/issue/mesMaterialIssue/index.vue'
@@ -26,8 +27,9 @@ function setup(actions = ['list', 'query']) {
     ...actions.map(a => 'business:mes:material:issue:' + a),
     ...actions.map(a => 'business:mes:material:issue:item:' + a)
   ]
-  const wrapper = mount(Header, { global: { plugins: [pinia, ElementPlus], stubs: { MaterialSelect: true, WarehouseSelect: true }}})
-  return { wrapper, auth }
+  const router = createRouter({history:createMemoryHistory(),routes:[{path:'/',component:{template:'<div />'}}]})
+  const wrapper = mount(Header, { global: { plugins: [pinia, ElementPlus, router], stubs: { MaterialSelect: true, WarehouseSelect: true }}})
+  return { wrapper, auth, router }
 }
 async function open(wrapper: ReturnType<typeof setup>['wrapper']) {
   await flushPromises()
@@ -35,6 +37,12 @@ async function open(wrapper: ReturnType<typeof setup>['wrapper']) {
   await flushPromises()
 }
 describe('master detail material issue document', () => {
+  it('opens the exact linked issue and keeps factory changes from reopening the old ID',async()=>{
+    const {wrapper,router,auth}=setup(); await router.push({path:'/',query:{issueId:parent}});await flushPromises();
+    expect(header.detail).toHaveBeenCalledWith(parent);expect(wrapper.text()).toContain('主单信息');
+    const count=header.detail.mock.calls.length;auth.factoryId='B';auth.revision++;await flushPromises();
+    expect(header.detail).toHaveBeenCalledTimes(count);expect(wrapper.text()).not.toContain('主单信息');wrapper.unmount()
+  })
   it('opens a single document and reads only its lines, preserving ID and decimal strings', async() => {
     const { wrapper } = setup()
     await open(wrapper)

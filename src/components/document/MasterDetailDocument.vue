@@ -14,6 +14,9 @@ const props = defineProps<{
   headerPermission: string; itemPermission: string; parentKey: string;
   headerTableKey?: string; itemTableKey?: string;
   headerReadonly?: (row: Row) => boolean;
+  itemPermissionOverrides?: Record<string, string>;
+  itemsReadonlyWhenDirty?: boolean;
+  itemVersionField?: string;
 }>()
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
@@ -115,6 +118,7 @@ async function remove() {
   }
 }
 watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|')], clear)
+defineExpose({ open, refresh })
 onBeforeUnmount(clear)
 </script>
 <template>
@@ -152,13 +156,14 @@ onBeforeUnmount(clear)
       <el-alert v-if="!id" title="先保存主单，再新增明细。" type="info" :closable="false" />
       <CrudPage
         v-else
-        :key="id"
+        :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
         embedded
-        :readonly="readonly"
+        :readonly="readonly || !!itemsReadonlyWhenDirty && JSON.stringify(draft) !== savedDraft"
         title="明细"
         :api="itemApi"
         :fields="itemFields"
         :permission="itemPermission"
+        :permission-overrides="itemPermissionOverrides"
         permission-scope="factory"
         list-action="list"
         detail-action="query"

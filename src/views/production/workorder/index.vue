@@ -3,9 +3,12 @@ import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } fr
 import { routeLocationKey } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
+import E10SyncPreview from '@/components/business/E10SyncPreview.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import CodeText from '@/components/CodeText.vue'
 import Pagination from '@/components/Pagination/index.vue'
+import WorkOrderCancellation from '@/components/business/production/WorkOrderCancellation.vue'
+import WorkorderMaterialPanel from '@/components/business/production/WorkorderMaterialPanel.vue'
 import WorkOrderExecutions from '@/components/business/production/WorkOrderExecutions.vue'
 import WorkOrderRoutePreview from '@/components/business/production/WorkOrderRoutePreview.vue'
 import { api, type BatchHistory, type Detail, type RoutingOption, type Save } from '@/api/production/workorder'
@@ -144,24 +147,26 @@ onMounted(load)
     <PageHeader title="生产工单" description="工单记录生产需求；实际工艺与执行身份由生产执行单元确定。" />
     <el-form class="filter-panel" inline @submit.prevent="load">
       <el-form-item label="工单号"><el-input v-model="code" clearable /></el-form-item>
-      <el-form-item label="状态"><el-select v-model="status" clearable style="width:140px"><el-option label="草稿" value="DRAFT" /><el-option label="已下达" value="RELEASED" /></el-select></el-form-item>
+      <el-form-item label="状态"><el-select v-model="status" clearable style="width:140px"><el-option label="草稿" value="DRAFT" /><el-option label="已下达" value="RELEASED" /><el-option label="已作废" value="CANCELLED" /></el-select></el-form-item>
       <el-button @click="page=1;load()">查询</el-button>
     </el-form>
-    <div class="table-toolbar"><el-button v-if="can('create')" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">执行目标合计含全部状态，不代表完成量</span></div>
+    <div class="table-toolbar"><E10SyncPreview kind="workorder" permission="workorder:sync" @completed="load" /><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">执行目标合计含全部状态，不代表完成量</span></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-table v-loading="loading" :data="rows" row-key="workorder.id">
       <el-table-column label="工单号" min-width="160"><template #default="{row}"><CodeText :value="row.workorder.code" /><el-tag v-if="row.erpExtraMissing" type="warning" size="small" title="该工单扩展记录缺失，详情和修改仍需通过完整性校验">扩展记录缺失</el-tag></template></el-table-column>
       <el-table-column label="产出物料" min-width="180"><template #default="{row}">{{ row.productCode }} · {{ row.productName }}</template></el-table-column>
+      <el-table-column label="来源" width="115"><template #default="{row}">{{ row.workorder.source==='LOCAL'?'本地':row.workorder.source==='EXTERNAL'?'外部ERP':'历史待核实' }}</template></el-table-column>
       <el-table-column label="计划数量" min-width="130"><template #default="{row}">{{ row.workorder.plannedQty }}</template></el-table-column>
       <el-table-column label="默认工艺" min-width="150"><template #default="{row}">{{ row.routingCode }} / V{{ row.routingVersion }}</template></el-table-column>
       <el-table-column label="执行目标合计" min-width="145"><template #default="{row}">{{ row.allocation.allocatedTargetQty }}</template></el-table-column>
       <el-table-column label="尚未分配" min-width="130"><template #default="{row}">{{ row.allocation.remainingTargetQty }}</template></el-table-column>
       <el-table-column label="超额分配" min-width="130"><template #default="{row}">{{ row.allocation.excessTargetQty }}</template></el-table-column>
-      <el-table-column label="状态" width="100"><template #default="{row}"><StatusTag :label="row.workorder.status==='DRAFT'?'草稿':'已下达'" :tone="row.workorder.status==='DRAFT'?'disabled':'success'" /></template></el-table-column>
+      <el-table-column label="状态" width="100"><template #default="{row}"><StatusTag :label="row.workorder.status==='CANCELLED'?'已作废':row.workorder.status==='DRAFT'?'草稿':'已下达'" :tone="row.workorder.status==='CANCELLED'?'error':row.workorder.status==='DRAFT'?'disabled':'success'" /></template></el-table-column>
       <el-table-column label="操作" fixed="right" min-width="190"><template #default="{row}">
+        <WorkOrderCancellation :order="row.workorder" @changed="load" />
         <el-button v-if="can('query')" link type="primary" @click="open(row.workorder.id)">详情 / 执行</el-button>
-        <el-button v-if="can('update') && can('query') && row.workorder.status==='DRAFT'" link @click="edit(row.workorder.id)">编辑</el-button>
-        <el-button v-if="can('delete') && row.workorder.status==='DRAFT'" link type="danger" @click="remove(row.workorder)">删除</el-button>
+        <el-button v-if="can('update') && can('query') && row.workorder.status==='DRAFT' && row.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" link @click="edit(row.workorder.id)">编辑</el-button>
+        <el-button v-if="can('delete') && row.workorder.status==='DRAFT' && row.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" link type="danger" @click="remove(row.workorder)">删除</el-button>
       </template></el-table-column>
     </el-table>
     <Pagination :total="total" v-model:page="page" v-model:limit="pageSize" @pagination="load" />
@@ -173,8 +178,8 @@ onMounted(load)
         <el-form-item label="默认工艺" required><el-select v-model="form.routingId" :disabled="!form.productId" :loading="routesLoading" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" no-data-text="该物料暂无匹配的已发布工艺" filterable remote :remote-method="searchRoutes" @visible-change="(v: boolean)=>v && !routesLoading && searchRoutes()"><el-option v-for="r in routeOptions" :key="r.id" :value="r.id" :label="r.code+' / V'+r.version+' · '+r.name" /></el-select></el-form-item>
         <el-form-item label="计划开始"><el-date-picker v-model="form.plannedStartAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
         <el-form-item label="计划结束"><el-date-picker v-model="form.plannedEndAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
-        <el-form-item label="外部标识"><el-input v-model="form.externalId" maxlength="128" /></el-form-item>
-        <el-form-item label="外部单号"><el-input v-model="form.externalCode" maxlength="128" /></el-form-item>
+        <el-form-item label="外部标识"><el-input v-model="form.externalId" maxlength="128" readonly /></el-form-item>
+        <el-form-item label="外部单号"><el-input v-model="form.externalCode" maxlength="128" readonly /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
       <p class="secondary">保存工单不要求分批或执行单元；默认工艺仅可选择产出物料适用的已发布版本，不会覆盖已有执行版本。</p>
@@ -182,13 +187,15 @@ onMounted(load)
     </el-dialog>
     <el-drawer @close="closeHistory" v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close>
       <template v-if="detail">
+        <WorkOrderCancellation history :order="detail.workorder" @changed="load();open(detail.workorder.id)" />
         <el-descriptions :column="detailColumns" border>
-          <el-descriptions-item label="工单">{{ detail.workorder.code }}</el-descriptions-item><el-descriptions-item label="产出物料">{{ detail.productCode }} · {{ detail.productName }}</el-descriptions-item>
+          <el-descriptions-item label="来源">{{ detail.workorder.source || '历史待核实：禁止新交易' }}</el-descriptions-item><el-descriptions-item label="工单">{{ detail.workorder.code }}</el-descriptions-item><el-descriptions-item label="产出物料">{{ detail.productCode }} · {{ detail.productName }}</el-descriptions-item>
           <el-descriptions-item label="默认工艺">{{ detail.routing.code }} / V{{ detail.routing.version }}</el-descriptions-item><el-descriptions-item label="计划数量">{{ detail.allocation.plannedQty }}</el-descriptions-item>
           <el-descriptions-item label="执行目标合计">{{ detail.allocation.allocatedTargetQty }}</el-descriptions-item><el-descriptions-item label="尚未分配">{{ detail.allocation.remainingTargetQty }}</el-descriptions-item>
           <el-descriptions-item label="超额分配">{{ detail.allocation.excessTargetQty }}</el-descriptions-item><el-descriptions-item label="执行单元数">{{ detail.allocation.executionCount }}</el-descriptions-item>
         </el-descriptions>
-        <div class="table-toolbar"><span class="secondary">执行目标合计含全部状态，不代表实际完成量。</span><el-button v-if="can('release') && detail.workorder.status==='DRAFT'" type="primary" :loading="busy" @click="release">下达工单</el-button></div>
+        <div class="table-toolbar"><span class="secondary">执行目标合计含全部状态，不代表实际完成量。</span><el-button v-if="can('release') && detail.workorder.status==='DRAFT' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" type="primary" :loading="busy" @click="release">下达工单</el-button></div>
+        <WorkorderMaterialPanel v-if="detail.workorder.status!=='CANCELLED' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" :key="detail.workorder.id" :workorder-id="detail.workorder.id" />
         <WorkOrderRoutePreview :workorder-id="detail.workorder.id" :routing-id="detail.workorder.routingId" />
         <WorkOrderExecutions v-if="canExecutions" :key="detail.workorder.id" :workorder-id="detail.workorder.id" />
         <el-alert v-else title="当前账号没有生产执行列表权限" type="info" :closable="false" />

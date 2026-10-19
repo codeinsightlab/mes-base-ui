@@ -23,12 +23,12 @@ describe('stock reference selection', () => {
   it.each([[MaterialSelect, material, 'business:material'], [WarehouseSelect, warehouse, 'business:wm:warehouse']] as const)(
     'clears references on factory switch and rejects a late result', async(component, api, permission) => {
       const pinia = createPinia(), auth = useAuth(pinia)
-      auth.factoryId = 'A'
+      auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'
       auth.factoryPermissions = [permission + ':list', permission + ':query']
       let release!: (value: unknown) => void
       api.list.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
-        .mockResolvedValue({ items: [{ id: '9007199254740993', code: 'B', name: '当前引用' }], total: 1 })
-      api.detail.mockResolvedValue({ id: '9007199254740993', code: 'B', name: '当前引用' })
+        .mockResolvedValue({ items: [{ id: '9007199254740993', code: 'B', name: '当前引用', source: 'LOCAL' }], total: 1 })
+      api.detail.mockResolvedValue({ id: '9007199254740993', code: 'B', name: '当前引用', source: 'LOCAL' })
       const wrapper = mount(component, { props: { modelValue: '9007199254740993' }, global: { plugins: [pinia, ElementPlus] }})
       auth.factoryId = 'B'; auth.revision++
       await flushPromises()
@@ -44,9 +44,30 @@ describe('stock reference selection', () => {
       wrapper.unmount()
     }
   )
+  it('filters warehouse sources and clears a selected identity when the source changes', async() => {
+    const pinia = createPinia(), auth = useAuth(pinia)
+    auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'
+    auth.factoryPermissions = ['business:wm:warehouse:list', 'business:wm:warehouse:query']
+    warehouse.list.mockResolvedValue({ items: [
+      { id: '1', code: 'L', name: '本地仓', source: 'LOCAL' },
+      { id: '2', code: 'E', name: '外部仓', source: 'EXTERNAL' }
+    ], total: 2 })
+    const wrapper = mount(WarehouseSelect, { props: { modelValue: null }, global: { plugins: [pinia, ElementPlus] } })
+    await flushPromises()
+    expect(warehouse.list).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'LOCAL' }))
+    expect((wrapper.vm as unknown as { rows: { id: string }[] }).rows.map(row => row.id)).toEqual(['1'])
+    auth.runtimeMode = 'ERP'
+    await flushPromises()
+    expect(warehouse.list).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'EXTERNAL' }))
+    expect((wrapper.vm as unknown as { rows: { id: string }[] }).rows.map(row => row.id)).toEqual(['2'])
+    auth.runtimeMode = null
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'ElSelect' }).props('disabled')).toBe(true)
+    wrapper.unmount()
+  })
   it('renders named quantities and hides sync with CRUD-only grants', async() => {
     const pinia = createPinia(), auth = useAuth(pinia)
-    auth.factoryId = 'A'
+    auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'
     auth.factoryPermissions = ['business:wm:inventory:list', 'business:wm:inventory:create', 'business:wm:inventory:update', 'business:wm:inventory:delete']
     stock.list.mockResolvedValue({ items: [{ id: '9007199254740993', materialName: '物料一', warehouseName: '一号仓', quantity: '12345678901234.1234', availableQuantity: null, status: 'ENABLED' }], total: 1, offset: 0, limit: 20 })
     const wrapper = mount(Inventory, { global: { plugins: [pinia, ElementPlus] }})
@@ -55,7 +76,7 @@ describe('stock reference selection', () => {
     expect(wrapper.text()).toContain('一号仓')
     expect(wrapper.text()).toContain('12,345,678,901,234.1234')
     expect(wrapper.findAll('button').map(b => b.text())).not.toContain('同步')
-    auth.factoryPermissions.push('business:wm:inventory:sync')
+    auth.factoryPermissions.push('business:wm:inventory:sync'); auth.runtimeMode='ERP'
     await flushPromises()
     expect(wrapper.findAll('button').map(b => b.text())).toContain('同步')
     wrapper.unmount()

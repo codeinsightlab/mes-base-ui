@@ -3,6 +3,10 @@
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import CrudPage from '@/components/CrudPage.vue'
+import LocalStockPanel from '@/components/business/warehouse/LocalStockPanel.vue'
+import { useAuth } from '@/stores/auth'
+const stockPanel = ref<InstanceType<typeof LocalStockPanel> | null>(null)
+const auth = useAuth()
 import { api } from '@/api/wm/wmInventory'
 import type { Field } from '@/lib/crud'
 import { ref } from 'vue'
@@ -11,6 +15,7 @@ import SyncButton from '@/components/business/SyncButton.vue'
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 
 const fields: Field[] = [
+  {key:'warehouseSource',label:'仓库来源',kind:'text',readonly:true,columnMinWidth:200},
   { key: 'batchNo', label: '材料批次', kind: 'text', maxLength: 128 },
   { key: 'binCode', label: '库位', kind: 'text', maxLength: 64 },
   { key: 'materialName', columnMinWidth: 260, label: '物料', kind: 'text', readonly: true, searchable: false },
@@ -47,9 +52,9 @@ const fields: Field[] = [
   {
     key: 'quantity',
     columnMinWidth: 220,
-    label: '库存数量',
+    label: '实存数量',
     kind: 'decimal',
-    readonly: false,
+    readonly: true,
     required: true,
     searchable: false,
     maxLength: 20
@@ -59,7 +64,7 @@ const fields: Field[] = [
     columnMinWidth: 220,
     label: '可用数量',
     kind: 'decimal',
-    readonly: false,
+    readonly: true,
     required: false,
     searchable: false,
     maxLength: 20
@@ -132,6 +137,8 @@ const fields: Field[] = [
     list-action="list"
     detail-action="query"
     :api="api"
+    :readonly="auth.runtimeMode!=='LOCAL'"
+    :editable-row="row => row.warehouseSource==='LOCAL'"
     :fields="fields"
     id-key="id"
   >
@@ -139,16 +146,20 @@ const fields: Field[] = [
       <MaterialSelect :model-value="search.materialId ? String(search.materialId) : null" @update:model-value="search.materialId = $event || ''" />
     </template>
     <template #search-warehouseId="{ search }">
-      <WarehouseSelect :model-value="search.warehouseId ? String(search.warehouseId) : null" @update:model-value="search.warehouseId = $event || ''" />
+      <WarehouseSelect history :model-value="search.warehouseId ? String(search.warehouseId) : null" @update:model-value="search.warehouseId = $event || ''" />
     </template>
     <template #field-materialId="{ draft }">
       <MaterialSelect :model-value="draft.materialId ? String(draft.materialId) : null" @update:model-value="draft.materialId = $event" />
     </template>
     <template #field-warehouseId="{ draft }">
-      <WarehouseSelect :model-value="draft.warehouseId ? String(draft.warehouseId) : null" @update:model-value="draft.warehouseId = $event" />
+      <WarehouseSelect source="LOCAL" :model-value="draft.warehouseId ? String(draft.warehouseId) : null" @update:model-value="draft.warehouseId = $event" />
     </template>
+    <template #cell-warehouseSource="{row}">{{ row.warehouseSource==='LOCAL'?'本地':row.warehouseSource==='EXTERNAL'?'外部ERP（库存仅参考）':'历史待核实' }}</template>
     <template #toolbar>
-      <SyncButton permission="business:wm:inventory:sync" scope="factory" :run="sync" @completed="page?.load()" />
+      <span class="secondary">外部镜像仅供参考，不作为正式库存交易依据。</span>
+      <SyncButton v-if="auth.runtimeMode==='ERP'" permission="business:wm:inventory:sync" scope="factory" :run="sync" @completed="page?.load()" />
     </template>
+    <template #actions="{ row }"><el-button v-if="auth.hasPermission('business:wm:inventory:query', 'factory')" link @click="stockPanel?.open(String(row.id))">库存业务 / 流水</el-button></template>
   </CrudPage>
+  <LocalStockPanel ref="stockPanel" @changed="page?.load()" />
 </template>

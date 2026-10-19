@@ -26,7 +26,7 @@ beforeEach(() => {
 })
 function setup(permissions: string[]) {
   const pinia = createPinia(), auth = useAuth(pinia)
-  auth.factoryId = 'A'; auth.factoryPermissions = permissions
+  auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = permissions
   return { auth, global: { plugins: [pinia, ElementPlus] } }
 }
 describe('single active execution chain', () => {

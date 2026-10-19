@@ -1,8 +1,8 @@
 import { request } from '@/lib/request'
 import type { RoutingDetail } from './routing'
 export interface Order {
-  id: string; code: string; productId: string; routingId: string; plannedQty: string | number
-  status: 'DRAFT' | 'RELEASED'; plannedStartAt: string | null; plannedEndAt: string | null
+  id: string; source?: 'LOCAL' | 'EXTERNAL' | null; code: string; productId: string; routingId: string; plannedQty: string | number
+  status: 'DRAFT' | 'RELEASED' | 'CANCELLED'; plannedStartAt: string | null; plannedEndAt: string | null
   externalId: string | null; externalCode: string | null; remark: string | null; revision: number
 }
 export interface Batch {
@@ -42,9 +42,13 @@ export function parseWorkOrderResponse(text: string): unknown {
   })
   return JSON.parse(decoded)
 }
+export interface CancelCommand { requestId:string; reason:string; expectedRevision?:number }
+export interface Cancellation { workOrderId:string; status:'CANCELLED'; cancellationId:string; cancelledAt:string; cancelledBy:string; reason:string; previousStatus:string; sourceSnapshot:string|null }
 const base = '/api/production/workorder'
 const path = (id: string) => base + '/' + encodeURIComponent(id)
 export const api = {
+  cancel:(id:string,body:CancelCommand)=>request<Cancellation>(path(id)+'/actions/cancel',{method:'POST',body,scope:'factory'}),
+  cancellation:(id:string)=>request<Cancellation|null>(path(id)+'/cancellation',{scope:'factory'}),
   batchHistory: (id: string) => request<BatchHistory>('/api/production/batch/' + encodeURIComponent(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; batchCount: number; erpExtraMissing: boolean; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   detail: (id: string) => request<Detail>(path(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),

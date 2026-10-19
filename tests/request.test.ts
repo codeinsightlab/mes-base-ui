@@ -135,3 +135,5 @@ describe('warehouse and inventory business errors', () => {
     expect(unauthorized).not.toHaveBeenCalled()
   })
 })
+
+it('shows the reviewed closure refusal including the remaining quantity',async()=>{configureRequests(()=>({token:'test',factoryId:'B',revision:1}),()=>{});vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({errorCode:'PRODUCTION_CLOSURE_BLOCKED',message:'末道有效产出尚未全部合法交接；未交接数量 14.000000',requestId:'TEST'}),{status:409})));await expect(request('/api/production/executions/1/actions/complete',{method:'POST',body:{}})).rejects.toMatchObject({code:'PRODUCTION_CLOSURE_BLOCKED',status:409,message:'末道有效产出尚未全部合法交接；未交接数量 14.000000'})})

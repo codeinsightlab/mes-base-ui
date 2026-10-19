@@ -1,0 +1,36 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
+import { useAuth } from '../src/stores/auth'
+import { ApiError } from '../src/lib/request'
+import Actions from '../src/components/business/warehouse/StockDocumentActions.vue'
+import { stockDocuments, stockDocumentApis } from '../src/api/wm/stockDocuments'
+const mocks=vi.hoisted(()=>({request:vi.fn(),confirm:vi.fn()}))
+vi.mock('../src/lib/request',async original=>({...await original<object>(),request:mocks.request}))
+vi.mock('element-plus',async original=>({...await original<object>(),ElMessageBox:{confirm:mocks.confirm}}))
+let wrapper:ReturnType<typeof mount>|undefined
+beforeEach(()=>{sessionStorage.clear();vi.clearAllMocks();mocks.confirm.mockResolvedValue('confirm');vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}})})
+afterEach(()=>{wrapper?.unmount();wrapper=undefined;vi.unstubAllGlobals()})
+function setup(post=true){
+ const pinia=createPinia(),auth=useAuth(pinia);auth.factoryId='PROD';auth.runtimeMode='LOCAL';auth.username='admin';auth.factoryPermissions=['business:wm:stock:document:query',...(post?['business:wm:stock:document:post']:[])];
+ const refresh=vi.fn().mockResolvedValue(undefined)
+ wrapper=mount(Actions,{props:{row:{id:'9007199254740999',revision:'8',status:'DRAFT',documentType:'OTHER_RECEIPT'},dirty:false,refresh},global:{plugins:[pinia,ElementPlus],stubs:{RouterLink:true}}})
+ return {auth,refresh,s:(wrapper.vm.$ as unknown as {setupState:Record<string,any>}).setupState}
+}
+it('freezes original post UUID/revision across UNKNOWN and later 403; scope changes reject late completion',async()=>{
+ const {s,auth,refresh}=setup();mocks.request.mockRejectedValueOnce(new Error('lost')).mockRejectedValueOnce(new ApiError('FORBIDDEN','撤权','',403))
+ await s.post();await s.post();const first=mocks.request.mock.calls[0]![1].body;expect(mocks.request.mock.calls[1]![1].body).toEqual(first);expect(first.expectedRevision).toBe('8');expect(Object.keys(first).sort()).toEqual(['expectedRevision','requestId']);expect(sessionStorage.length).toBe(1)
+ let release!:(v:unknown)=>void;mocks.request.mockImplementationOnce(()=>new Promise(r=>release=r));const waiting=s.post();await flushPromises();auth.factoryId='B';await flushPromises();release({});await waiting;expect(refresh).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
+})
+it('query permission cannot post; unsaved header blocks new commands',async()=>{
+ const {s,auth}=setup(false);await s.post();expect(mocks.request).not.toHaveBeenCalled();auth.factoryPermissions.push('business:wm:stock:document:post');await wrapper!.setProps({dirty:true});await s.post();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('保存主单')
+})
+it('uses exact string quantities and fixed parent/version without accepting writable stock facts',async()=>{
+ const changed=vi.fn().mockResolvedValue(undefined),{headerApi,itemApi}=stockDocumentApis(changed)
+ const document={id:'9007199254740999',revision:'2',status:'DRAFT',documentType:'OTHER_RECEIPT',reason:'TEST'}
+ mocks.request.mockResolvedValueOnce({document,lines:[]});await headerApi.detail!(document.id)
+ mocks.request.mockResolvedValueOnce({id:'4',documentId:document.id});await itemApi.create({documentId:document.id,stockId:'99',materialId:'2',warehouseId:'3',unitId:'5',batchNo:'LOT',binCode:'BIN',quantity:'0.000001',operatorUserId:'hacker',status:'POSTED',stockActionId:'fake'})
+ const [url,options]=mocks.request.mock.calls[1]!;expect(url).toBe('/api/wm/stock-documents/'+document.id+'/lines');expect(options.body.quantity).toBe('0.000001');expect(options.body.expectedRevision).toBe('2');expect(options.body).not.toHaveProperty('operatorUserId');expect(options.body).not.toHaveProperty('status');expect(options.body).not.toHaveProperty('stockActionId');expect(changed).toHaveBeenCalledOnce()
+})
+it('post endpoint preserves the exact caller intent for replay',async()=>{mocks.request.mockResolvedValue({});const body={requestId:'c7b6c1e2-2e51-41d6-86b6-620efc433027',expectedRevision:'7'};await stockDocuments.post('8',body);expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/8/actions/post',{method:'POST',body,scope:'factory'})})

@@ -24,16 +24,34 @@ const pathComplete = computed(() => {
  return !!graph && !!last && !graph.edges.some(e => e.fromNodeCode === last.nodeCode) && graph.nodes.filter(n => n.isKey).every(n => selected.value.includes(n.id!))
 })
 function clear() { generation++; contextSequence++; previewSequence++; calculateSequence++; supply.value = null; preview.value = null; calculation.value = null; selected.value = []; pending.value = null; result.value = null; error.value = ''; busy.value = false; orderId.value = ''; stockId.value = ''; outputQty.value = ''; nextNode.value = '' }
-watch(() => [auth.factoryId, auth.revision, allowed.value], () => { clear(); code.value = '' }, {flush: 'sync'})
+const recoveryKey = () => 'mes-production-input-pending:' + auth.username + ':' + auth.factoryId
+function restorePending() {
+ if (!allowed.value) return
+ const saved = sessionStorage.getItem(recoveryKey()); if (!saved) return
+ try { const request = JSON.parse(saved) as Command; code.value = request.code; pending.value = request; error.value = '存在结果待确认的投产请求，请使用原请求重查，不能发起替代领料。' }
+ catch { error.value = '待确认投产请求无法读取，请联系管理员核实原记录。' }
+}
+watch(() => [auth.factoryId, auth.revision, allowed.value], () => { clear(); code.value = ''; restorePending() }, {flush: 'sync'})
 watch(code, clear, {flush: 'sync'})
+restorePending()
 watch([stockId, outputQty], () => { calculateSequence++; calculation.value = null }, {flush: 'sync'})
 watch(orderId, () => { previewSequence++; calculateSequence++; preview.value = null; calculation.value = null; selected.value = []; nextNode.value = ''; stockId.value = ''; outputQty.value = ''; if (orderId.value) void loadPreview() }, {flush: 'sync'})
 onBeforeUnmount(clear)
 async function query() {
- if (!allowed.value || busy.value) return
+ if (!allowed.value || busy.value || pending.value) return
  const ticket = ++contextSequence; busy.value = true; error.value = ''; supply.value = null; orderId.value = ''; preview.value = null; result.value = null
- try { const data = await api.query(code.value); if (ticket !== contextSequence) return; supply.value = data; if (data.orders.length === 1) orderId.value = data.orders[0]!.workorderId }
+ try { const data = await api.query(code.value); if (ticket !== contextSequence) return; supply.value = data; if ((data.total ?? data.orders.length) === 1) orderId.value = data.orders[0]!.workorderId }
  catch (e) { if (ticket === contextSequence) error.value = e instanceof Error ? e.message : '库存查询失败' }
+ finally { if (ticket === contextSequence) busy.value = false }
+}
+async function moreOrders() {
+ if (!supply.value || busy.value || pending.value) return
+ const ticket = contextSequence; busy.value = true; error.value = ''
+ try {
+  const data = await api.query(code.value, supply.value.orders.length)
+  if (ticket !== contextSequence || !supply.value) return
+  supply.value = {...data, orders: [...new Map([...supply.value.orders, ...data.orders].map(o => [o.workorderId, o])).values()]}
+ } catch(e) { if (ticket === contextSequence) error.value = e instanceof Error ? e.message : '候选工单读取失败' }
  finally { if (ticket === contextSequence) busy.value = false }
 }
 async function loadPreview() {
@@ -51,12 +69,13 @@ async function calculate() {
 async function submit() {
  if (!allowed.value || busy.value || (!pending.value && (!calculation.value || !preview.value || !pathComplete.value))) return
  if (!pending.value) pending.value = {requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: outputQty.value, routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey}
+ const storageKey = recoveryKey(); sessionStorage.setItem(storageKey, JSON.stringify(pending.value))
  const ticket = generation; busy.value = true; error.value = ''
- try { const data = await api.submit(pending.value); if (ticket !== generation) return; result.value = data; if (data.status === 'CONFIRMED') await loadPreview() }
+ try { const data = await api.submit(pending.value); if (data.status === 'CONFIRMED') sessionStorage.removeItem(storageKey); if (ticket !== generation) return; result.value = data; if (data.status === 'CONFIRMED') await loadPreview() }
  catch (e) { if (ticket === generation) error.value = e instanceof Error ? e.message : '提交结果未取得，请使用同一请求重查' }
  finally { if (ticket === generation) busy.value = false }
 }
-function again() { pending.value = null; calculation.value = null; result.value = null; outputQty.value = ''; void query() }
+function again() { if (result.value?.status !== 'CONFIRMED') return; pending.value = null; calculation.value = null; result.value = null; outputQty.value = ''; void query() }
 </script>
 <template>
  <section class="page-shell production-input">
@@ -74,6 +93,7 @@ function again() { pending.value = null; calculation.value = null; result.value 
     <el-empty v-else-if="!supply.orders.length" description="没有匹配的工单；请检查已下达工单、用料配置与允许仓库" />
     <el-form v-else label-position="top" class="panel">
      <el-form-item label="生产工单"><el-select v-model="orderId" :disabled="busy || !!pending" placeholder="选择工单、产出产品与工作中心"><el-option v-for="o in supply.orders" :key="o.workorderId" :value="o.workorderId" :label="`${o.workorderCode} · ${o.productCode} ${o.productName} · ${o.workCenter} · 计划 ${o.plannedQty} ${o.outputUnitCode} · ${o.status}`" /></el-select></el-form-item>
+     <p class="secondary">已加载 {{ supply.orders.length }} / {{ supply.total ?? supply.orders.length }} 张匹配工单 <el-button v-if="supply.orders.length < supply.total" link :loading="busy" :disabled="!!pending" @click="moreOrders">加载更多匹配工单</el-button></p>
      <el-form-item label="材料库存来源"><el-select v-model="stockId" :disabled="!orderId || busy || !!pending" placeholder="明确选择仓库、批次及库位"><el-option v-for="s in stockOptions" :key="s.reference" :value="s.reference" :label="`${s.materialCode} / ${s.lotCode} · ${s.warehouseCode}${s.binCode ? ' / '+s.binCode : ''} · 可用 ${s.availableQty} ${s.unitCode}`" /></el-select></el-form-item>
      <el-form-item :label="'本次预计成品产出数量' + (supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode ? '（' + supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode + '）' : '')"><el-input v-model="outputQty" inputmode="decimal" :disabled="busy || !!pending" placeholder="正数，最多6位小数" /></el-form-item>
      <el-button :disabled="!stockId || !outputQty || !!pending" :loading="busy" @click="calculate">计算本次材料领用量</el-button>
@@ -90,9 +110,11 @@ function again() { pending.value = null; calculation.value = null; result.value 
       </template>
       <p class="secondary">实际路径在首次领料确认后锁定；追加投产不会改变工艺版本或路径。</p>
      </template>
-     <div class="table-toolbar"><el-button type="primary" :loading="busy" :disabled="terminal || !!result || (!pending && (!calculation || !pathComplete))" @click="submit">{{ pending ? '使用原请求重查结果' : '确认正式投产' }}</el-button></div>
+     <div class="table-toolbar"><el-button type="primary" :loading="busy" :disabled="terminal || result?.status === 'CONFIRMED' || (!pending && (!calculation || !pathComplete))" @click="submit">{{ pending ? '使用原请求重查结果' : '确认正式投产' }}</el-button></div>
     </el-form>
    </template>
+   <div v-if="pending && result?.status !== 'CONFIRMED'" class="table-toolbar" role="status"><span>原投产请求 {{ pending.requestId }}：结果待确认</span><el-button :loading="busy" @click="submit">使用原请求重查</el-button></div>
+   <el-button v-if="result?.issueId" @click="router.push({path:'/issue/mesMaterialIssue',query:{issueId:result.issueId}})">打开本次领料单并核实</el-button>
    <el-descriptions v-if="result" :column="1" border><el-descriptions-item label="执行单元">{{ result.executionNo }}</el-descriptions-item><el-descriptions-item label="领料结果">{{ result.status }}</el-descriptions-item><el-descriptions-item label="生产身份码">{{ result.code }}</el-descriptions-item><el-descriptions-item label="当前可支用投产额度">{{ result.productionInputQty }}</el-descriptions-item><el-descriptions-item label="首工序剩余可报">{{ result.availableQty }}</el-descriptions-item><el-descriptions-item label="请求号">{{ result.requestId }}</el-descriptions-item></el-descriptions>
    <el-alert v-if="result && result.status !== 'CONFIRMED'" title="本次尚未贡献投产额度，请在领料管理中核实原操作；不要重新发起同一次领料。" type="warning" :closable="false" />
    <div v-if="result?.status === 'CONFIRMED'" class="table-toolbar"><el-button @click="again">再次投产</el-button><el-button @click="router.push({path:'/production/productionReport',query:{executionId:result.executionId,workorderId:orderId}})">查看生产数量</el-button></div>

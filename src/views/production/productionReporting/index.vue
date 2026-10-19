@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DefectDeclarationPanel from '@/components/business/quality/DefectDeclarationPanel.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
@@ -15,13 +16,14 @@ const pending = ref<ReportCommand | null>(null), showAll = ref(false)
 let version = 0
 const nodes = computed(() => context.value?.quantities.nodes.map(n => ({ ...n, ...context.value?.candidates.find(c => c.routingNodeId === n.routingNodeId) })) ?? [])
 const visibleNodes = computed(() => nodes.value.filter(n => showAll.value || n.status === 'AVAILABLE'))
+const qualityPending = computed(() => [...new Set(nodes.value.filter(n => n.status === 'QUALITY_PENDING').map(n => n.reason).filter(Boolean))].join('；'))
 const selected = computed(() => nodes.value.find(n => n.routingNodeId === selectedId.value))
 const graphNodes = computed<RoutingNode[]>(() => context.value?.path.nodes.map((n, i) => ({ id: n.id, nodeCode: n.nodeCode, operationId: n.operationId, operationCode: n.operationCode, operationName: n.operationName, isKey: n.required, displayOrder: i, description: null })) ?? [])
 const graphEdges = computed<RoutingEdge[]>(() => {
  const codes = new Map(context.value?.path.nodes.map(n => [n.id, n.nodeCode]))
  return context.value?.path.edges.map(e => ({ fromNodeCode: codes.get(e.fromNodeId)!, toNodeCode: codes.get(e.toNodeId)! })) ?? []
 })
-const statusNames: Record<string, string> = { READY: '待开工', RUNNING: '生产中', COMPLETED: '已完成', CANCELLED: '已取消', AVAILABLE: '可报工', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
+const statusNames: Record<string, string> = { READY: '待开工', RUNNING: '生产中', COMPLETED: '已完成', CANCELLED: '已取消', AVAILABLE: '可报工', QUALITY_PENDING: '受待核实不良影响', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
 function clear() {
  version++; context.value = null; selectedId.value = ''; quantity.value = ''; pending.value = null
  result.value = null; error.value = ''; busy.value = loading.value = false; showAll.value = false
@@ -82,13 +84,14 @@ async function submit() {
     <el-alert v-if="context.quantities.pathStatus !== 'LOCKED'" title="实际路径尚未锁定，不能正式报工。请在生产执行完成选路与领料确认。" type="warning" :closable="false" />
     <el-collapse v-if="context.quantities.pathStatus !== 'UNSELECTED'"><el-collapse-item title="查看本次实际执行路径" name="path"><p class="secondary">突出节点与连线是本次已选路径，其余节点仅为同版本工艺定义参考。</p><RoutingGraphPreview :nodes="graphNodes" :edges="graphEdges" :selected-node-ids="context.path.selectedNodeIds" /></el-collapse-item></el-collapse>
     <div class="table-toolbar"><strong>实际路径工序</strong><el-switch v-model="showAll" active-text="查看其他节点状态" /></div>
+    <el-alert v-if="qualityPending" :title="qualityPending" type="warning" :closable="false" />
     <el-table :data="visibleNodes" row-key="routingNodeId">
      <el-table-column label="顺序" prop="sequenceNo" width="75" />
      <el-table-column label="工序" min-width="190"><template #default="{row}">{{ row.code }} · {{ row.name || '工序名称未记录' }}</template></el-table-column>
      <el-table-column label="上游可用 / 输入" prop="inputQty" min-width="145" />
      <el-table-column label="累计报工" prop="reportedQty" min-width="130" />
-     <el-table-column label="有效不良" prop="defectQty" min-width="110" />
-     <el-table-column label="可流转产出" prop="effectiveOutputQty" min-width="130" />
+     <el-table-column label="原始申报量" prop="defectQty" min-width="110" /><el-table-column label="独立不良" prop="directDefectQty" min-width="110" /><el-table-column label="待核实" prop="unverifiedDefectQty" min-width="110" /><el-table-column label="已恢复" prop="recoveredQty" min-width="110" /><el-table-column label="当前净不良" prop="netDefectQty" min-width="110" />
+     <el-table-column label="产出数量投影" min-width="180"><template #default="{row}">{{ row.effectiveOutputQty }}<span v-if="row.status === 'QUALITY_PENDING'"> · 待核实，暂不可流转</span></template></el-table-column>
      <el-table-column label="剩余可报" prop="availableQty" min-width="130" />
      <el-table-column label="状态 / 原因" min-width="230"><template #default="{row}">{{ statusNames[row.status] || row.status }}<span v-if="row.reason"> · {{ row.reason }}</span></template></el-table-column>
     </el-table>
@@ -100,6 +103,7 @@ async function submit() {
      <el-button type="primary" size="large" :loading="busy" :disabled="!pending && selected?.status !== 'AVAILABLE'" @click="submit">{{ pending && !busy ? '结果未确认，安全重试原报工' : '确认报工' }}</el-button>
     </el-form>
     <p v-if="pending && !busy" class="secondary">原工序和数量已保留。重试复用同一请求标识；切换执行前请确认原请求结果。</p>
+    <el-collapse v-if="context && selected && auth.hasPermission('business:quality:defect:create', 'factory')"><el-collapse-item title="申报本工序不良" name="defect"><DefectDeclarationPanel :execution-id="context.identity.executionId" :node-id="selected.routingNodeId" /></el-collapse-item></el-collapse>
     <p class="secondary">报工数量为加工完成总量（含不良），不良由质量申报独立记录并扣减可流转产出；本入口不自动完工或入库。待开工执行的首次报工还会校验正式领料确认。</p>
    </section>
    <el-empty v-else-if="!loading" description="请扫描或输入生产执行身份码" />

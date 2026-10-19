@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router' 
 import MaterialIssueSubmitAction from '@/components/business/MaterialIssueSubmitAction.vue'
 import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
 import MaterialIssueErpAction from '@/components/business/MaterialIssueErpAction.vue'
@@ -9,9 +11,13 @@ import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import { api as headerApi } from '@/api/issue/mesMaterialIssue'
 import { api as itemApi } from '@/api/issue/mesMaterialIssueItem'
 import { headerFields, itemFields } from '../fields'
+const route = useRoute(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
+function openLinkedIssue() { const id = route.query.issueId; if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({id}) }
+onMounted(openLinkedIssue)
+watch(() => route.query.issueId, openLinkedIssue)
 </script>
 <template>
-  <MasterDetailDocument
+  <MasterDetailDocument ref="document"
     title="领料出库"
     :header-readonly="row => !!row.submissionId || !!row.voidOperationId || ['VOIDED','VOID_PENDING','VOID_UNKNOWN'].includes(String(row.status))"
     :header-api="headerApi"

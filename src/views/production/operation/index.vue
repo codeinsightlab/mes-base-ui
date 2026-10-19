@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OperationDefectTypePanel from '@/components/business/quality/OperationDefectTypePanel.vue'
 import OperatorConfigurationPanel from '@/components/business/production/OperatorConfigurationPanel.vue'
 import { ref, watch } from 'vue'
 import DocumentFields from '@/components/document/DocumentFields.vue'
@@ -10,6 +11,7 @@ import type { Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 const auth = useAuth()
+const typePending = ref(false), typeBusy = ref(false)
 const peoplePending = ref(false), peopleBusy = ref(false), editorTab = ref('information')
 let editingRevision: { id: string; revision: number } | null = null
 watch(() => auth.revision, () => { editingRevision = null }, { flush: 'sync' })
@@ -61,9 +63,9 @@ const sync = () => request<{ fetched: number; created: number; updated: number; 
     :fields="fields"
     editor-width="min(1040px, 94vw)"
     keep-editor-open
-    :editor-access="auth.hasPermission('business:mes:operation:user:list', 'factory')"
-    :editor-dirty="peoplePending"
-    :editor-busy="peopleBusy"
+    :editor-access="auth.hasPermission('business:mes:operation:user:list', 'factory') || auth.hasPermission('business:operation:defect:type:read', 'factory')"
+    :editor-dirty="peoplePending || typePending"
+    :editor-busy="peopleBusy || typeBusy"
     save-label="保存工序信息"
   >
     <template #editor="{ editId, draft, fields: editorFields, saving, readonly: metadataReadonly, save }">
@@ -76,6 +78,10 @@ const sync = () => request<{ fetched: number; created: number; updated: number; 
           <p class="secondary">人员配置单独保存，保存后立即生效。</p>
           <OperatorConfigurationPanel v-if="editId && auth.hasPermission('business:mes:operation:user:list', 'factory')" :key="editId" :operation-id="editId" :context-label="String(draft.code) + ' · ' + String(draft.name)" @pending="peoplePending = $event" @busy="peopleBusy = $event" />
           <p v-else class="secondary">{{ editId ? '暂无查看工序能力人员的权限。' : '请先保存工序，再编辑并配置可操作人员。' }}</p>
+        </el-tab-pane>
+        <el-tab-pane label="不良类型" name="defects" lazy>
+          <OperationDefectTypePanel v-if="editId && auth.hasPermission('business:operation:defect:type:read', 'factory')" :operation-id="editId" @pending="typePending = $event" @busy="typeBusy = $event" />
+          <p v-else class="secondary">{{ editId ? '暂无工序不良类型配置权限。' : '请先保存工序，再维护其不良类型。' }}</p>
         </el-tab-pane>
       </el-tabs>
     </template>

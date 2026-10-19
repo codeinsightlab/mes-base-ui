@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<{
   tableConfigUrl?: string;
   title: string;
   permission: string;
+  permissionOverrides?: Record<string, string>;
   permissionScope?: PermissionScope;
   listAction?: string;
   detailAction?: string;
@@ -39,6 +40,7 @@ const props = withDefaults(defineProps<{
   fields: Field[];
   idKey?: string;
   readonly?: boolean;
+  editableRow?: (row: Record<string, unknown>) => boolean;
   searchable?: boolean
 }>(), { idKey: 'id', fixedValues: undefined, permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
 const emit = defineEmits<{ changed: [] }>()
@@ -60,7 +62,7 @@ const editable = computed(() => props.fields.filter(f => !f.readonly && !(f.key 
 const selectedIds = ref<string[]>([])
 const deleting = ref(false)
 watch(() => columns.value.map(column => column.key).join('|'), () => { selectedIds.value = [] })
-const can = (action: string) => auth.hasPermission(props.permission + ':' + action, resolvedPermissionScope.value)
+const can = (action: string) => auth.hasPermission(props.permissionOverrides?.[action] ?? props.permission + ':' + action, resolvedPermissionScope.value)
 const writeAllowed = computed(() => editId.value ? can('update') : can('create'))
 
 async function load() {
@@ -98,6 +100,7 @@ async function load() {
 }
 
 async function open(row?: Row) {
+  if (row && props.editableRow && !props.editableRow(row)) return
   if (props.readonly || props.managedEditing || (row ? (!can('update') && !props.editorAccess) || !can(props.detailAction) : !can('create'))) return
   const revision = auth.revision
   const context = contextGeneration
@@ -155,7 +158,7 @@ async function save() {
 }
 
 async function remove(row: Row) {
-  if (props.readonly || !can('delete')) return
+  if (props.readonly || !can('delete') || props.editableRow && !props.editableRow(row)) return
   const revision = auth.revision
   const context = contextGeneration
   try {
@@ -308,7 +311,7 @@ defineExpose({ load })
       style="width:100%"
       @selection-change="selectRows"
     >
-      <el-table-column v-if="!readonly && can('delete') && api.delids" type="selection" width="48" />
+      <el-table-column v-if="!readonly && can('delete') && api.delids" type="selection" width="48" :selectable="(row: Record<string, unknown>) => !editableRow || editableRow(row)" />
       <el-table-column
         v-for="field in columns"
         :key="field.key"
@@ -340,8 +343,8 @@ defineExpose({ load })
         :width="actionColumnWidth ?? 180"
       >
         <template #default="{row}">
-          <el-button v-if="!readonly && !managedEditing && (can('update') || editorAccess)" text type="primary" @click="open(row)">编辑</el-button>
-          <el-button v-if="!readonly && can('delete')" text type="danger" @click="remove(row)">删除</el-button>
+          <el-button v-if="!readonly && !managedEditing && (!editableRow || editableRow(row)) && (can('update') || editorAccess)" text type="primary" @click="open(row)">编辑</el-button>
+          <el-button v-if="!readonly && (!editableRow || editableRow(row)) && can('delete')" text type="danger" @click="remove(row)">删除</el-button>
           <slot name="actions" :row="row" />
         </template>
       </el-table-column>

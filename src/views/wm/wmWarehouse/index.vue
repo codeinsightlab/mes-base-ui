@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import E10SyncPreview from '@/components/business/E10SyncPreview.vue'
 import CrudPage from '@/components/CrudPage.vue'
 import { api } from '@/api/wm/wmWarehouse'
 import type { Field } from '@/lib/crud'
 import { ref } from 'vue'
-import { sync } from '@/api/wm/wmWarehouse'
-import SyncButton from '@/components/business/SyncButton.vue'
+import { useAuth } from '@/stores/auth'
+const auth = useAuth()
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 
 const fields: Field[] = [
+  { key: 'source', columnMinWidth: 200, label: '来源', kind: 'text', readonly: true, options: [{label:'本地',value:'LOCAL'}, {label:'外部ERP（库存仅参考）',value:'EXTERNAL'}] },
   {
     key: 'id',
     label: '编号',
@@ -105,11 +107,15 @@ const fields: Field[] = [
     list-action="list"
     detail-action="query"
     :api="api"
+    :readonly="auth.runtimeMode !== 'LOCAL'"
+    :editable-row="row => row.source === 'LOCAL'"
     :fields="fields"
     id-key="id"
   >
+    <template #cell-source="{ row }"><span>{{ row.source === 'LOCAL' ? '本地' : row.source === 'EXTERNAL' ? '外部ERP（库存仅参考）' : '历史待核实' }}</span></template>
     <template #toolbar>
-      <SyncButton permission="business:wm:warehouse:sync" scope="factory" :run="sync" @completed="page?.load()" />
+      <span class="secondary">来源由可信创建入口确定；ERP仓库仅由同步维护，库存镜像仅供参考。</span>
+      <E10SyncPreview kind="warehouse" permission="business:wm:warehouse:sync" @completed="page?.load()" />
     </template>
   </CrudPage>
 </template>

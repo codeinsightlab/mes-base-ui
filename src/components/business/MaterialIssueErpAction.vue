@@ -29,8 +29,8 @@ async function run(reconcile: boolean) {
 }
 </script>
 <template>
- <el-button v-if="row.id && queryAllowed" :loading="busy" :disabled="dirty" @click="run(false)">查询 ERP 状态</el-button>
- <el-button v-if="row.id && reconcileAllowed" :loading="busy" :disabled="dirty" @click="run(true)">核实并同步</el-button>
+ <el-button v-if="row.id && queryAllowed" :loading="busy" :disabled="dirty" @click="run(false)">{{ ['SUBMITTING','SUBMIT_UNKNOWN'].includes(String(row.status)) ? '查询原领料结果' : '查询 ERP 状态' }}</el-button>
+ <el-button v-if="row.id && reconcileAllowed" :loading="busy" :disabled="dirty" @click="run(true)">{{ ['SUBMITTING','SUBMIT_UNKNOWN'].includes(String(row.status)) ? '核实原领料结果' : '核实并同步' }}</el-button>
  <div v-if="view && (queryAllowed || reconcileAllowed)" role="status">
   <span>{{ view.result.executionMode }} · {{ view.result.outcome }} · {{ view.result.documentStatus }}</span>
   <span v-if="view.result.externalCode">ERP单号：{{ view.result.externalCode }}</span>

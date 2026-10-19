@@ -33,6 +33,7 @@ export const useAuth = defineStore('auth', {
       avatar: '',
       username: '',
       factoryId: '',
+      runtimeMode: null as 'LOCAL' | 'ERP' | null,
       savedFactoryId: saved?.factoryId ?? '',
       factorySwitching: false,
       factorySelectionRequired: false,
@@ -58,6 +59,7 @@ export const useAuth = defineStore('auth', {
       this.token = ''
       this.avatar = ''
       this.username = ''
+      this.runtimeMode = null
       this.factoryId = ''
       this.savedFactoryId = ''
       this.sessionReady = true
@@ -65,15 +67,18 @@ export const useAuth = defineStore('auth', {
       this.platformMenus = []
       this.factoryMenus = []
       this.platformPermissions = []
+      this.runtimeMode = null
       this.factoryPermissions = []
       this.factories = []
       this.revision++
     },
     requireFactorySelection() {
       this.factorySelectionRequired = true
+      this.runtimeMode = null
       this.factoryId = ''
       this.savedFactoryId = ''
       this.factoryMenus = []
+      this.runtimeMode = null
       this.factoryPermissions = []
       this.revision++
       this.persistSession()
@@ -129,6 +134,7 @@ export const useAuth = defineStore('auth', {
       })
       this.token = session.accessToken
       this.username = username
+      this.runtimeMode = null
       this.factoryId = ''
       this.savedFactoryId = ''
       this.factorySelectionRequired = false
@@ -166,6 +172,7 @@ export const useAuth = defineStore('auth', {
       this.avatar = info.user.avatar
       this.platformMenus = routeMenus(response.data)
       this.factoryMenus = []
+      this.runtimeMode = null
       this.factoryPermissions = []
     },
     async restoreFactory() {
@@ -187,6 +194,7 @@ export const useAuth = defineStore('auth', {
       const switchMarker = {}
       switches.set(this, switchMarker)
       this.factoryMenus = []
+      this.runtimeMode = null
       this.factoryPermissions = []
       const revision = ++this.revision
       try {
@@ -203,12 +211,13 @@ export const useAuth = defineStore('auth', {
         const selectedRevision = ++this.revision
         this.persistSession()
         if (id) {
-          const value = await request<{ permissions: string[]; menus: SourceRoute[] }>(
+          const value = await request<{ permissions: string[]; menus: SourceRoute[]; runtimeMode?: 'LOCAL' | 'ERP' }>(
             '/api/factory/navigation', { scope: 'factory' }
           )
           if (selectedRevision !== this.revision || this.factoryId !== id) {
             throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
           }
+          this.runtimeMode = value.runtimeMode === 'LOCAL' || value.runtimeMode === 'ERP' ? value.runtimeMode : null
           this.factoryPermissions = value.permissions
           this.factoryMenus = routeMenus(value.menus)
         }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WarehouseAcceptancePanel from '@/components/business/warehouse/WarehouseAcceptancePanel.vue'
 import ExecutionIdentityLookup from '@/components/business/production/ExecutionIdentityLookup.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -24,6 +25,14 @@ const reverseBalance = ref('')
 const formOpen = ref(false), mode = ref<'receive' | 'reverse'>('receive'), originalId = ref(''), formError = ref(''), saving = ref(false)
 const form = reactive({ warehouseId: null as string | null, productLotCode: '', quantity: '', reason: '' })
 const pending = ref<{mode: 'receive'; body: Receive} | {mode: 'reverse'; id: string; body: Reverse} | null>(null)
+const pendingKey=()=>`mes-receipt-pending:${auth.username}:${auth.factoryId}`
+const hasSaved=ref(false)
+let uncertain=false
+function recoverPending(){
+ const saved=sessionStorage.getItem(pendingKey());if(!saved)return
+ try{const snapshot=JSON.parse(saved);if(snapshot.executionId)executionId.value=snapshot.executionId;closeState();pending.value=snapshot.command;uncertain=true;mode.value=snapshot.command.mode;originalId.value=snapshot.command.mode==='reverse'?snapshot.command.id:'';Object.assign(form,{warehouseId:snapshot.command.body.warehouseId??null,productLotCode:snapshot.command.body.productLotCode??'',quantity:snapshot.command.body.quantity,reason:snapshot.command.body.reason??''});formOpen.value=true}catch{error.value='待核实交接请求无法读取，请按流水核实'}
+}
+watch(()=>[auth.factoryId,auth.username,auth.revision],()=>{hasSaved.value=!!sessionStorage.getItem(pendingKey())},{immediate:true,flush:'sync'})
 let generation = 0, listSeq = 0, summarySeq = 0, detailSeq = 0, historySeq = 0, writeSeq = 0
 function closeState() { detailSeq++; historySeq++; writeSeq++; detailOpen.value = false; detail.value = null; history.value = []; historyTotal.value = 0; detailLoading.value = false; detailError.value = ''; formOpen.value = false; reverseBalance.value = ''; pending.value = null; saving.value = false; formError.value = ''; Object.assign(form, { warehouseId: null, productLotCode: '', quantity: '', reason: '' }) }
 function invalidate() { generation++; listSeq++; summarySeq++; rows.value = []; total.value = 0; summary.value = null; loading.value = false; error.value = ''; summaryError.value = ''; success.value = ''; closeState() }
@@ -60,7 +69,7 @@ async function loadHistory() {
  if (n === detailSeq && h === historySeq) { history.value = p.items; historyTotal.value = p.total }
 }
 async function historyChanged() { const n = detailSeq, h = historySeq + 1; try { await loadHistory() } catch (e) { if (n === detailSeq && h === historySeq) detailError.value = e instanceof Error ? e.message : '历史查询失败' } }
-function openReceive() { if (!canCreate.value || !summary.value?.canReceive) return; closeState(); mode.value = 'receive'; form.warehouseId = warehouseId.value; form.productLotCode = lot.value; formOpen.value = true }
+function openReceive() { if (hasSaved.value) {recoverPending();return} if (!canCreate.value || !summary.value?.canReceive) return; closeState(); mode.value = 'receive'; form.warehouseId = warehouseId.value; form.productLotCode = lot.value; formOpen.value = true }
 async function openReverse(row: Receipt) {
  if (!canReverse.value || !canDetail.value || row.recordType !== 'RECEIPT') return
  closeState(); mode.value = 'reverse'; originalId.value = row.id; formOpen.value = true
@@ -81,15 +90,16 @@ async function submit() {
   if (mode.value === 'receive' && (!summary.value?.canReceive || !form.warehouseId || !executionId.value)) { formError.value = '当前执行尚不允许交接或未选择仓库'; return }
   pending.value = mode.value === 'receive' ? {mode: 'receive', body: {executionId: executionId.value, warehouseId: form.warehouseId!, productLotCode: form.productLotCode.trim() || null, quantity: form.quantity, requestId: crypto.randomUUID()}} : {mode: 'reverse', id: originalId.value, body: {quantity: form.quantity, reason: form.reason.trim(), requestId: crypto.randomUUID()}}
  }
- const command = pending.value, n = ++writeSeq, g = generation; saving.value = true; formError.value = ''
+ sessionStorage.setItem(pendingKey(),JSON.stringify({executionId:executionId.value,command:pending.value}));hasSaved.value=true
+ const storageKey=pendingKey(),command = pending.value, n = ++writeSeq, g = generation; saving.value = true; formError.value = ''
  try {
   const r = command.mode === 'receive' ? await api.receive(command.body) : await api.reverse(command.id, command.body)
   if (n !== writeSeq || g !== generation) return
-  pending.value = null; success.value = `生产交接已登记，尚未执行库存入账。记录编号：${r.receiptNo}`; closeState()
+  sessionStorage.removeItem(storageKey);hasSaved.value=false;uncertain=false;pending.value = null; success.value = `本次生产交接登记成功（此操作不入库存）。记录编号：${r.receiptNo}`; closeState()
   await load()
  } catch (e) {
   if (n !== writeSeq || g !== generation) return
-  if (e instanceof ApiError && e.status >= 400 && e.status < 500) pending.value = null
+  if (!uncertain && e instanceof ApiError && e.status >= 400 && e.status < 500) {sessionStorage.removeItem(storageKey);hasSaved.value=false;pending.value = null}else uncertain=true
   formError.value = e instanceof Error ? e.message : '提交失败'
  } finally { if (n === writeSeq) saving.value = false }
 }
@@ -103,15 +113,16 @@ onBeforeUnmount(invalidate)
 </script>
 <template>
  <div class="app-container receipt-page">
-  <PageHeader title="生产交接管理" description="登记实际交接、查询不可变历史与冲销；交接额度来自锁定实际路径的末道有效产出。" />
-  <el-alert title="生产交接已登记，尚未执行库存入账。" description="本模块仅记录车间向仓库的交接事实，不改变库存、ERP 或生产执行状态。" type="info" :closable="false" show-icon />
+  <el-button v-if="hasSaved&&(canCreate||canReverse)" type="warning" @click="recoverPending">恢复待核实交接原请求</el-button>
+  <PageHeader title="生产交接管理" description="登记实际交接、查询不可变历史与冲销；交接额度来自正式质量放行；仓库实际接收后才入库存。" />
+  <el-alert title="生产交接与仓库实际接收分别登记。" description="登记交接本身不入库存；实际仓储接收才增加成品库存，请以当前净接收数量和库存动作核对。" type="info" :closable="false" show-icon />
   <el-alert v-if="!allowed" title="当前账号没有生产交接查询权限" type="warning" :closable="false" />
   <template v-else>
    <el-form inline class="filter-panel receipt-filters" @submit.prevent="page=1;load()">
     <ExecutionIdentityLookup selectable @selected="i => { workorderId = i.workorderId; executionId = i.executionId }" />
    <el-form-item label="工单"><WorkOrderSelect v-model="workorderId" /></el-form-item>
     <el-form-item label="执行单元"><ExecutionSelect v-model="executionId" :workorder-id="workorderId" /></el-form-item>
-    <el-form-item label="目标仓库"><WarehouseSelect v-model="warehouseId" /></el-form-item>
+    <el-form-item label="目标仓库"><WarehouseSelect history v-model="warehouseId" /></el-form-item>
     <el-form-item label="产品批次"><el-input v-model="lot" clearable maxlength="100" placeholder="按实际产品批次精确查询" /></el-form-item>
     <el-button type="primary" :loading="loading" @click="page=1;load()">查询</el-button>
    </el-form>
@@ -121,11 +132,11 @@ onBeforeUnmount(invalidate)
     <h3>{{ summary.executionNo }} · {{ summary.productCode }} / {{ summary.productName }}</h3>
     <p class="secondary">工单 {{ summary.workorderCode }} · {{ summary.routingLabel }} · 末道：{{ summary.terminalNodeName || '尚未确定' }}</p>
     <el-descriptions :column="2" border>
-     <el-descriptions-item label="执行目标">{{ summary.targetQty }}</el-descriptions-item><el-descriptions-item label="末道有效产出 O">{{ summary.output ?? '无法确定' }}</el-descriptions-item>
-     <el-descriptions-item label="已交接净额 R">{{ summary.received }}</el-descriptions-item><el-descriptions-item label="剩余可交接 O − R">{{ summary.remaining ?? '无法确定' }}</el-descriptions-item>
-     <el-descriptions-item label="超额差额">{{ summary.excess ?? '无法确定' }}</el-descriptions-item><el-descriptions-item label="实际路径">{{ ({UNSELECTED: '尚未选择', SELECTED: '已选择，未锁定', LOCKED: '已锁定'} as Record<string, string>)[summary.pathStatus] || summary.pathStatus }}</el-descriptions-item>
+     <el-descriptions-item label="执行目标">{{ summary.targetQty }}</el-descriptions-item><el-descriptions-item label="末道有效产出 E">{{ summary.output ?? '无法确定' }}</el-descriptions-item>
+     <el-descriptions-item label="已交接净额 R">{{ summary.received }}</el-descriptions-item><el-descriptions-item label="待交接有效产出 E − R">{{ summary.remaining ?? '无法确定' }}</el-descriptions-item>
+     <el-descriptions-item label="当前放行 Q">{{ summary.released }}</el-descriptions-item><el-descriptions-item label="剩余放行额度 Q − R">{{summary.releaseRemaining}}</el-descriptions-item><el-descriptions-item label="仓储净接收">{{summary.accepted}}</el-descriptions-item><el-descriptions-item label="待仓储接收">{{summary.pendingAcceptance}}</el-descriptions-item><el-descriptions-item label="超放行差额">{{summary.releaseExcess}}</el-descriptions-item><el-descriptions-item label="超额差额">{{ summary.excess ?? '无法确定' }}</el-descriptions-item><el-descriptions-item label="实际路径">{{ ({UNSELECTED: '尚未选择', SELECTED: '已选择，未锁定', LOCKED: '已锁定'} as Record<string, string>)[summary.pathStatus] || summary.pathStatus }}</el-descriptions-item>
     </el-descriptions>
-    <el-alert v-if="summary.excess && /[1-9]/.test(summary.excess)" :title="`已交接超过当前有效产出 ${summary.excess}，禁止新增交接，可按原始余额冲销交接。`" type="error" :closable="false" />
+    <el-alert v-if="summary.excess && /[1-9]/.test(summary.excess)" :title="`已交接超过当前有效产出 ${summary.excess}，禁止新增交接，冲销须同时扣除已被仓库实际接收的依赖。`" type="error" :closable="false" />
     <el-alert v-if="!summary.canReceive" :title="summary.blockedReason" type="warning" :closable="false" />
    </section>
    <div class="table-toolbar"><span>交接事实 · {{ total }} 条</span><div class="receipt-actions"><el-button v-if="canCreate" type="primary" :disabled="!summary?.canReceive" @click="openReceive">登记交接</el-button><el-button @click="load">刷新数量与记录</el-button></div></div>
@@ -138,7 +149,7 @@ onBeforeUnmount(invalidate)
     <el-table-column prop="quantityDelta" label="数量变化" min-width="145" /><el-table-column label="目标仓库" min-width="160"><template #default="{row}">{{ row.warehouseName || '名称未记录' }}</template></el-table-column>
     <el-table-column prop="productLotCode" label="产品批次" min-width="150" /><el-table-column label="实际人员" min-width="130"><template #default="{row}">{{ row.operatorName || '姓名未记录' }}</template></el-table-column>
     <el-table-column label="录入人员" min-width="130"><template #default="{row}">{{ row.recordedByName || '姓名未记录' }}</template></el-table-column><el-table-column prop="occurredAt" label="实际发生时间" min-width="200" /><el-table-column prop="createTime" label="登记时间" min-width="200" />
-    <el-table-column label="操作" width="150" fixed="right"><template #default="{row}"><el-button v-if="canDetail" link type="primary" @click="showDetail(row)">详情</el-button><el-button v-if="canReverse && canDetail && row.recordType === 'RECEIPT'" link type="danger" @click="openReverse(row)">冲销</el-button></template></el-table-column>
+    <el-table-column label="操作" min-width="360" fixed="right"><template #default="{row}"><el-button v-if="canDetail" link type="primary" @click="showDetail(row)">详情</el-button><WarehouseAcceptancePanel v-if="row.recordType==='RECEIPT'" :receipt-id="row.id" @changed="load"/><el-button v-if="canReverse && canDetail && row.recordType === 'RECEIPT'" link type="danger" @click="openReverse(row)">冲销</el-button></template></el-table-column>
    </el-table>
    <Pagination v-model:page="page" v-model:limit="limit" :total="total" @pagination="load" />
   </template>

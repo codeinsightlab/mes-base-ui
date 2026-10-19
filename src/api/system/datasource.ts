@@ -14,3 +14,22 @@ export const listFactories = (query = { pageNum: 1, pageSize: 100 }) => request<
 export const createFactory = (data:any) => call('factory', 'POST', data)
 export const saveFactory = (data:any) => call('factory', 'PUT', data)
 export const deleteFactory = (id:any, revision:number) => request<void>(`/api/system/factory/${id}`, { method: 'DELETE', scope: 'platform', query: { revision }})
+
+export const factoryIntegrationOptions = (factoryId:string) => request<any[]>('/api/system/factory/integration-options', { scope: 'platform', query: { factoryId } })
+
+export interface FactoryOapiSettings {
+  syncContract?: Record<string, unknown> | null
+  endpoint: string
+  host: { ver: string; prod: string; timezone: string; ip: string; id: string; lang: string; acct: string }
+  service: { prod: string; ip: string; id: string }
+}
+export interface FactoryOapiView {
+  factoryId: string
+  factoryRevision: number
+  reference: string | null
+  configurationRevision: number
+  locked: boolean
+  settings: FactoryOapiSettings | null
+}
+export const getFactoryOapi = (id: string) => request<FactoryOapiView>(`/api/system/factory/${encodeURIComponent(id)}/oapi`, { scope: 'platform' })
+export const saveFactoryOapi = (id: string, factoryRevision: number, settings: FactoryOapiSettings) => request<FactoryOapiView>(`/api/system/factory/${encodeURIComponent(id)}/oapi`, { method: 'PUT', scope: 'platform', body: { factoryRevision, settings } })

@@ -23,7 +23,7 @@ async function setup() {
 }
 it('locates by scanner input without writing, shows quantities, and explains unavailable nodes', async() => {
  const { state } = await setup(); expect(context).toHaveBeenCalledWith('EXE:1'); expect(submit).not.toHaveBeenCalled()
- expect(wrapper.text()).toContain('有效不良'); expect(wrapper.text()).toContain('2.000001'); expect(wrapper.text()).not.toContain('质量尚未接入'); expect(wrapper.text()).toContain('阶段物料'); expect(wrapper.text()).toContain('10.000001')
+ expect(wrapper.text()).toContain('原始申报量'); expect(wrapper.text()).toContain('当前净不良'); expect(wrapper.text()).toContain('待核实'); expect(wrapper.text()).toContain('已恢复'); expect(wrapper.text()).toContain('2.000001'); expect(wrapper.text()).not.toContain('质量尚未接入'); expect(wrapper.text()).toContain('阶段物料'); expect(wrapper.text()).toContain('10.000001')
  state.showAll = true; await flushPromises(); expect(wrapper.text()).toContain('不在派工名单中')
  const option = wrapper.findAllComponents({ name: 'ElOption' }).find(n => n.props('value') === '12')
  expect(option?.props('disabled')).toBe(true)
@@ -70,3 +70,5 @@ it('ignores a late scan response from the previous execution', async() => {
 it.each(['0', '-1', '1.1234567'])('rejects invalid quantity %s before sending', async(qty) => {
  const { state } = await setup(); state.selectedId = '11'; state.quantity = qty; await state.submit(); expect(submit).not.toHaveBeenCalled()
 })
+
+it('explains a known quality gate even with unavailable rows hidden and forbids its selection',async()=>{const d=data();d.candidates[1]={routingNodeId:'12',status:'QUALITY_PENDING',reason:'工序 D · 热处理存在待核实不良，须先核实质量记录'};context.mockResolvedValue(d);const{state}=await setup();expect(wrapper.text()).toContain('工序 D · 热处理存在待核实不良');const option=wrapper.findAllComponents({name:'ElOption'}).find(n=>n.props('value')==='12');expect(option?.props('disabled')).toBe(true);state.selectedId='12';state.quantity='1';await state.submit();expect(submit).not.toHaveBeenCalled()})

@@ -1,5 +1,14 @@
 # MES Base UI
 
+## 2026-10-17 — LOCAL / ERP 页面与请求约束（用户确认）
+
+本节覆盖旧的混合生产与无缝切换页面建议；后端完整约束见 [mes-base/AGENTS.md](../mes-base/AGENTS.md)，业务规则与当前未实现项见 [业务边界设计方案 V1.0](../mes-base/docs/architecture/local-erp-business-boundary.md)。以下规则持续生效；V1.7 来源展示与受控选择器已实施，验收及未验证边界见 [V1.7 实施报告](../mes-base/docs/reviews/2026-10-17-local-external-source-isolation-v17-report.md)。
+
+- 工厂新业务仅按服务端当前 LOCAL/ERP 模式开放；工单、原料仓、成品仓必须同来源（LOCAL 或 EXTERNAL）且模式允许。选择器过滤与提交前提示须一致，缺来源/映射或配置异常阻止新正式操作；最终校验由后端负责，不在浏览器推断来源或 ERP 降级。
+- 来源仅展示服务端可信字段，普通编辑不得填写、变更来源或伪造 ERP 映射；EXTERNAL 库存镜像明确标示参考用途，不作为正式可领/可入权威依据。历史来源记录可查不等于允许两套新业务并行。
+- 每厂最多选择一个有效 ERP；保留模式锁定与迁移准备提示，解绑不解锁，禁止普通工厂编辑切换有历史的模式。迁移采用停旧启新，补录须区分历史加工和新增加工，不提供一键无缝迁移或直接删除历史事实入口。
+- 历史核实/撤销通过原操作 ID 请求，由后端使用冻结来源/provider/binding；UNKNOWN 保留原身份，不自动重建、重试创建或改派当前 ERP。沿用切厂、撤权、卸载和迟到响应清理，不能用当前页面模式重解释旧事实。
+
 ## 2026-10-14 主子单据页面
 
 未来遇到主表带明细的单据结构，前端不沿用生成的单表页面或两张独立CRUD页面，优先复用 `src/components/document/MasterDetailDocument.vue`、`DocumentFields.vue`，采用上方主单、下方绑定当前主单的明细表。业务模块显式提供真实字段、API、权限、父单关联键和业务选择器，组件保持通用交互。前端组件复用不豁免后端生成：新增主表与明细表仍必须通过Codegen Skill生成完整基础后端（persistence + backend，通常同时test），生成配置不产出独立单表前端页面；基础后端生成与业务规则补齐遵守相邻 mes-base/AGENTS.md 第13/14节及迁移例外。
