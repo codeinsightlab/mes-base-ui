@@ -60,6 +60,7 @@ it('restores an originally absent inline style without leaving a width or lock c
 
 async function pageHarness(beforeClose?: (done: () => void) => unknown, ignoreModelClose = false) {
   const dialog = ref(false), drawer = ref(false), events: boolean[] = []
+  const boundary = ref<InstanceType<typeof PageBoundary>>(), refresh = ref(0)
   const First = defineComponent({ setup: () => () => [
     h('p', '第一页'),
     h(PageDialog, { modelValue: dialog.value, title: '表单弹窗', beforeClose, 'onUpdate:modelValue': value => { events.push(value); if (!ignoreModelClose) dialog.value = value } }, () => h('p', '表单内容')),
@@ -67,11 +68,11 @@ async function pageHarness(beforeClose?: (done: () => void) => unknown, ignoreMo
   ] })
   const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/first', component: First }, { path: '/second', component: { render: () => h('p', '第二页') }}] })
   await router.push('/first'); await router.isReady()
-  const Host = defineComponent({ setup: () => () => h(RouterView, {}, { default: ({ Component, route }: any) => h(KeepAlive, {}, () => h(PageBoundary, { key: route.fullPath, pageKey: route.fullPath }, () => h(Component))) }) })
+  const Host = defineComponent({ setup: () => () => h(RouterView, {}, { default: ({ Component, route }: any) => h(KeepAlive, {}, () => h(PageBoundary, { key: route.fullPath + ':' + refresh.value, pageKey: route.fullPath, ref: boundary }, () => h(Component))) }) })
   const wrapper = mount(Host, { attachTo: document.body, global: { plugins: [router, ElementPlus] }})
   wrappers.push(wrapper)
   await flushPromises()
-  return { wrapper, router, dialog, drawer, events }
+  return { wrapper, router, dialog, drawer, events, boundary, refresh }
 }
 
 it('closes only the cached page overlays on navigation, rejects late openings, and returns without reopening', async() => {
@@ -149,4 +150,32 @@ it('returns the native close promise and calls its completion only after the for
   expect(closing).toBeInstanceOf(Promise);expect(done).not.toHaveBeenCalled()
   accept();await closing
   expect(done).toHaveBeenCalledOnce();expect(dialog.value).toBe(false)
+})
+
+it('exposes the same close review to a host refresh so busy and cancelled forms stay mounted until confirmed', async() => {
+  let busy = true, answer!: (accepted: boolean) => void
+  const { wrapper, boundary, refresh, dialog } = await pageHarness(done => {
+    if (busy) return
+    return new Promise<boolean>(resolve => { answer = resolve }).then(accepted => { if (accepted) done() })
+  })
+  dialog.value = true; await flushPromises()
+  const originalBoundary = boundary.value
+  async function refreshHost() {
+    if (!await boundary.value!.requestLeave()) return false
+    refresh.value++; await flushPromises()
+    return true
+  }
+  expect(await refreshHost()).toBe(false)
+  expect(refresh.value).toBe(0); expect(dialog.value).toBe(true)
+  busy = false
+  const cancelled = refreshHost(); await flushPromises()
+  expect(refresh.value).toBe(0)
+  answer(false); expect(await cancelled).toBe(false)
+  expect(boundary.value).toBe(originalBoundary)
+  expect(dialog.value).toBe(true); expect(document.body.style.overflow).toBe('hidden')
+  const confirmed = refreshHost(); await flushPromises()
+  answer(true); expect(await confirmed).toBe(true)
+  expect(refresh.value).toBe(1); expect(boundary.value).not.toBe(originalBoundary)
+  expect(wrapper.findComponent(PageDialog).props('modelValue')).toBe(false)
+  expect(document.body.style.overflow).toBe('')
 })

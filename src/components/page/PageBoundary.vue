@@ -31,6 +31,7 @@ async function requestLeave(): Promise<boolean> {
   })()
   try { return await pendingLeave } finally { pendingLeave = undefined }
 }
+defineExpose({ requestLeave })
 onBeforeRouteLeave(requestLeave)
 onBeforeRouteUpdate(to => to.fullPath === props.pageKey || requestLeave())
 // Route state changes before cached subtree deactivation. Hide its overlays now.
