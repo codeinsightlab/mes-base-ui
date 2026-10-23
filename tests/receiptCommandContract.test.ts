@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { productionClosure } from '../src/api/production/productionClosure'
 import { qualityTreatment } from '../src/api/quality/qualityTreatment'
-import { executionStatusLabel } from '../src/lib/production/executionState'
+import { executionStatusLabel, executionStatusOptions } from '../src/lib/production/executionState'
 
 const request=vi.hoisted(()=>vi.fn())
 vi.mock('../src/lib/request',()=>({request}))
@@ -13,9 +13,10 @@ it('retired completion and return commands cannot be sent through active API ada
  expect(request).not.toHaveBeenCalled()
 })
 
-it('keeps the historical end state distinct from full receipt in every shared execution label',()=>{
+it('offers only the current execution states and preserves unknown values for diagnosis',()=>{
+ expect(executionStatusOptions.map(option=>option.value)).toEqual(['READY','RUNNING','FULLY_RECEIVED','CANCELLED'])
  expect(executionStatusLabel('FULLY_RECEIVED')).toBe('完全入库')
- expect(executionStatusLabel('COMPLETED')).toBe('历史已结束')
+ expect(executionStatusLabel('UNRECOGNIZED')).toBe('UNRECOGNIZED')
 })
 
 it('uses the dedicated receipt recheck endpoint without an old completion command or stock request',async()=>{

@@ -21,7 +21,7 @@ it('read permission cannot submit release or completion',async()=>{const{s}=awai
 
 it('does not submit a retired manual completion command',async()=>{const{s}=await setup();s.action='complete';s.form.reason='TEST 完工';await s.submit();expect(calls.execute).not.toHaveBeenCalled();expect(s.options.map((o:any)=>o.value)).toEqual(['release','revoke'])})
 
-it('completed production retains its fact and still allows separately authorized output release',async()=>{calls.summary.mockResolvedValueOnce({executionId:'9007199254740999',status:'COMPLETED',targetQty:'100',effective:'94',released:'94',received:'94',accepted:'94',basisHash:'basis',blockedReason:'执行必须处于RUNNING状态',completion:{id:'complete-id',effectiveQty:'94',inboundQty:'94'}});const{s}=await setup();expect(s.options.map((o:any)=>o.value)).toEqual(['release','revoke']);expect(document.body.textContent+wrapper.text()).toContain('complete-id');s.action='complete';s.form.reason='TEST';await s.submit();expect(calls.execute).not.toHaveBeenCalled()})
+it('shows completed receipt as a normal terminal state without offering production writes',async()=>{calls.summary.mockResolvedValueOnce({executionId:'9007199254740999',status:'FULLY_RECEIVED',targetQty:'100',effective:'94',released:'94',receivedQty:'94',defectQty:'6',receiptState:'FULLY_RECEIVED',orderBlockedReason:null,completion:{id:'complete-id',effectiveQty:'94',inboundQty:'94'}});const{s}=await setup();expect(s.options).toEqual([]);expect(s.canRecheck).toBe(false);expect(document.body.textContent).toContain('入库收尾记录：complete-id');expect(document.body.textContent).not.toContain('历史完工');s.action='release';s.form.reason='TEST';await s.submit();expect(calls.execute).not.toHaveBeenCalled()})
 
 
 it('keeps a retired unknown completion identity for reading without resubmitting it',async()=>{const original={action:'complete',body:{requestId:'old-complete',expectedBasisHash:'basis',reason:'原请求'}};sessionStorage.setItem('mes-closure::A:9007199254740999',JSON.stringify(original));const{s}=await setup();expect(s.pending).toEqual(original);expect(s.retiredIntent).toBe(true);await s.submit();expect(calls.execute).not.toHaveBeenCalled();expect(sessionStorage.getItem('mes-closure::A:9007199254740999')).toBe(JSON.stringify(original))})
@@ -52,10 +52,10 @@ it.each(['factory','permission'])('rejects a late recheck result after %s change
  expect(s.data).toBeNull();expect(s.rechecking).toBe(false);expect(s.recheckMessage).toBe('');expect(wrapper.emitted('changed')).toBeUndefined()
 })
 
-it('does not offer recheck without its permission or for historical and fully received execution states',async()=>{
+it('does not offer recheck without its permission or for inactive, unknown and fully received execution states',async()=>{
  const{s}=await setup(false,false);expect(s.canRecheck).toBe(false);await s.recheck();expect(calls.recheckReceipt).not.toHaveBeenCalled()
  wrapper.unmount();const{s:writer}=await setup();expect(writer.canRecheck).toBe(true)
- for(const status of ['COMPLETED','FULLY_RECEIVED','CANCELLED']){writer.data={...writer.data,status,orderBlockedReason:null};expect(writer.canRecheck).toBe(false)}
+ for(const status of ['READY','UNRECOGNIZED','FULLY_RECEIVED','CANCELLED']){writer.data={...writer.data,status,orderBlockedReason:null};expect(writer.canRecheck).toBe(false)}
 })
 
 it('rechecks through the receipt rule and keeps an unfinished order distinct from full execution receipt',async()=>{

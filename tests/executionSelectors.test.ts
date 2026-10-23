@@ -28,3 +28,14 @@ it('keeps one searchable execution ID field without a duplicate execution number
  expect(fields.find(field=>field.key==='id')?.searchable).toBe(true)
  expect(fields.some(field=>field.key==='executionNo')).toBe(false)
 })
+
+it('offers only running executions for a new production receipt and clears stale choices after factory changes',async()=>{
+ const pinia=createPinia(),auth=useAuth(pinia);auth.factoryId='A';auth.factoryPermissions=['business:mes:production:execution:list']
+ list.mockResolvedValueOnce({items:[{id:'1',status:'READY'},{id:'2',status:'RUNNING'},{id:'3',status:'FULLY_RECEIVED'},{id:'4',status:'CANCELLED'},{id:'5',status:'UNRECOGNIZED'}],total:5})
+ wrapper=mount(ProductionExecutionSelect,{props:{statuses:['RUNNING']},global:{plugins:[pinia,ElementPlus]}})
+ const state=(wrapper.vm.$ as unknown as {setupState:Record<string,any>}).setupState
+ await state.search();await flushPromises()
+ expect(state.options.map((row:any)=>row.id)).toEqual(['2'])
+ auth.factoryId='B';auth.revision++;await flushPromises()
+ expect(state.options).toEqual([])
+})

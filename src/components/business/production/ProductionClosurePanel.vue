@@ -13,10 +13,10 @@ const inboundPath=computed(()=>menuPathForComponent(auth.factoryMenus,'wm/stockD
 const visible=ref(false),data=ref<ClosureSummary|null>(null),release=ref<ReleaseState|null>(null),history=ref<ReleaseFact[]>([]),offset=ref(0),total=ref(0),loading=ref(false),loadError=ref('')
 const action=ref<ClosureAction>('release'),form=reactive({quantity:'',reason:''})
 const can=(p:string)=>auth.hasPermission(p,'factory'),readable=computed(()=>can('business:mes:production:execution:query')),releaseRead=computed(()=>can('business:quality:release:read'))
-const options=computed(()=>[{value:'release' as const,label:'累计数量放行',permission:'business:quality:release:create'},{value:'revoke' as const,label:'撤回当前放行',permission:'business:quality:release:revoke'}].filter(o=>['RUNNING','COMPLETED'].includes(data.value?.status??'')&&can(o.permission)&&releaseRead.value))
+const options=computed(()=>[{value:'release' as const,label:'累计数量放行',permission:'business:quality:release:create'},{value:'revoke' as const,label:'撤回当前放行',permission:'business:quality:release:revoke'}].filter(o=>data.value?.status==='RUNNING'&&can(o.permission)&&releaseRead.value))
 const retiredIntent=computed(()=>!!pending.value&&!['release','revoke'].includes(pending.value.action))
 const receiptLabel=computed(()=>data.value?({PENDING:'待入库',PARTIAL:'部分入库',FULLY_RECEIVED:'完全入库'}[data.value.receiptState]??'入库状态待确认'):'')
-const canRecheck=computed(()=>!!data.value&&!['COMPLETED','CANCELLED'].includes(data.value.status)&&(data.value.status!=='FULLY_RECEIVED'||!!data.value.orderBlockedReason)&&can('business:production:execution:complete'))
+const canRecheck=computed(()=>!!data.value&&(data.value.status==='RUNNING'||(data.value.status==='FULLY_RECEIVED'&&!!data.value.orderBlockedReason))&&can('business:production:execution:complete'))
 const rechecking=ref(false),recheckMessage=ref('')
 const command=useClosureCommand<ClosureIntent>(()=>`mes-closure:${auth.username}:${auth.factoryId}:${props.id}`),{pending,busy,error}=command
 let generation=0,attempt=0
@@ -58,7 +58,7 @@ async function close(done:()=>void){if(form.reason||form.quantity||pending.value
    <el-alert v-if="data.orderBlockedReason" :title="'工单未完结：'+data.orderBlockedReason" type="warning" :closable="false"/>
    <el-alert v-if="data.blockedReason" :title="data.blockedReason" type="warning" :closable="false"/>
    <el-alert v-if="release&&!release.basisValid&&release.currentReleaseId" title="原放行依据已变化或已撤回。历史事实保留，请核对当前依据后重新放行。" type="warning" :closable="false"/>
-   <el-alert v-if="data.completion" :title="(data.status==='FULLY_RECEIVED'?'完全入库事实：':'历史完工事实：')+data.completion.id+'；完工时有效产出 '+data.completion.effectiveQty+'，完工时已入库 '+data.completion.inboundQty" type="success" :closable="false"/>
+   <el-alert v-if="data.completion" :title="'入库收尾记录：'+data.completion.id+'；完工时有效产出 '+data.completion.effectiveQty+'，完工时已入库 '+data.completion.inboundQty" type="success" :closable="false"/>
    <div class="table-toolbar"><el-button :disabled="busy||rechecking" @click="load">刷新闭环数量</el-button><el-button v-if="canRecheck" :loading="rechecking" :disabled="busy||loading||!!pending" @click="recheck">{{data.status==='FULLY_RECEIVED'?'复查工单收尾':'复查入库收尾'}}</el-button><router-link v-if="inboundPath&&data.status!=='FULLY_RECEIVED'" :to="{path:inboundPath,query:{executionId:id}}">办理入库单</router-link></div>
    <el-alert v-if="recheckMessage" :title="recheckMessage" type="info" :closable="false"/>
    <el-alert v-if="retiredIntent" title="原手动完工请求已停用，仅保留原身份供查询核对，不再重发。" type="warning" :closable="false"/>

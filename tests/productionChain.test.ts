@@ -30,11 +30,11 @@ function setup(permissions: string[]) {
   return { auth, global: { plugins: [pinia, ElementPlus] } }
 }
 describe('single active execution chain', () => {
-  it('shows the server creation time and does not label historical workorders as released', async() => {
-    wo.list.mockResolvedValueOnce({ items: [{ workorder: { ...order, status: 'HISTORICAL', createTime: '2026-10-20T16:10:00' }, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
+  it('shows the server creation time and current completed workorder status', async() => {
+    wo.list.mockResolvedValueOnce({ items: [{ workorder: { ...order, status: 'COMPLETED', createTime: '2026-10-20T16:10:00' }, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
     const c = setup(['workorder:list']), w = mount(WorkOrder, { global: c.global })
     await flushPromises()
-    expect(w.find('.el-table__body .status-tag').text()).toBe('HISTORICAL')
+    expect(w.find('.el-table__body .status-tag').text()).toBe('已完工')
     expect(w.find('.el-table__header').text()).toContain('创建时间')
     expect(w.find('.el-table__body').text()).toContain('2026-10-20T16:10:00')
     w.unmount()

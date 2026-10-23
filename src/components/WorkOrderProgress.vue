@@ -20,7 +20,7 @@ defineExpose({ reload: load, loading })
     <QueryForm v-if="allowed" inline class="filter-panel" @submit="search">
       <el-form-item label="工单号"><el-input v-model="workorderCode" aria-label="工单号前缀" placeholder="按工单号前缀查询" maxlength="64" clearable /></el-form-item>
       <el-form-item label="产品编码"><el-input v-model="productCode" aria-label="产品编码前缀" placeholder="按产品编码前缀查询" maxlength="64" clearable /></el-form-item>
-      <el-form-item label="工单状态"><el-select v-model="status" aria-label="工单进度状态" clearable placeholder="未作废工单" style="width: 170px"><el-option value="ALL" label="全部（含已作废）" /><el-option v-for="s in ['DRAFT', 'RELEASED', 'COMPLETED', 'HISTORICAL', 'CANCELLED']" :key="s" :value="s" :label="orderStatus(s)" /></el-select></el-form-item>
+      <el-form-item label="工单状态"><el-select v-model="status" aria-label="工单进度状态" clearable placeholder="未作废工单" style="width: 170px"><el-option value="ALL" label="全部（含已作废）" /><el-option v-for="s in ['DRAFT', 'RELEASED', 'COMPLETED', 'CANCELLED']" :key="s" :value="s" :label="orderStatus(s)" /></el-select></el-form-item>
       <el-form-item><el-button type="primary" native-type="submit" :loading="loading">查询</el-button><el-button native-type="button" @click="reset">重置</el-button></el-form-item>
     </QueryForm>
     <WorkspaceReadState :resource="result" loading-overlay @retry="load">

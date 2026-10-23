@@ -4,6 +4,7 @@ import QueryForm from '@/components/QueryForm.vue'
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { quantityColumn } from '@/lib/production/quantity'
+import { executionStatusLabel } from '@/lib/production/executionState'
 import DefectDeclarationPanel from '@/components/business/quality/DefectDeclarationPanel.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
@@ -29,7 +30,7 @@ const graphEdges = computed<RoutingEdge[]>(() => {
  const codes = new Map(context.value?.path.nodes.map(n => [n.id, n.nodeCode]))
  return context.value?.path.edges.map(e => ({ fromNodeCode: codes.get(e.fromNodeId)!, toNodeCode: codes.get(e.toNodeId)! })) ?? []
 })
-const statusNames: Record<string, string> = { READY: '待开工', RUNNING: '生产中', COMPLETED: '历史已结束', FULLY_RECEIVED: '完全入库', CANCELLED: '已取消', AVAILABLE: '可报工', QUALITY_PENDING: '受待核实不良影响', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
+const statusNames: Record<string, string> = { AVAILABLE: '可报工', QUALITY_PENDING: '受待核实不良影响', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
 function clear() {
  version++; context.value = null; selectedId.value = ''; quantity.value = ''; pending.value = null
  result.value = null; error.value = ''; busy.value = loading.value = false; showAll.value = false
@@ -86,7 +87,7 @@ async function submit() {
    <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${result.quantityDelta}，时间 ${result.reportTime}`" type="success" :closable="false" />
    <section v-if="context" class="panel" v-loading="loading">
     <el-descriptions :column="1" border>
-     <el-descriptions-item label="生产执行">{{ context.identity.executionId }} · {{ statusNames[context.identity.status] || context.identity.status }}</el-descriptions-item>
+     <el-descriptions-item label="生产执行">{{ context.identity.executionId }} · {{ executionStatusLabel(context.identity.status) }}</el-descriptions-item>
      <el-descriptions-item label="工单">{{ context.identity.workorderCode }}</el-descriptions-item>
      <el-descriptions-item label="产出物料">{{ context.identity.productCode }} · {{ context.identity.productName }}</el-descriptions-item>
      <el-descriptions-item label="生产批次">{{ context.identity.batchNo || '未记录' }}</el-descriptions-item>

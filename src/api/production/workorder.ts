@@ -2,7 +2,7 @@ import { request } from '@/lib/request'
 import type { RoutingDetail } from './routing'
 export interface Order {
   id: string; source?: 'LOCAL' | 'EXTERNAL' | null; code: string; productId: string; routingId: string; plannedQty: string | number
-  status: 'DRAFT' | 'RELEASED' | 'CANCELLED' | 'HISTORICAL' | 'COMPLETED'; plannedStartAt: string | null; plannedEndAt: string | null
+  status: 'DRAFT' | 'RELEASED' | 'CANCELLED' | 'COMPLETED'; plannedStartAt: string | null; plannedEndAt: string | null
   createTime: string | null
   externalId: string | null; externalCode: string | null; remark: string | null; revision: number
 }

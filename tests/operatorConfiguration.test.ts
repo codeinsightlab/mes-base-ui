@@ -88,7 +88,7 @@ describe('production operator configuration', () => {
   expect(wrapper.findComponent({ name: 'CrudPage' }).props('fixedValues')).toEqual({ executionId: '9007199254740995', routingNodeId: '12' })
  })
  it('terminal execution hides add controls', async() => {
-  config.nodes.mockResolvedValue({ status: 'COMPLETED', nodes: [{ id: '11', operationId: '7', code: 'N1', name: '钻孔' }] })
+  config.nodes.mockResolvedValue({ status: 'FULLY_RECEIVED', nodes: [{ id: '11', operationId: '7', code: 'N1', name: '钻孔' }] })
   const { wrapper } = setup(true); await open(wrapper); await select(wrapper, 0, '11')
   expect(document.body.textContent).not.toContain('增加派工'); expect(assignment.create).not.toHaveBeenCalled()
  })
