@@ -22,6 +22,7 @@ import type { PermissionScope } from '@/lib/request'
 const props = withDefaults(defineProps<{
   embedded?: boolean;
   managedEditing?: boolean;
+  creatable?: boolean;
   beforeCreate?: () => Promise<Row | null>;
   editorWidth?: string;
   actionColumnWidth?: number;
@@ -45,7 +46,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean;
   editableRow?: (row: Record<string, unknown>) => boolean;
   searchable?: boolean
-}>(), { beforeCreate: undefined, idKey: 'id', fixedValues: undefined, permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
+}>(), { creatable: true, beforeCreate: undefined, idKey: 'id', fixedValues: undefined, permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth()
 const route = inject(routeLocationKey, undefined)
@@ -66,7 +67,7 @@ const selectedIds = ref<string[]>([])
 const deleting = ref(false)
 watch(() => columns.value.map(column => column.key).join('|'), () => { selectedIds.value = [] })
 const can = (action: string) => auth.hasPermission(props.permissionOverrides?.[action] ?? props.permission + ':' + action, resolvedPermissionScope.value)
-const writeAllowed = computed(() => editId.value ? can('update') : can('create'))
+const writeAllowed = computed(() => editId.value ? can('update') : props.creatable !== false && can('create'))
 
 async function load() {
   const current = ++generation
@@ -104,7 +105,7 @@ async function load() {
 
 async function open(row?: Row) {
   if (row && props.editableRow && !props.editableRow(row)) return
-  if (props.readonly || props.managedEditing || (row ? (!can('update') && !props.editorAccess) || !can(props.detailAction) : !can('create'))) return
+  if (props.readonly || props.managedEditing || (row ? (!can('update') && !props.editorAccess) || !can(props.detailAction) : props.creatable === false || !can('create'))) return
   const revision = auth.revision
   const context = contextGeneration
   error.value = ''
@@ -292,7 +293,7 @@ defineExpose({ load })
       </el-form-item>
     </QueryForm>
     <div class="table-toolbar">
-      <el-button v-if="!readonly && !managedEditing && can('create')" type="primary" icon="Plus" @click="open()">新增
+      <el-button v-if="creatable !== false && !readonly && !managedEditing && can('create')" type="primary" icon="Plus" @click="open()">新增
       </el-button>
       <span v-else-if="!$slots.toolbar" class="secondary">{{ readonly ? '只读列表' : '记录列表' }}</span>
       <el-button

@@ -27,7 +27,6 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<MesProductionExecutionVo, 'workorderId' | 'routingId' | 'targetQty' | 'status' | 'startTime' | 'endTime' | 'remark'>
 export type UpdateCommand = Pick<MesProductionExecutionVo, 'workorderId' | 'routingId' | 'targetQty' | 'status' | 'startTime' | 'endTime' | 'remark'>
 
 const removeIds = (ids: string[]) =>
@@ -40,8 +39,8 @@ export const api = {
   detail: (id: string) =>
     request<MesProductionExecutionVo>('/api/production/mes-production-execution/' + encodeURIComponent(id), { scope: 'factory' }),
 
-  create: (body: unknown) =>
-    request<MesProductionExecutionVo>('/api/production/mes-production-execution', { method: 'POST', body: { ...(body as object), status: 'READY', startTime: null, endTime: null }, scope: 'factory' }),
+  // Shared CrudApi requires a creation member; this screen cannot create production executions.
+  create: async () => { throw new Error('生产执行由BOM正式领料成功后创建') },
 
   update: async (id: string, body: unknown) => {
     const previous = await api.detail(id)

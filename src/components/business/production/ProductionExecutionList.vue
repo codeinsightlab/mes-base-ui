@@ -44,13 +44,13 @@ const fixed = computed(() => props.workorderId ? { workorderId: props.workorderI
 </script>
 <template>
   <el-alert v-if="cancelled" title="所属工单当前状态不允许新增生产或不可读取。" type="warning" :closable="false" />
-  <CrudPage :readonly="cancelled" :key="refresh" :embedded="embedded" :fixed-values="fixed" table-key="business:mes:production:execution:list"
+  <CrudPage :creatable="false" :readonly="cancelled" :key="refresh" :embedded="embedded" :fixed-values="fixed" table-key="business:mes:production:execution:list"
     :editable-row="row=>['DRAFT','RELEASED'].includes(String(row.workorderStatus)) && ['READY','RUNNING'].includes(String(row.status))" :action-column-width="220" title="生产执行单元" permission="business:mes:production:execution" list-action="list" detail-action="query"
     :api="api" :fields="fields" id-key="id" @changed="$emit('changed')">
     <template #search-routingId="{ search }"><BusinessDirectorySelect v-model="search.routingId as string | null" resource="routings" placeholder="搜索工艺名称或编码" /></template>
     <template #field-workorderId="{ draft }"><WorkOrderSelect :source="auth.runtimeMode==='LOCAL'?'LOCAL':auth.runtimeMode==='ERP'?'EXTERNAL':null" v-model="draft.workorderId as string | null" :disabled="Boolean(draft.id)" /></template>
     <template #field-routingId="{ draft }"><ExecutionRoutingSelect v-model="draft.routingId as string | null" :workorder-id="draft.workorderId as string | null" :disabled="draft.status !== 'READY'" /></template>
-    <template #toolbar><ExecutionIdentityLookup /></template>
+    <template #toolbar><el-button v-if="auth.hasPermission('business:mes:material:issue:update', 'factory')" @click="router.push('/production/productionInput')">正式领料创建执行</el-button><ExecutionIdentityLookup /></template>
     <template #cell-status="{row}">{{executionStatusLabel(String(row.status))}}<el-tag v-if="row.workorderStatus==='CANCELLED'" type="danger">所属工单已作废</el-tag></template>
     <template #cell-routingId="{row}"><span :title="'工艺版本 ID：'+row.routingId">{{ row.routingCode || '工艺名称未记录' }} / V{{ row.routingVersion ?? '未记录' }} · {{ row.routingName || '名称未记录' }}</span></template>
     <template #cell-createBy="{row}"><span :title="'用户 ID：'+row.createBy">{{ row.createByName || (row.createBy ? '用户 '+row.createBy+'（名称未记录）' : '—') }}</span></template>

@@ -14,12 +14,12 @@ type State = {code:string; orderId:string; stockId:string; outputQty:string; sel
 let wrapper:ReturnType<typeof mount>
 beforeEach(() => {sessionStorage.clear(); vi.resetAllMocks(); vi.stubGlobal('ResizeObserver',class {observe(){} unobserve(){} disconnect(){}}); query.mockResolvedValue({sourceMode:'LOCAL_ONLY',stocks:[stock],orders:[order]}); preview.mockResolvedValue({definition,actual:null}); calculate.mockResolvedValue({sourceMode:'LOCAL_ONLY',order,stock,outputQty:'100',issueQty:'200.000000',calculationKey:'freeze-1'}); submit.mockResolvedValue({requestId:'r',issueId:'2',executionId:'3',code:'WO1:P1#000L',status:'CONFIRMED',productionInputQty:'100',availableQty:'100'})})
 afterEach(()=>{wrapper?.unmount();document.body.innerHTML=''})
-async function setup(){const pinia=createPinia(),auth=useAuth(pinia);auth.factoryId='A';auth.factoryPermissions=['business:mes:material:issue:update'];wrapper=mount(Input,{global:{plugins:[pinia,ElementPlus],stubs:{RoutingGraphPreview:true}}});const s=wrapper.vm as unknown as State;s.code='WO1:P1#000L';await s.query();await flushPromises();return {s,auth}}
-it('queries without writes, auto-selects only one order, and keeps separate material and output quantities',async()=>{const {s}=await setup();expect(s.orderId).toBe('1');expect(submit).not.toHaveBeenCalled();expect(wrapper.text()).toContain('独立 MES');s.stockId='1';s.outputQty='100';await s.calculate();expect(wrapper.text()).toContain('200');s.selected=['11'];await s.submit();expect(submit.mock.calls[0]![0]).toMatchObject({code:'WO1:P1#000L',outputQty:'100',calculationKey:'freeze-1',inputKind:'PRODUCTION_INPUT'});expect(submit.mock.calls[0]![0]).not.toHaveProperty('issueQty');expect(wrapper.text()).toContain('3')})
-it('keeps an unmatched workorder and product empty rather than choosing another order',async()=>{query.mockResolvedValue({sourceMode:'LOCAL_ONLY',stocks:[],orders:[],total:0,offset:0,limit:20});const{s}=await setup();expect(s.orderId).toBe('');expect(preview).not.toHaveBeenCalled();expect(query).toHaveBeenCalledWith('WO1:P1#000L')})
+async function setup(){const pinia=createPinia(),auth=useAuth(pinia);auth.factoryId='A';auth.factoryPermissions=['business:mes:material:issue:update'];wrapper=mount(Input,{global:{plugins:[pinia,ElementPlus],stubs:{RoutingGraphPreview:true}}});const s=wrapper.vm as unknown as State;s.code='WO1:M1#000L';await s.query();await flushPromises();return {s,auth}}
+it('queries without writes, auto-selects only one order, and keeps separate material and output quantities',async()=>{const {s}=await setup();expect(s.orderId).toBe('1');expect(submit).not.toHaveBeenCalled();expect(wrapper.text()).toContain('独立 MES');s.stockId='1';s.outputQty='100';await s.calculate();expect(wrapper.text()).toContain('200');s.selected=['11'];await s.submit();expect(submit.mock.calls[0]![0]).toMatchObject({code:'WO1:M1#000L',outputQty:'100',calculationKey:'freeze-1',inputKind:'PRODUCTION_INPUT'});expect(submit.mock.calls[0]![0]).not.toHaveProperty('issueQty');expect(wrapper.text()).toContain('3')})
+it('keeps an unmatched workorder and product empty rather than choosing another order',async()=>{query.mockResolvedValue({sourceMode:'LOCAL_ONLY',stocks:[],orders:[],total:0,offset:0,limit:20});const{s}=await setup();expect(s.orderId).toBe('');expect(preview).not.toHaveBeenCalled();expect(query).toHaveBeenCalledWith('WO1:M1#000L')})
 it('keeps the same request after a lost response and prevents double submission',async()=>{const {s}=await setup();s.stockId='1';s.outputQty='100';await s.calculate();s.selected=['11'];submit.mockRejectedValueOnce(new Error('网络断开'));await s.submit();const first={...submit.mock.calls[0]![0]};await s.submit();expect(submit.mock.calls[1]![0]).toEqual(first)})
 it.each(['factory','permission'])('clears state and rejects late responses on %s change',async(kind)=>{const {s,auth}=await setup();let release!:(v:unknown)=>void;query.mockImplementationOnce(()=>new Promise(r=>{release=r}));const task=s.query();if(kind==='factory')auth.factoryId='B';else auth.factoryPermissions=[];await flushPromises();release({sourceMode:'LOCAL_ONLY',stocks:[stock],orders:[order]});await task;expect(s.supply).toBeNull();expect(s.pending).toBeNull();expect(s.code).toBe('')})
-it('selects the exact sole order while preserving the page contract',async()=>{query.mockResolvedValueOnce({sourceMode:'LOCAL_ONLY',stocks:[stock],orders:[order],total:1,offset:0,limit:20});const{s}=await setup();expect(s.orderId).toBe('1');expect(preview).toHaveBeenCalledWith('WO1:P1#000L','1');expect(wrapper.text()).toContain('1 / 1');expect(wrapper.text()).not.toContain('加载更多匹配工单')})
+it('selects the exact sole order while preserving the page contract',async()=>{query.mockResolvedValueOnce({sourceMode:'LOCAL_ONLY',stocks:[stock],orders:[order],total:1,offset:0,limit:20});const{s}=await setup();expect(s.orderId).toBe('1');expect(preview).toHaveBeenCalledWith('WO1:M1#000L','1');expect(wrapper.text()).toContain('1 / 1');expect(wrapper.text()).not.toContain('加载更多匹配工单')})
 
 it('keeps UNKNOWN query enabled and retains the original request across reopening',async()=>{const{s}=await setup();s.stockId='1';s.outputQty='100';await s.calculate();s.selected=['11'];submit.mockResolvedValueOnce({requestId:'r',issueId:'2',executionId:'3',status:'SUBMIT_UNKNOWN'});await s.submit();const first=JSON.parse(JSON.stringify(submit.mock.calls[0]![0]));expect(wrapper.text()).toContain('打开本次领料单并核实');const retry=wrapper.findAll('button').find(b=>b.text()==='使用原请求重查');expect(retry?.attributes('disabled')).toBeUndefined();wrapper.unmount();const {s:reopened}=await setup();await reopened.submit();expect(submit.mock.calls[1]![0]).toEqual(first)})
 
@@ -27,5 +27,35 @@ it('keeps a historical replay without a code explicitly ungenerated',async()=>{
  const{s}=await setup();s.stockId='1';s.outputQty='100';await s.calculate();s.selected=['11']
  submit.mockResolvedValueOnce({requestId:'r',issueId:'2',executionId:'3',code:null,status:'CONFIRMED',productionInputQty:'100',availableQty:'100'})
  await s.submit();expect(wrapper.text()).toContain('未生成（未记录批次）')
- expect(query).toHaveBeenCalledWith('WO1:P1#000L')
+ expect(query).toHaveBeenCalledWith('WO1:M1#000L')
+})
+
+it('selects the sole eligible stock without choosing the first of multiple stocks', async() => {
+ const {s} = await setup(); expect(s.stockId).toBe('1')
+ query.mockResolvedValueOnce({sourceMode:'LOCAL_ONLY',stocks:[stock,{...stock,reference:'2',warehouseId:'2'}],orders:[{...order,allowedWarehouses:['1','2']}]})
+ await s.query(); await flushPromises(); expect(s.stockId).toBe('')
+})
+it('allows a fully received execution to accept an approved additional input on the same path',async()=>{
+ preview.mockResolvedValueOnce({definition,actual:{executionId:'3',executionStatus:'FULLY_RECEIVED',selectedNodeIds:['11']}})
+ const {s}=await setup();s.outputQty='10';await s.calculate()
+ expect(wrapper.text()).toContain('计划余额内的合法追加将复用本执行')
+ const confirm=wrapper.findAll('button').find(b=>b.text()==='确认正式投产')!
+ expect(confirm.attributes('disabled')).toBeUndefined(); await s.submit();expect(submit).toHaveBeenCalledTimes(1)
+})
+it('clears only a definite local rejection so the operator can recompute instead of replaying a stale calculation forever',async()=>{
+ const {s}=await setup();s.outputQty='100';await s.calculate();s.selected=['11']
+ const {ApiError}=await import('../src/lib/request')
+ submit.mockRejectedValueOnce(new ApiError('PRODUCTION_INPUT_STALE','BOM依据已变化','',409))
+ await s.submit();const first=submit.mock.calls[0]![0]
+ expect(s.pending).toBeNull();expect(wrapper.text()).toContain('本次未形成正式投入，请重新计算')
+ expect(sessionStorage.getItem('mes-production-input-pending:'+useAuth().username+':A')).toBeNull()
+ await s.calculate();await s.submit();expect(submit.mock.calls[1]![0].requestId).not.toBe(first.requestId)
+})
+it('retains the original external or unconfirmed operation when a retry cannot be classified as a rolled-back local input',async()=>{
+ const {s}=await setup();s.outputQty='100'
+ calculate.mockResolvedValueOnce({sourceMode:'CONNECTED',order,stock,outputQty:'100',issueQty:'200',calculationKey:'erp-frozen'})
+ await s.calculate();s.selected=['11'];const {ApiError}=await import('../src/lib/request')
+ submit.mockRejectedValueOnce(new ApiError('PRODUCTION_INPUT_STALE','外部结果待核实','',409))
+ await s.submit();const first={...submit.mock.calls[0]![0]};expect(s.pending).not.toBeNull()
+ await s.submit();expect(submit.mock.calls[1]![0]).toEqual(first)
 })

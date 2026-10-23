@@ -129,3 +129,15 @@ it('keeps executions readable when a product code is not returned without substi
  expect(wrapper.text()).toContain('品号未记录');expect(wrapper.text()).not.toContain('781234')
  wrapper.unmount()
 })
+
+it('creates executions through formal input even when the old create permission is still granted', async() => {
+  const context = setup()
+  context.auth.factoryPermissions.push('business:mes:production:execution:create', 'business:mes:material:issue:update')
+  const wrapper = mount(Page, { global: context.global })
+  await flushPromises()
+  const buttons = wrapper.findAll('button').map(button => button.text())
+  expect(buttons).not.toContain('新增')
+  expect(buttons).toContain('正式领料创建执行')
+  expect(api.create).not.toHaveBeenCalled()
+  wrapper.unmount()
+})
