@@ -2,7 +2,7 @@ import { request } from '@/lib/request'
 import type { CrudApi, Row } from '@/lib/crud'
 export const stockDocumentTypes = [
  {value:'PURCHASE_RECEIPT',label:'采购入库',origin:'供应商交货',basis:'采购订单、收货单',approvalAvailable:false},
- {value:'PRODUCTION_RECEIPT',label:'生产完工入库',origin:'工单生产完成',basis:'工单、Execution、报工及质量放行记录',approvalAvailable:true},
+ {value:'PRODUCTION_RECEIPT',label:'生产完工入库',origin:'工单生产完成',basis:'工单、Execution、报工、不良及入库审核记录',approvalAvailable:true},
  {value:'OUTSOURCE_RECEIPT',label:'委外加工入库',origin:'外协厂加工完成',basis:'委外单、委外发料记录',approvalAvailable:false},
  {value:'MATERIAL_RETURN_RECEIPT',label:'退料入库',origin:'生产领料后退回',basis:'原领料单、工单',approvalAvailable:false},
  {value:'REWORK_RECEIPT',label:'返工入库',origin:'返工完成并检验合格',basis:'原不良记录、返工任务及检验依据',approvalAvailable:false},
@@ -22,7 +22,7 @@ export interface Header extends Row {
 export interface Line extends Row {id:string;documentId:string;lineNo:number;stockId:string;materialId:string;warehouseId:string;unitId:string;batchNo:string|null;binCode:string|null;quantity:string;remark:string|null;stockActionId:string|null}
 export interface Detail { document:Header; lines:Line[]; qualitySource?:{sourceDeclarationId:string;sourceTreatmentId:string;sourceQualityExecutionId:string}|null }
 export interface ApprovalIntent {requestId:string;expectedRevision:string}
-export interface ProductionBasis {executionId:string;productId:string;effective:string;released:string;received:string;remaining:string;canReceive:boolean;blockedReason:string|null}
+export interface ProductionBasis {executionId:string;productId:string;effective:string;received:string;remaining:string;canReceive:boolean;blockedReason:string|null}
 export interface CancellationBasis {workorderId:string;productId:string;status:string;handedOver:string;accepted:string;manuallyReceived:string;remaining:string}
 const root='/api/wm/stock-documents'
 const path=(id:string)=>root+'/'+encodeURIComponent(id)

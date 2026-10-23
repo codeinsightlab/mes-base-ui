@@ -50,7 +50,7 @@ onBeforeUnmount(clear)
   <el-button v-if="row.status==='DRAFT'&&auth.hasPermission(p+':cancel','factory')" type="danger" plain :disabled="dirty||!!intent.pending.value" :loading="cancelBusy" @click="cancel">作废草稿</el-button>
   <el-button v-if="canApprove" :disabled="!stockDocumentPurpose(row.documentType)?.approvalAvailable" type="primary" :loading="intent.busy.value" @click="approve">{{intent.pending.value?'核对原审核请求':'审核单据'}}</el-button>
   <router-link v-if="row.sourceWorkorderId" :to="{path:'/production/workorder',query:{workorderId:String(row.sourceWorkorderId)}}">查看关联工单 {{row.sourceWorkorderId}}</router-link>
-  <p v-if="production">生产有效产出 {{production.effective}}，可信放行 {{production.released}}，累计已入库 {{production.received}}，当前可入库 {{production.remaining}}。{{production.blockedReason}}</p>
+  <p v-if="production">生产有效产出 {{production.effective}}，累计已入库 {{production.received}}，当前可入库 {{production.remaining}}。{{production.blockedReason}}</p>
   <p v-if="basis">历史补录依据：已交接 {{basis.handedOver}}，已实际接收 {{basis.accepted}}，已人工补入 {{basis.manuallyReceived}}，本次可补上限 {{basis.remaining}}。仍须逐行填写实际清点依据。</p>
   <el-alert v-if="intent.pending.value" :title="'原审核UUID：'+intent.pending.value.requestId+'。结果未知时只核实此请求，不另建意图。'" type="warning" :closable="false" />
   <el-alert v-if="error||intent.error.value" :title="error||intent.error.value" type="error" :closable="false" />

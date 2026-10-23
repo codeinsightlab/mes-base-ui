@@ -8,7 +8,9 @@ vi.mock('../src/lib/request',()=>({request}))
 beforeEach(()=>request.mockReset())
 
 it('retired completion and return commands cannot be sent through active API adapters',()=>{
- expect(()=>productionClosure.execute('1',{action:'complete',body:{requestId:'old',reason:'原请求'}} as any)).toThrow('手动完工已停用')
+ expect(productionClosure).not.toHaveProperty('execute')
+ expect(productionClosure).not.toHaveProperty('release')
+ expect(productionClosure).not.toHaveProperty('history')
  expect(()=>qualityTreatment.dispose('d1',{requestId:'old',destination:'RETURN_NODE',warehouseId:null,quantity:'1',expectedRevision:1,reason:'原请求'} as any)).toThrow('不良只办理正式入仓')
  expect(request).not.toHaveBeenCalled()
 })
