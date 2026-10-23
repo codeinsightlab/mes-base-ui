@@ -172,7 +172,7 @@
     />
 
     <!-- 添加或修改角色配置对话框 -->
-    <el-dialog v-model="open" :title="title" width="500px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="角色范围" prop="kind"><el-select v-model="form.kind" :disabled="!!form.roleId" @change="handleRoleKindChange"><el-option label="平台" value="PLATFORM" /><el-option label="工厂" value="FACTORY" /></el-select></el-form-item>
         <el-form-item v-if="form.kind==='FACTORY'" label="所属工厂" prop="factoryId" :rules="[{required:true,message:'请选择工厂'}]"><el-select v-model="form.factoryId" :disabled="!!form.roleId"><el-option v-for="f in factories" :key="f.factoryId" :label="f.name" :value="f.factoryId" /></el-select></el-form-item>
@@ -225,10 +225,10 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
 
     <!-- 分配角色数据权限对话框 -->
-    <el-dialog v-model="openDataScope" :title="title" width="500px" append-to-body>
+    <PageDialog v-model="openDataScope" :title="title" width="500px" append-to-body>
       <el-form :model="form" label-width="80px">
         <el-form-item label="角色名称">
           <el-input v-model="form.roleName" :disabled="true" />
@@ -267,11 +267,13 @@
         <el-button type="primary" @click="submitDataScope">确 定</el-button>
         <el-button @click="cancelDataScope">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { useAuth } from '@/stores/auth'
 import { listRole, getRole, delRole, addRole, updateRole, dataScope, changeRoleStatus } from '@/api/system/role'
@@ -279,6 +281,7 @@ import { treeselect as menuTreeselect, roleMenuTreeselect } from '@/api/system/m
 import { treeselect as deptTreeselect, roleDeptTreeselect } from '@/api/system/dept'
 
 export default {
+  components: { PageDialog },
   name: 'Role',
   dicts: ['sys_normal_disable'],
   data() {

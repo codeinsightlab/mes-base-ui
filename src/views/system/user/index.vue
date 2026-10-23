@@ -251,7 +251,7 @@
     </el-row>
 
     <!-- 添加或修改用户配置对话框 -->
-    <el-dialog v-model="open" :title="title" width="600px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-row>
           <el-col :span="12">
@@ -354,10 +354,10 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
 
     <!-- 用户导入对话框 -->
-    <el-dialog v-model="upload.open" :title="upload.title" width="400px" append-to-body>
+    <PageDialog v-model="upload.open" :title="upload.title" width="400px" append-to-body>
       <el-form-item label="新用户初始密码"><el-input v-model="upload.initialPassword" type="password" show-password placeholder="仅用于本次导入" /></el-form-item>
       <el-upload
         ref="upload"
@@ -390,11 +390,13 @@
         <el-button type="primary" @click="submitFileForm">确 定</el-button>
         <el-button @click="upload.open = false">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus } from '@/api/system/user'
 import request from '@/utils/request'
@@ -408,7 +410,7 @@ import DictSelect from '@/components/DictSelect.vue'
 export default {
   name: 'User',
   dicts: ['sys_normal_disable', 'sys_user_sex'],
-  components: { Treeselect, DictSelect },
+  components: { PageDialog, Treeselect, DictSelect },
   data() {
     const policy = useAuth().passwordPolicy
     return {

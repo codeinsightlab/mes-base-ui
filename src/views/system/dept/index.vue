@@ -99,7 +99,7 @@
     </el-table>
 
     <!-- 添加或修改部门对话框 -->
-    <el-dialog v-model="open" :title="title" width="600px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="600px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-row>
           <el-col v-if="String(form.parentId) !== '0'" :span="24">
@@ -155,11 +155,13 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listDept, getDept, delDept, addDept, updateDept, listDeptExcludeChild } from '@/api/system/dept'
 import Treeselect from '@/components/Treeselect/index.vue'
@@ -167,7 +169,7 @@ import Treeselect from '@/components/Treeselect/index.vue'
 export default {
   name: 'Dept',
   dicts: ['sys_normal_disable'],
-  components: { Treeselect },
+  components: { PageDialog, Treeselect },
   data() {
     return {
       queryError: '',

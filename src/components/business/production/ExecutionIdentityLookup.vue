@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { executionStatusLabel } from '@/lib/production/executionState'
 import QueryForm from '@/components/QueryForm.vue'
 
@@ -65,7 +67,7 @@ function open() {
 <template>
   <el-button v-if="allowed && id" link type="primary" @click="open">身份码</el-button>
   <CodeScanner v-else-if="allowed" button-label="扫码查询" :context-key="auth.factoryId + ':' + auth.revision" @confirm="scanned" />
-  <el-dialog v-model="visible" title="生产执行身份查询" width="min(640px, 94vw)" append-to-body :before-close="close">
+  <PageDialog v-model="visible" title="生产执行身份查询" width="min(640px, 94vw)" append-to-body :before-close="close">
     <QueryForm @submit="resolve()">
       <el-form-item label="执行身份码">
         <el-input v-model="code" placeholder="工单号:品号#批次号，例如 WO001:P001#LOT001" maxlength="2048" :disabled="loading" />
@@ -87,5 +89,5 @@ function open() {
     </el-descriptions>
     <el-button v-if="selectable && result" type="primary" @click="emit('selected', result); clear()">使用此执行单元</el-button>
     <OperatorConfiguration v-if="result && !selectable" :execution-id="result.executionId" :context-label="result.executionId" />
-  </el-dialog>
+  </PageDialog>
 </template>

@@ -1,6 +1,6 @@
 <template>
   <!-- 授权用户 -->
-  <el-dialog
+  <PageDialog
     v-model="visible"
     title="选择用户"
     width="1100px"
@@ -112,13 +112,16 @@
       <el-button type="primary" @click="handleSelectUser">确 定</el-button>
       <el-button @click="visible = false">取 消</el-button>
     </div></template>
-  </el-dialog>
+  </PageDialog>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { unallocatedUserList, authUserSelectAll } from '@/api/system/role'
 import { treeselect } from '@/api/system/dept'
 export default {
+  components: { PageDialog },
   props: {
     // 角色编号
     roleId: {

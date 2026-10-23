@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
-import { ElMessageBox } from 'element-plus'
+
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import { scanExecution, type ScanInputMethod } from '@/api/production/productionScan'
 import type { ProductionIdentity } from '@/api/production/productionIdentity'
@@ -9,6 +11,8 @@ import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import { qualityV2 as api, wasteLabels, type Declaration, type DeclarationContext, type WasteCategory } from '@/api/quality/qualityV2'
 import type { Node } from '@/api/quality/productionDefect'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ executionId?: string; nodeId?: string }>()
 const emit = defineEmits<{ saved: []; pending: [value:boolean]; dirty: [value:boolean] }>()
 const auth = useAuth(), allowed = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission('business:quality:defect:create', 'factory'))

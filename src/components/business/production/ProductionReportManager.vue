@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { ApiError } from '@/lib/request'
 import { useAuth } from '@/stores/auth'
 import Pagination from '@/components/Pagination/index.vue'
 import { executionActions, type PathView } from '@/api/production/executionActions'
 import { productionReport as api, reportPermissions, type ExecutionQuantity, type NodeQuantity, type Ledger, type Detail, type HistoricalUser } from '@/api/production/productionReport'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ executionId: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref('')
@@ -198,13 +204,13 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
    </template>
   </section>
  </section>
- <el-dialog v-model="historyVisible" title="原始报工与调整历史" width="min(1040px, 94vw)" append-to-body destroy-on-close @close="closeHistory">
+ <PageDialog v-model="historyVisible" title="原始报工与调整历史" width="min(1040px, 94vw)" append-to-body destroy-on-close @close="closeHistory">
   <el-alert v-if="historyError" :title="historyError" type="error" :closable="false" />
   <p v-if="detail">原始流水 {{ detail.record.id }} · 原始数量 <QuantityText :value="detail.record.quantityDelta" /> · 当前有效余额 <QuantityText :value="detail.originalEffectiveQty" /> · 操作人 {{ person(detail.record.operatorName,detail.record.operatorUserId) }}</p>
   <el-table v-loading="historyLoading" :data="history" border empty-text="暂无调整记录"><el-table-column prop="id" label="流水编号" /><el-table-column :formatter="quantityColumn" prop="quantityDelta" label="调整数量" /><el-table-column label="订正提交人"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column><el-table-column label="订正时间" min-width="180"><template #default="{row}">{{ time(row.createTime) }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" /></el-table>
   <Pagination v-model:page="historyPage" v-model:limit="historyLimit" :total="historyTotal" :auto-scroll="false" @pagination="loadHistory()" />
- </el-dialog>
- <el-dialog :model-value="Boolean(command)" :title="commandTitle" width="min(640px, 94vw)" append-to-body destroy-on-close :before-close="closeCommand" :show-close="!saving" :close-on-click-modal="!saving" :close-on-press-escape="!saving" @update:model-value="setCommandVisible">
+ </PageDialog>
+ <PageDialog :model-value="Boolean(command)" :title="commandTitle" width="min(640px, 94vw)" append-to-body destroy-on-close :before-close="closeCommand" :show-close="!saving" :close-on-click-modal="!saving" :close-on-press-escape="!saving" @update:model-value="setCommandVisible">
   <el-alert v-if="commandError" :title="commandError" type="error" :closable="false" />
   <p>{{ quantity?.executionId }} · {{ node?.code }} · {{ node?.name || '工序名称未记录' }}</p>
   <p v-if="original">原始流水：{{ original.id }}，原始报工量：<QuantityText :value="original.quantityDelta" />。调整继承原操作人员及实际生产时间。</p>
@@ -219,7 +225,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
    <el-form-item label="操作原因" required><el-input v-model="form.reason" type="textarea" :maxlength="500" show-word-limit /></el-form-item>
   </el-form>
   <template #footer><el-button :disabled="saving" @click="closeCommand()">取消</el-button><el-button type="primary" :loading="saving" @click="save">{{ command === 'void' ? '确认整笔冲销' : '追加数量流水' }}</el-button></template>
- </el-dialog>
+ </PageDialog>
 </template>
 <style scoped>
 .report-command :deep(.el-select__input:focus-visible), .report-command :deep(.el-input__inner:focus-visible) { outline: none; }

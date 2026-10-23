@@ -78,12 +78,12 @@
       <right-toolbar v-model:show-search="showSearch" @query-table="getList" />
     </el-row>
 
-    <el-dialog v-model="codeOpen" title="验证平台编码规则" width="520px" append-to-body>
+    <PageDialog v-model="codeOpen" title="验证平台编码规则" width="520px" append-to-body>
       <p>规则：{{ codeRule.ruleName }}（{{ codeRule.ruleCode }}）</p>
       <el-input v-model="codeInput" maxlength="64" placeholder="输入字符（仅输入字符组成或按字符循环时需要）" />
       <el-alert v-if="generatedCode" :title="generatedCode" type="success" :closable="false" style="margin-top:16px" />
       <template #footer><el-button @click="codeOpen=false">关闭</el-button><el-button :loading="codeLoading" @click="testCode(false)">预览（不占用流水号）</el-button><el-button v-hasPermi="['system:autocode:rule:generate']" type="primary" :loading="codeLoading" @click="testCode(true)">生成并登记</el-button></template>
-    </el-dialog>
+    </PageDialog>
     <el-table v-loading="loading" :data="ruleList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="规则编号" align="center" width="210px" prop="ruleCode">
@@ -139,7 +139,7 @@
     />
 
     <!-- 添加或修改参数配置对话框 -->
-    <el-dialog v-model="open" :title="title" width="500px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="规则编码" prop="ruleCode">
           <el-input v-model="form.ruleCode" placeholder="请输入规则编码" />
@@ -185,16 +185,19 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import request from '@/utils/request'
 import { listRule, getRule, delRule, addRule, updateRule } from '@/api/system/autocode/rule'
 
 export default {
+  components: { PageDialog },
   name: 'AutoCodeRule',
   dicts: ['sys_yes_no'],
   data() {

@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
 
 import { useAuth } from '@/stores/auth'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
@@ -10,6 +13,8 @@ import BomVersionSelect from '@/components/business/material/BomVersionSelect.vu
 import UnitMeasureSelect from '@/components/business/material/UnitMeasureSelect.vue'
 import { bomApi, type Bom } from '@/api/basic/materialBom'
 import { workorderMaterial, type WorkorderMaterial } from '@/api/production/workorderMaterial'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ workorderId: string; productId: string; readonly?: boolean }>(), auth = useAuth()
 const data = ref<WorkorderMaterial | null>(null), bom = ref<Bom | null>(null), bomError = ref(''), error = ref(''), busy = ref(false), editing = ref(false)
 const form = reactive({ bomId: null as string | null, warehouseIds: [] as string[], workCenter: '', enabled: true })
@@ -63,7 +68,7 @@ onBeforeUnmount(clear)
    <el-descriptions-item label="保存时计划 / 材料需求"><QuantityText :value="data.plannedQty" /> / <QuantityText :value="data.totalRequiredQty" /></el-descriptions-item>
   </el-descriptions>
   <el-alert v-if="bomError" :title="bomError" type="error" :closable="false"><el-button link @click="loadBom">重试BOM名称</el-button></el-alert>
-  <el-dialog v-model="editing" title="选择工单BOM用料" width="min(760px,94vw)" append-to-body :before-close="closeEditor">
+  <PageDialog v-model="editing" title="选择工单BOM用料" width="min(760px,94vw)" append-to-body :before-close="closeEditor">
    <el-form v-if="canWrite()" label-width="120px" :disabled="busy">
     <el-form-item label="已发布BOM"><BomVersionSelect v-model="form.bomId" :material-id="productId" placeholder="明确选择本工单的已发布BOM版本" /></el-form-item>
     <el-form-item label="允许领料仓库"><WarehouseSelect v-for="(_, index) in form.warehouseIds" :key="index" v-model="form.warehouseIds[index]" source="LOCAL" /><el-button @click="form.warehouseIds.push('')">添加仓库</el-button><el-button :disabled="!form.warehouseIds.length" @click="form.warehouseIds.pop()">移除末项</el-button></el-form-item>
@@ -71,6 +76,6 @@ onBeforeUnmount(clear)
     <el-alert title="当前正式领料要求一个直接组件。比例和基本单位取自BOM，累计领料不得超过计划额度；已有正式领料后保留原依据。" type="info" :closable="false" />
     <el-button type="primary" :loading="busy" @click="save">保存工单用料</el-button>
    </el-form>
-  </el-dialog>
+  </PageDialog>
  </section>
 </template>

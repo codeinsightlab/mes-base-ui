@@ -150,7 +150,7 @@
     />
 
     <!-- 添加或修改消息对话框 -->
-    <el-dialog v-model="open" :title="title" width="960px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="960px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="8">
@@ -212,17 +212,19 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listMessage, getMessage, delMessage, addMessage, updateMessage } from '@/api/system/message'
 import UserSingleSelect from '@/components/userSelect/single.vue'
 export default {
   name: 'Message',
-  components: { UserSingleSelect },
+  components: { PageDialog, UserSingleSelect },
   dicts: ['sys_message_type', 'sys_message_status', 'sys_message_level'],
   data() {
     return {

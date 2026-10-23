@@ -1,11 +1,15 @@
 <!-- SOURCE_PRODUCT_PORT: ktg-mes-ui/src/views/register.vue account, confirmation, captcha and success-to-login flow. -->
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+
 import { request } from '@/lib/request'
 import { loadLoginOptions } from '@/api/loginOptions'
 import { passwordError, type PasswordPolicy } from '@/utils/passwordPolicy'
+const ElMessageBox = usePageMessageBox()
+
 
 interface Options { captchaOnOff: boolean; registrationEnabled: boolean; passwordPolicy: PasswordPolicy; uuid?: string; img?: string }
 const router = useRouter(), form = ref({ username: '', password: '', confirmPassword: '', code: '', uuid: '' })

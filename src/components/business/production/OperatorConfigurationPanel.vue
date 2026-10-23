@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import OperatorConfiguration from './OperatorConfiguration.vue'
 import CrudPage from '@/components/CrudPage.vue'
 import { useAuth } from '@/stores/auth'
@@ -8,6 +10,8 @@ import { api as capabilityApi } from '@/api/production/mesOperationUser'
 import { api as assignmentApi } from '@/api/production/mesExecutionAssignment'
 import { operatorConfiguration, type UserOption, type AssignmentNode } from '@/api/production/operatorConfiguration'
 import type { Field } from '@/lib/crud'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ operationId?: string; executionId?: string; contextLabel?: string; triggerLabel?: string }>()
 const emit = defineEmits<{ changed: []; pending: [value: boolean]; busy: [value: boolean] }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref(''), keyword = ref('')

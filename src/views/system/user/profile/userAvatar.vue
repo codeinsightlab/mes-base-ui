@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="user-info-head" @click="editCropper()"><img :src="options.img" title="点击上传头像" class="img-circle img-lg"></div>
-    <el-dialog v-model="open" :title="title" width="800px" append-to-body @opened="modalOpened" @close="closeDialog">
+    <PageDialog v-model="open" :title="title" width="800px" append-to-body @opened="modalOpened" @close="closeDialog">
       <el-row>
         <el-col :xs="24" :md="12" :style="{height: '350px'}">
           <vue-cropper
@@ -48,11 +48,13 @@
           <el-button type="primary" size="small" @click="uploadImg()">提 交</el-button>
         </el-col>
       </el-row>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { useAuth } from '@/stores/auth'
 import { requestBlob } from '@/lib/request'
 import 'vue-cropper/dist/index.css'
@@ -60,7 +62,7 @@ import { VueCropper } from 'vue-cropper'
 import { uploadAvatar } from '@/api/system/user'
 
 export default {
-  components: { VueCropper },
+  components: { PageDialog, VueCropper },
   props: {
     user: {
       type: Object,

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { capability, preview, sync, type SyncResult, type Capability, type Preview, type PreviewKind } from '@/api/production/e10Preview'
 import { useAuth } from '@/stores/auth'
@@ -65,7 +67,7 @@ async function run(commit = false) {
 <template>
   <el-button v-if="allowed && support?.supported" @click="visible = true">ERP同步准备</el-button>
   <span v-if="allowed && !visible && error" role="alert">{{ error }}</span>
-  <el-dialog v-model="visible" title="ERP同步准备" width="min(1100px, 94vw)" destroy-on-close>
+  <PageDialog v-model="visible" title="ERP同步准备" width="min(1100px, 94vw)" destroy-on-close>
     <el-alert title="同步按当前工厂的受管身份和映射契约执行；缺少证据的记录会被阻断。Dry Run 不写业务数据。" type="warning" :closable="false" />
     <ul><li v-for="reason in support?.blockers" :key="reason">{{ reason }}</li></ul>
     <div class="table-toolbar">
@@ -111,5 +113,5 @@ async function run(commit = false) {
       </el-table>
     </template>
     <template #footer><el-button @click="visible = false">关闭</el-button></template>
-  </el-dialog>
+  </PageDialog>
 </template>

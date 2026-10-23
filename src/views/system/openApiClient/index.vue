@@ -42,16 +42,16 @@
     </el-table>
     <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" :page-sizes="[10, 20, 50, 100]" @pagination="getList" />
 
-    <el-dialog v-model="createOpen" title="新建 OpenAPI 应用" width="520px" :close-on-click-modal="false" @closed="clearCreate">
+    <PageDialog v-model="createOpen" title="新建 OpenAPI 应用" width="520px" :close-on-click-modal="false" @closed="clearCreate">
       <el-form ref="createForm" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="应用名称" prop="clientName"><el-input v-model="form.clientName" maxlength="100" /></el-form-item>
         <el-form-item label="备注" prop="remark"><el-input v-model="form.remark" type="textarea" maxlength="500" show-word-limit /></el-form-item>
       </el-form>
       <el-alert title="创建后默认禁用，请配置授权后手工启用。" type="info" :closable="false" />
       <template #footer><el-button :disabled="busy" @click="createOpen = false">取消</el-button><el-button type="primary" :loading="busy" @click="handleCreate">创建</el-button></template>
-    </el-dialog>
+    </PageDialog>
 
-    <el-dialog v-model="detailOpen" title="应用详情" width="650px">
+    <PageDialog v-model="detailOpen" title="应用详情" width="650px">
       <el-descriptions v-if="detail" :column="1" border>
         <el-descriptions-item label="应用名称">{{ detail.clientName }}</el-descriptions-item>
         <el-descriptions-item label="appKey">{{ detail.appKey }}</el-descriptions-item>
@@ -60,18 +60,18 @@
         <el-descriptions-item label="更新时间">{{ parseTime(detail.updateTime) }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ detail.remark }}</el-descriptions-item>
       </el-descriptions>
-    </el-dialog>
+    </PageDialog>
 
-    <el-dialog v-model="secretOpen" title="一次性凭证" width="700px" :close-on-click-modal="false" :before-close="closeSecret" @closed="clearSecret">
+    <PageDialog v-model="secretOpen" title="一次性凭证" width="700px" :close-on-click-modal="false" :before-close="closeSecret" @closed="clearSecret">
       <el-alert title="Secret 仅本次展示，关闭后无法再次查看，请妥善保存。" type="warning" :closable="false" />
       <el-form v-if="secret" label-width="90px" class="credentials">
         <el-form-item label="appKey"><el-input :model-value="secret.appKey" readonly><template #append><el-button @click="copyCredential('appKey')">复制</el-button></template></el-input></el-form-item>
         <el-form-item label="appSecret"><el-input :model-value="secret.appSecret" readonly><template #append><el-button @click="copyCredential('appSecret')">复制</el-button></template></el-input></el-form-item>
       </el-form>
       <template #footer><el-button type="primary" @click="closeSecret">已保存，关闭</el-button></template>
-    </el-dialog>
+    </PageDialog>
 
-    <el-dialog
+    <PageDialog
       v-model="apisOpen"
       title="接口授权"
       width="800px"
@@ -145,15 +145,18 @@
           <el-button type="primary" :loading="busy" @click="saveApis">保存授权</el-button>
         </div>
       </div></template>
-    </el-dialog>
+    </PageDialog>
 
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { listClients, getClient, createClient, changeStatus, resetSecret, getApiCatalog, getClientApis, replaceClientApis, getDataScope } from '@/api/system/openApiClient'
 
 export default {
+  components: { PageDialog },
   name: 'OpenApiClient',
   beforeRouteLeave(to, from, next) { this.disposeSecrets(); next() },
   data() {

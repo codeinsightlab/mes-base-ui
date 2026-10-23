@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { useDruidMonitor } from '@/composables/useDruidMonitor'
@@ -46,6 +48,6 @@ const poolFields = [
         <el-empty v-else-if="!detailLoading && !detailError" description="选择数据源查看监控" />
       </section>
     </div>
-    <el-dialog :model-value="!!sqlDetail" title="SQL 统计详情" width="760px" @close="sqlDetail = null"><template v-if="sqlDetail"><pre class="druid-sql-template">{{ sqlDetail.sql }}</pre><el-descriptions :column="2" border><el-descriptions-item label="统计编号"><CodeText :value="sqlDetail.id" /></el-descriptions-item><el-descriptions-item label="执行次数"><MetricValue :value="sqlDetail.executeCount" /></el-descriptions-item><el-descriptions-item label="正在执行"><MetricValue :value="sqlDetail.runningCount" /></el-descriptions-item><el-descriptions-item label="最大并发"><MetricValue :value="sqlDetail.concurrentMax" /></el-descriptions-item><el-descriptions-item label="更新行数"><MetricValue :value="sqlDetail.updateCount" /></el-descriptions-item><el-descriptions-item label="读取行数"><MetricValue :value="sqlDetail.fetchRowCount" /></el-descriptions-item><el-descriptions-item label="最近执行">{{ parseTime(sqlDetail.lastExecuteAt) || '暂无记录' }}</el-descriptions-item><el-descriptions-item label="最近错误">{{ parseTime(sqlDetail.lastErrorAt) || '暂无记录' }}</el-descriptions-item></el-descriptions></template><template #footer><el-button @click="sqlDetail = null">关闭</el-button></template></el-dialog>
+    <PageDialog :model-value="!!sqlDetail" title="SQL 统计详情" width="760px" @close="sqlDetail = null"><template v-if="sqlDetail"><pre class="druid-sql-template">{{ sqlDetail.sql }}</pre><el-descriptions :column="2" border><el-descriptions-item label="统计编号"><CodeText :value="sqlDetail.id" /></el-descriptions-item><el-descriptions-item label="执行次数"><MetricValue :value="sqlDetail.executeCount" /></el-descriptions-item><el-descriptions-item label="正在执行"><MetricValue :value="sqlDetail.runningCount" /></el-descriptions-item><el-descriptions-item label="最大并发"><MetricValue :value="sqlDetail.concurrentMax" /></el-descriptions-item><el-descriptions-item label="更新行数"><MetricValue :value="sqlDetail.updateCount" /></el-descriptions-item><el-descriptions-item label="读取行数"><MetricValue :value="sqlDetail.fetchRowCount" /></el-descriptions-item><el-descriptions-item label="最近执行">{{ parseTime(sqlDetail.lastExecuteAt) || '暂无记录' }}</el-descriptions-item><el-descriptions-item label="最近错误">{{ parseTime(sqlDetail.lastErrorAt) || '暂无记录' }}</el-descriptions-item></el-descriptions></template><template #footer><el-button @click="sqlDetail = null">关闭</el-button></template></PageDialog>
   </div>
 </template>

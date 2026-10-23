@@ -118,7 +118,7 @@
     />
 
     <!-- 添加或修改参数配置对话框 -->
-    <el-dialog v-model="open" :title="title" width="900px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="900px" append-to-body>
       <el-form ref="form" class="filter-panel" :model="form" :inline="true" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="12">
@@ -216,15 +216,18 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listPart, getPart, delPart, addPart, updatePart } from '@/api/system/autocode/part'
 
 export default {
+  components: { PageDialog },
   name: 'Part',
   dicts: ['sys_autocode_cyclemethod', 'sys_autocode_parttype'],
   data() {

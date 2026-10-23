@@ -126,7 +126,7 @@
     />
 
     <!-- 添加或修改岗位对话框 -->
-    <el-dialog v-model="open" :title="title" width="500px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="岗位名称" prop="postName">
           <el-input v-model="form.postName" placeholder="请输入岗位名称" />
@@ -154,15 +154,18 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listPost, getPost, delPost, addPost, updatePost } from '@/api/system/post'
 
 export default {
+  components: { PageDialog },
   name: 'Post',
   dicts: ['sys_normal_disable'],
   data() {

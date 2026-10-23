@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { computed, ref } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useAuth } from '@/stores/auth'
 import type { Row } from '@/lib/crud'
 import { voidMaterialIssue } from '@/api/issue/mesMaterialIssue'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ row: Row; refresh: () => Promise<void>; dirty: boolean }>()
 const auth = useAuth(), busy = ref(false), error = ref('')
 const allowed = computed(() => auth.hasPermission('business:mes:material:issue:void', 'factory'))

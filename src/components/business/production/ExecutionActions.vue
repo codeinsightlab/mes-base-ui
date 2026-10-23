@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { executionActions, type PathView } from '@/api/production/executionActions'
@@ -38,7 +40,7 @@ function add() { if(next.value && editable.value && !busy.value) { selected.valu
 </script>
 <template>
  <el-button v-if="can('query')" text @click="load">路径与开工</el-button>
- <el-dialog v-model="open" title="执行路径与开工" width="680px" append-to-body destroy-on-close @closed="closed">
+ <PageDialog v-model="open" title="执行路径与开工" width="680px" append-to-body destroy-on-close @closed="closed">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
   <section v-if="view" v-loading="busy">
    <p>执行状态：{{ view.executionStatus }} · 路径：{{ view.pathStatus === 'LOCKED' ? '已锁定' : view.pathStatus === 'SELECTED' ? '已选择，待领料确认' : '未选择' }}</p>
@@ -54,5 +56,5 @@ function add() { if(next.value && editable.value && !busy.value) { selected.valu
    <el-button v-if="can('start') && view.executionStatus === 'READY'" type="success" :disabled="view.pathStatus !== 'LOCKED' || busy" @click="run(true)">开工</el-button>
    <p v-if="view.executionStatus === 'RUNNING'" role="status">执行已开工 · RUNNING</p>
   </section>
- </el-dialog>
+ </PageDialog>
 </template>

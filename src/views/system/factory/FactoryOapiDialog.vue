@@ -1,5 +1,5 @@
 <template>
-  <el-dialog :model-value="true" title="鼎捷 E10 OAPI 配置" width="760px" :close-on-click-modal="false" :close-on-press-escape="!saving" :show-close="!saving" @close="emit('close')">
+  <PageDialog :model-value="true" title="鼎捷 E10 OAPI 配置" width="760px" :close-on-click-modal="false" :close-on-press-escape="!saving" :show-close="!saving" @close="emit('close')">
     <p class="secondary">工厂：{{ factory.factoryName }}（{{ factory.factoryId }}） · 当前模式：{{ factory.runtimeMode === 'ERP' ? 'ERP' : '独立 MES' }}</p>
     <el-alert title="保存连接参数不会切换工厂运行模式，也不会向 ERP 发送请求。" type="info" :closable="false" />
     <p v-if="error" role="alert" class="secondary">{{ error }} <el-button v-if="!loaded" link @click="load">重试</el-button></p>
@@ -29,10 +29,12 @@
       <el-button :disabled="saving" @click="emit('close')">关闭</el-button>
       <el-button v-if="loaded && !locked" type="primary" :loading="saving" @click="save">保存配置</el-button>
     </template>
-  </el-dialog>
+  </PageDialog>
 </template>
 
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { ElMessage, type FormInstance } from 'element-plus'

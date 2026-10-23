@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { ref } from 'vue'
 import type { useTableColumns } from '@/lib/useTableColumns'
 const props = defineProps<{ controller: ReturnType<typeof useTableColumns> }>()
@@ -11,7 +13,7 @@ function drop(key: string) { props.controller.move(dragging.value, key); draggin
 </script>
 <template>
   <el-button :disabled="!controller.available.value || controller.state.loading" @click="controller.edit">列配置</el-button>
-  <el-dialog v-model="controller.state.open" title="个人列配置" width="min(520px,92vw)"
+  <PageDialog v-model="controller.state.open" title="个人列配置" width="min(520px,92vw)"
              :close-on-click-modal="!controller.state.busy" :close-on-press-escape="!controller.state.busy"
              :show-close="!controller.state.busy">
     <p class="secondary">勾选显示列，拖动调整顺序。选择框和操作列保持固定。</p>
@@ -33,7 +35,7 @@ function drop(key: string) { props.controller.move(dragging.value, key); draggin
       <el-button :disabled="controller.state.busy" @click="controller.cancel">取消</el-button>
       <el-button type="primary" :loading="controller.state.busy" @click="controller.save">保存</el-button>
     </template>
-  </el-dialog>
+  </PageDialog>
 </template>
 <style scoped>
 .column-settings-list { padding: 0; list-style: none; }

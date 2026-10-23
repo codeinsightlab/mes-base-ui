@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import QueryForm from '@/components/QueryForm.vue'
 
 import ColumnSettings from '@/components/ColumnSettings.vue'
@@ -13,11 +17,13 @@ import Pagination from '@/components/Pagination/index.vue'
 import { computed, reactive, ref, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { routeLocationKey } from 'vue-router'
 import { isPlatformMenu } from '@/lib/menuWorkspaces'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useAuth } from '@/stores/auth'
 import { commandFromDraft, formatValue } from '@/lib/crud'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import type { PermissionScope } from '@/lib/request'
+const ElMessageBox = usePageMessageBox()
+
 
 const props = withDefaults(defineProps<{
   embedded?: boolean;
@@ -380,7 +386,7 @@ defineExpose({ load })
       :auto-scroll="false"
       @pagination="load"
     />
-    <el-dialog
+    <PageDialog
       v-model="dialog"
       :title="editId?'编辑'+title:'新增'+title"
       :width="editorWidth || 'min(640px,92vw)'"
@@ -402,6 +408,6 @@ defineExpose({ load })
         <el-button :disabled="saving || editorBusy" @click="closeEditor()">{{ keepEditorOpen ? '关闭' : '取消' }}</el-button>
         <el-button type="primary" :loading="saving" :disabled="!writeAllowed || editorBusy" @click="save">{{ saveLabel || '保存' }}</el-button>
       </template>
-    </el-dialog>
+    </PageDialog>
   </section>
 </template>

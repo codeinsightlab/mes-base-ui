@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import ScopeTag from '@/components/ScopeTag.vue'
 import QueryForm from '@/components/QueryForm.vue'
@@ -18,6 +22,8 @@ import { qualityStateLabel, qualityStateTone, qualityReceiptLabel, positiveQuant
 import { parseTime } from '@/utils/ruoyi'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
+const ElMessageBox = usePageMessageBox()
+
 const auth=useAuth(), can=(key:keyof typeof defectPermissions)=>auth.hasPermission(defectPermissions[key],'factory')
 const access=computed(()=>[can('read'),can('create'),can('revise'),can('void')].join(','))
 const rows=ref<Version[]>([]),total=ref(0),page=ref(1),limit=ref(20),loading=ref(false),error=ref('')
@@ -74,13 +80,13 @@ void load()
    <Pagination v-model:page="page" v-model:limit="limit" :total="total" @pagination="load" />
   </template>
   <DefectStatisticsPanel v-else :execution-id="execution" />
-  <el-dialog v-model="declarationOpen" title="登记不良" width="min(650px,96vw)" :before-close="closeDeclaration" destroy-on-close><DefectDeclarationPanel v-if="declarationOpen" :execution-id="execution||undefined" @saved="load" @pending="declarationPending=$event" @dirty="declarationDirty=$event"/></el-dialog>
-  <el-dialog v-model="historyOpen" title="不良详情" width="min(960px,96vw)" :before-close="closeHistory" destroy-on-close>
+  <PageDialog v-model="declarationOpen" title="登记不良" width="min(650px,96vw)" :before-close="closeDeclaration" destroy-on-close><DefectDeclarationPanel v-if="declarationOpen" :execution-id="execution||undefined" @saved="load" @pending="declarationPending=$event" @dirty="declarationDirty=$event"/></PageDialog>
+  <PageDialog v-model="historyOpen" title="不良详情" width="min(960px,96vw)" :before-close="closeHistory" destroy-on-close>
    <QualityTreatmentPanel v-if="historyOpen&&detailRecord" :declaration-id="detailRecord.declarationId" :record="detailRecord" :candidates="rows" :initial-action="initialAction" @changed="onChanged" @pending="treatmentPending=$event" @dirty="treatmentDirty=$event"><template #versions><el-alert v-if="historyError" :title="historyError" type="error"/><el-table :data="history" row-key="id"><el-table-column prop="revisionNo" label="版本" width="65"/><el-table-column label="操作" width="100"><template #default="{row}">{{versionAction(row.recordAction)}}</template></el-table-column><el-table-column label="申报数量" width="105"><template #default="{row}"><QuantityText :value="row.defectQty"/></template></el-table-column><el-table-column prop="revisionReason" label="操作原因" min-width="140"/><el-table-column prop="recordedByName" label="操作人" width="100"/><el-table-column label="时间" min-width="160"><template #default="{row}">{{parseTime(row.recordedAt)}}</template></el-table-column></el-table><Pagination v-model:page="historyPage" :total="historyTotal" :limit="20" @pagination="loadHistory"/></template></QualityTreatmentPanel>
-  </el-dialog>
-  <el-dialog v-model="open" :title="mode==='revise'?'订正不良申报':'作废不良申报'" width="min(560px,94vw)" :before-close="closeDialog" destroy-on-close>
+  </PageDialog>
+  <PageDialog v-model="open" :title="mode==='revise'?'订正不良申报':'作废不良申报'" width="min(560px,94vw)" :before-close="closeDialog" destroy-on-close>
    <el-alert v-if="formError" :title="formError" type="error" :closable="false"/><el-form label-position="top" :disabled="busy||!!pendingEdit||editBlocked" @submit.prevent="submit"><template v-if="mode==='revise'"><el-form-item label="不良数量" required><el-input v-model="form.defectQty" inputmode="decimal"/></el-form-item><el-form-item label="不良原因" required><el-input v-model="form.defectReason" type="textarea" maxlength="500"/></el-form-item><el-form-item label="责任人"><PersonnelSelect v-model="form.responsibleUserId"/></el-form-item><el-form-item label="责任说明"><el-input v-model="form.responsibilityRemark" maxlength="500"/></el-form-item></template><p v-else>作废后，此申报不再计入有效不良，原操作记录保留。</p><el-form-item label="操作原因" required><el-input v-model="reason" type="textarea" maxlength="500"/></el-form-item></el-form><template #footer><el-button :disabled="busy||!!pendingEdit" @click="closeDialog()">取消</el-button><el-button type="primary" :loading="busy" :disabled="editBlocked" @click="submit">{{pendingEdit?'核对原请求结果':mode==='revise'?'保存订正':'确认作废'}}</el-button></template>
-  </el-dialog>
+  </PageDialog>
  </div>
 </template>
 <style scoped>

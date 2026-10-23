@@ -105,7 +105,7 @@
     </el-table>
 
     <!-- 添加或修改菜单对话框 -->
-    <el-dialog v-model="open" :title="title" width="680px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="680px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
@@ -265,11 +265,13 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listMenu, getMenu, delMenu, addMenu, updateMenu } from '@/api/system/menu'
 import Treeselect from '@/components/Treeselect/index.vue'
@@ -279,7 +281,7 @@ import IconSelect from '@/components/IconSelect/index.vue'
 export default {
   name: 'SystemMenu',
   dicts: ['sys_show_hide', 'sys_normal_disable'],
-  components: { Treeselect, IconSelect },
+  components: { PageDialog, Treeselect, IconSelect },
   data() {
     return {
       queryError: '',

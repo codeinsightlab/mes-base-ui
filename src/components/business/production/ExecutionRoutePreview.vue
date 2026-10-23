@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { executionActions, type PathView } from '@/api/production/executionActions'
@@ -32,7 +34,7 @@ async function open() {
 </script>
 <template>
  <el-button v-if="allowed" link type="primary" @click="open">实际工艺路线</el-button>
- <el-dialog v-model="visible" title="执行单元实际工艺路线" width="min(1180px,96vw)" append-to-body destroy-on-close @close="clear">
+ <PageDialog v-model="visible" title="执行单元实际工艺路线" width="min(1180px,96vw)" append-to-body destroy-on-close @close="clear">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
   <section v-if="view" v-loading="loading">
    <p><strong>{{ view.executionId }}</strong> · {{ view.routingCode }} / V{{ view.routingVersion }} · 工艺版本 ID：{{ view.routingId }}</p>
@@ -44,5 +46,5 @@ async function open() {
    <p class="secondary">此处仅查看路线；路径选择和开工在生产执行页面操作。</p>
   </section>
   <p v-else-if="loading" role="status">正在读取执行路线…</p>
- </el-dialog>
+ </PageDialog>
 </template>

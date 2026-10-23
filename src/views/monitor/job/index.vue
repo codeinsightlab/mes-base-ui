@@ -161,12 +161,12 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="stateOpen" title="运行状态与受控恢复" width="600px" append-to-body>
+    <PageDialog v-model="stateOpen" title="运行状态与受控恢复" width="600px" append-to-body>
       <el-descriptions :column="1" border><el-descriptions-item label="任务">{{ stateJob.jobName }}</el-descriptions-item><el-descriptions-item label="运行令牌">{{ runState.runToken||'未占用' }}</el-descriptions-item><el-descriptions-item label="领取时间">{{ parseTime(runState.startedAt) }}</el-descriptions-item><el-descriptions-item label="状态">{{ runState.status==='1'?'已暂停':'已启用' }}</el-descriptions-item></el-descriptions>
       <el-alert v-if="runState.runToken" type="warning" :closable="false" title="仅在任务已暂停、占用超过5分钟，且原执行进程已经停止时恢复。恢复记录结果为UNKNOWN。" style="margin:16px 0" />
       <el-checkbox v-if="runState.runToken" v-model="confirmedDead">已确认原执行进程停止</el-checkbox>
       <template #footer><el-button @click="stateOpen=false">关闭</el-button><el-button :loading="stateLoading" @click="inspectRun(stateJob)">刷新状态</el-button><el-button v-if="runState.runToken" v-hasPermi="['monitor:job:changeStatus']" type="danger" :disabled="!confirmedDead||runState.status!=='1'" :loading="stateLoading" @click="recoverRun">确认恢复占用</el-button></template>
-    </el-dialog>
+    </PageDialog>
     <pagination
       v-show="total>0"
       v-model:page="queryParams.pageNum"
@@ -176,7 +176,7 @@
     />
 
     <!-- 添加或修改定时任务对话框 -->
-    <el-dialog v-model="open" :title="title" width="800px" append-to-body>
+    <PageDialog v-model="open" :title="title" width="800px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="120px">
         <el-row>
           <el-col :span="12">
@@ -246,14 +246,14 @@
         <el-button type="primary" @click="submitForm">确 定</el-button>
         <el-button @click="cancel">取 消</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
 
-    <el-dialog v-model="openCron" title="Cron表达式生成器" append-to-body destroy-on-close class="scrollbar">
+    <PageDialog v-model="openCron" title="Cron表达式生成器" append-to-body destroy-on-close class="scrollbar">
       <crontab :expression="expression" @hide="openCron=false" @fill="crontabFill" />
-    </el-dialog>
+    </PageDialog>
 
     <!-- 任务日志详细 -->
-    <el-dialog v-model="openView" title="任务详细" width="700px" append-to-body>
+    <PageDialog v-model="openView" title="任务详细" width="700px" append-to-body>
       <el-form ref="form" :model="form" label-width="120px" size="small">
         <el-row>
           <el-col :span="12">
@@ -298,11 +298,13 @@
       <template #footer><div class="dialog-footer">
         <el-button @click="openView = false">关 闭</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { useAuth } from '@/stores/auth'
 import request from '@/utils/request'
@@ -311,7 +313,7 @@ import Crontab from '@/components/Crontab/index.vue'
 
 export default {
   name: 'Job',
-  components: { Crontab },
+  components: { PageDialog, Crontab },
   dicts: ['sys_job_group', 'sys_job_status'],
   data() {
     return {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDrawer from '@/components/page/PageDrawer.vue'
+
 import { executionStatusLabel } from '@/lib/production/executionState'
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import QuantityText from '@/components/business/production/QuantityText.vue'
@@ -35,7 +37,7 @@ function close(done:()=>void){clear();done()}
 </script>
 <template>
  <el-button v-if="readable" link type="primary" @click="open">入库进度</el-button>
- <el-drawer v-model="visible" title="生产数量与入库收尾" size="min(1160px,96vw)" append-to-body destroy-on-close :before-close="close">
+ <PageDrawer v-model="visible" title="生产数量与入库收尾" size="min(1160px,96vw)" append-to-body destroy-on-close :before-close="close">
   <el-alert v-if="loadError" :title="loadError" type="error" :closable="false"/>
   <div v-if="!data" v-loading="loading"><el-button v-if="loadError" @click="load">重试读取</el-button></div>
   <section v-if="data" v-loading="loading">
@@ -51,5 +53,5 @@ function close(done:()=>void){clear();done()}
    <div class="table-toolbar"><el-button :disabled="rechecking||loading" @click="load">刷新入库数量</el-button><el-button v-if="canRecheck" :loading="rechecking" :disabled="loading" @click="recheck">{{data.status==='FULLY_RECEIVED'?'复查工单收尾':'复查入库收尾'}}</el-button><router-link v-if="inboundPath&&data.status!=='FULLY_RECEIVED'" :to="{path:inboundPath,query:{executionId:id}}">办理入库单</router-link></div>
    <el-alert v-if="recheckMessage" :title="recheckMessage" type="info" :closable="false"/>
   </section>
- </el-drawer>
+ </PageDrawer>
 </template>

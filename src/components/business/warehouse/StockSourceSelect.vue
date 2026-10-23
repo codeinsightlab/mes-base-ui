@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+
 import { api, type WmInventoryVo } from '@/api/wm/wmInventory'
 import { api as materials } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
+const ElMessageBox = usePageMessageBox()
+
 const props=defineProps<{modelValue?:string|null;materialId?:string|null;warehouseId?:string|null;disabled?:boolean;receipt?:boolean}>()
 const emit=defineEmits<{'update:modelValue':[string|null];selected:[WmInventoryVo,string]}>()
 const auth=useAuth(),rows=ref<WmInventoryVo[]>([]),loading=ref(false),error=ref(''),offset=ref(0),total=ref(0)
@@ -44,9 +50,9 @@ onBeforeUnmount(clear)
  <el-button v-if="rows.length<total" link :disabled="loading" @click="load(true)">加载更多</el-button>
  <el-button v-if="receipt&&allowed&&auth.hasPermission('business:wm:inventory:create','factory')" link :disabled="disabled" @click="creating=true">建立零余额来源</el-button>
  <el-text v-if="error" type="danger">{{error}}</el-text>
- <el-dialog v-model="creating" title="建立零余额库存来源" width="480px" append-to-body :before-close="close" @closed="batch='';bin=''">
+ <PageDialog v-model="creating" title="建立零余额库存来源" width="480px" append-to-body :before-close="close" @closed="batch='';bin=''">
   <el-alert title="这里只建立库存身份，余额为0；正式过账成功后才增加库存。" :closable="false" type="info" />
   <el-form label-position="top"><el-form-item label="实际批次"><el-input v-model="batch" maxlength="128" /></el-form-item><el-form-item label="实际库位"><el-input v-model="bin" maxlength="64" /></el-form-item></el-form>
   <template #footer><el-button @click="close()">取消</el-button><el-button type="primary" :loading="loading" @click="create">建立来源</el-button></template>
- </el-dialog></div>
+ </PageDialog></div>
 </template>

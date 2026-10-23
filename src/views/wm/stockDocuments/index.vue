@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { displayQuantity } from '@/lib/production/quantity'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
@@ -66,10 +68,10 @@ function resetIdentity(draft:Row){draft.stockId=null;draft.batchNo=null;draft.bi
   <template #field-unitId="{draft}"><el-input :model-value="draft.unitId" disabled placeholder="物料基本单位" /></template>
   <template #cell-stockActionId="{row}"><el-button v-if="row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="showAction(row.stockActionId)">{{row.stockActionId}}</el-button><span v-else>{{row.stockActionId||'待审核执行'}}</span></template>
  </MasterDetailDocument>
- <el-dialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
+ <PageDialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
   <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" />
   <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{action.id}}</el-descriptions-item><el-descriptions-item label="审核UUID">{{action.operationId||'—'}}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{action.documentLineId||'—'}}</el-descriptions-item><el-descriptions-item label="业务来源">{{action.sourceType}} / {{action.sourceId}}</el-descriptions-item><el-descriptions-item label="库存来源">{{action.stockId}}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{action.batchNo}} / {{action.binCode}}</el-descriptions-item><el-descriptions-item label="变动量">{{action.quantityDelta}}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{action.quantityBefore}} / {{action.quantityAfter}}</el-descriptions-item><el-descriptions-item label="操作人">{{action.operatorUserId}}</el-descriptions-item><el-descriptions-item label="原因">{{action.reason}}</el-descriptions-item></el-descriptions>
- </el-dialog>
+ </PageDialog>
  </div>
 </template>
 

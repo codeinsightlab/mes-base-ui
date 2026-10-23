@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+import PageDrawer from '@/components/page/PageDrawer.vue'
+
 import { computed, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import CrudPage from '@/components/CrudPage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import DocumentFields from '@/components/document/DocumentFields.vue'
@@ -12,6 +17,8 @@ import { api as units } from '@/api/basic/unitMeasure'
 import { categoryTree } from '@/lib/materialCategories'
 import { commandFromDraft, type CrudApi, type Field, type Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
+const ElMessageBox = usePageMessageBox()
+
 const auth = useAuth(), page = ref<InstanceType<typeof CrudPage> | null>(null)
 const can = (object:'material' | 'category', action:string) => auth.hasPermission('business:material' + (object === 'category' ? ':category' : '') + ':' + action, 'factory')
 const categoryRows = ref<MaterialCategoryVo[]>([]), categoryError = ref(''), categoryLoading = ref(false), categoryKeyword = ref('')
@@ -141,17 +148,17 @@ onBeforeUnmount(clear)
         </CrudPage>
       </div>
     </div>
-    <el-dialog v-model="editorOpen" :title="(editorId?'维护':'新增')+'物料'" width="760px" :before-close="closeEditor" destroy-on-close>
+    <PageDialog v-model="editorOpen" :title="(editorId?'维护':'新增')+'物料'" width="760px" :before-close="closeEditor" destroy-on-close>
       <el-alert v-if="editorError" :title="editorError" type="error" :closable="false" />
       <DocumentFields :fields="editorFields" :draft="draft" :disabled="saving || editorReadonly" @submit="save">
         <template #field-categoryId="{disabled}"><el-tree-select v-model="draft.categoryId as string" :data="nodes" node-key="id" clearable filterable check-strictly :disabled="disabled || !can('category','list')" placeholder="选择分类（可留空）" /></template>
         <template #field-unitId="{disabled}"><UnitMeasureSelect v-model="draft.unitId as string" :disabled="disabled" /></template>
       </DocumentFields>
       <template #footer><el-button @click="closeEditor(()=>{})">关闭</el-button><el-button v-if="!editorReadonly" type="primary" :loading="saving" @click="save">保存</el-button></template>
-    </el-dialog>
-    <el-drawer :model-value="!!bomMaterial" title="物料BOM" size="min(1180px, 96vw)" :before-close="closeBom" destroy-on-close>
+    </PageDialog>
+    <PageDrawer :model-value="!!bomMaterial" title="物料BOM" size="min(1180px, 96vw)" :before-close="closeBom" destroy-on-close>
       <MaterialBomPanel v-if="bomMaterial" :key="bomKey" ref="bomPanel" :material="bomMaterial" :unit-names="unitNames" />
-    </el-drawer>
+    </PageDrawer>
   </section>
 </template>
 <style scoped>

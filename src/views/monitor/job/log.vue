@@ -149,7 +149,7 @@
     />
 
     <!-- 调度日志详细 -->
-    <el-dialog v-model="open" title="调度日志详细" width="700px" append-to-body>
+    <PageDialog v-model="open" title="调度日志详细" width="700px" append-to-body>
       <el-form ref="form" :model="form" label-width="100px" size="small">
         <el-row>
           <el-col :span="12">
@@ -180,16 +180,19 @@
       <template #footer><div class="dialog-footer">
         <el-button @click="open = false">关 闭</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { getJob } from '@/api/monitor/job'
 import { listJobLog, delJobLog, cleanJobLog } from '@/api/monitor/jobLog'
 
 export default {
+  components: { PageDialog },
   name: 'JobLog',
   dicts: ['sys_common_status', 'sys_job_group'],
   data() {

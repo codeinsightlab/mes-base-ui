@@ -11,18 +11,21 @@
         <el-button size="small" circle icon="Menu" aria-label="显示或隐藏列" @click="showColumn()" />
       </el-tooltip>
     </el-row>
-    <el-dialog v-model="open" :title="title" append-to-body>
+    <PageDialog v-model="open" :title="title" append-to-body>
       <el-transfer
         v-model="value"
         :titles="['显示', '隐藏']"
         :data="columns"
         @change="dataChange"
       />
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 export default {
+  components: { PageDialog },
   name: 'RightToolbar',
   props: {
     showSearch: {

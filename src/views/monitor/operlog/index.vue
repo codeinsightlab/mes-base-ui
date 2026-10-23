@@ -227,7 +227,7 @@
     />
 
     <!-- 操作日志详细 -->
-    <el-dialog
+    <PageDialog
       v-model="open"
       title="操作日志详细"
       width="700px"
@@ -276,15 +276,18 @@
       <template #footer><div class="dialog-footer">
         <el-button @click="open = false">关 闭</el-button>
       </div></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { list, delOperlog, cleanOperlog } from '@/api/monitor/operlog'
 
 export default {
+  components: { PageDialog },
   name: 'Operlog',
   dicts: ['sys_oper_type', 'sys_common_status'],
   data() {

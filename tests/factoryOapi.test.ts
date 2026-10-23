@@ -9,7 +9,7 @@ const settings = () => ({ endpoint: 'https://erp.invalid/oapi', host: { ver: '5.
 const view = (locked = false) => ({ factoryId: 'A', factoryRevision: 7, reference: 'binding', configurationRevision: 2, locked, settings: settings() })
 function create() {
   return mount(Dialog, { props: { factory: { factoryId: 'A', factoryName: 'TEST', runtimeMode: 'LOCAL' } }, global: { directives: { loading: {} }, stubs: {
-    ElDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+    PageDialog: { template: '<div><slot /><slot name="footer" /></div>' },
     ElForm: { template: '<form><slot /></form>', methods: { validate: () => Promise.resolve(true) } },
     ElFormItem: { template: '<label><slot /></label>' }, ElDivider: { template: '<div><slot /></div>' }, ElAlert: true,
     ElInput: { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' },

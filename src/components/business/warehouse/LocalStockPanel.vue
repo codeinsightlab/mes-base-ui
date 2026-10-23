@@ -1,12 +1,18 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDrawer from '@/components/page/PageDrawer.vue'
+
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import { computed, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import { api, type WmInventoryVo } from '@/api/wm/wmInventory'
 import { localStock, stockOperations, type StockOperation, type StockCommand, type StockAction } from '@/api/wm/localStock'
+const ElMessageBox = usePageMessageBox()
+
 const emit = defineEmits<{ changed: [] }>()
 const router = useRouter()
 const auth = useAuth(), visible = ref(false), stockId = ref(''), stock = ref<WmInventoryVo | null>(null)
@@ -77,7 +83,7 @@ onDeactivated(() => { visible.value = false; clear() })
 const label = (value: string) => ({OPENING:'期初建账',RECEIPT:'历史原材料入库',ISSUE:'生产领料',RETURN:'生产退料',GAIN:'盘盈',LOSS:'盘亏',CORRECTION:'业务纠错',REVERSAL:'原操作撤销',PRODUCT_RECEIPT:'历史成品入库',PRODUCT_REVERSAL:'历史成品入库逆向'}[value] ?? value)
 </script>
 <template>
- <el-drawer v-model="visible" title="LOCAL 库存业务与流水" size="min(1120px, 96vw)" :before-close="beforeClose" @closed="clear">
+ <PageDrawer v-model="visible" title="LOCAL 库存业务与流水" size="min(1120px, 96vw)" :before-close="beforeClose" @closed="clear">
   <el-alert v-if="stock && auth.runtimeMode!=='LOCAL' && !pending" title="当前工厂模式不允许新增LOCAL库存动作；历史流水仍可读取" type="info" :closable="false" />
   <el-alert v-if="stock && stock.warehouseSource !== 'LOCAL'" title="外部镜像或未核实来源仅供参考，不允许新增本地库存动作" type="warning" :closable="false" />
    <el-alert v-if="error" :title="error" type="error" :closable="false" />
@@ -108,5 +114,5 @@ const label = (value: string) => ({OPENING:'期初建账',RECEIPT:'历史原材�
    </el-table>
    <div v-if="readable" class="table-toolbar"><el-button :disabled="offset === 0 || loading" @click="offset -= 20; load()">上一页</el-button><span>{{ offset + 1 }} / {{ total }}</span><el-button :disabled="offset + 20 >= total || loading" @click="offset += 20; load()">下一页</el-button></div>
   </div>
- </el-drawer>
+ </PageDrawer>
 </template>

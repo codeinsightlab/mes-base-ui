@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+
 import { parseTime } from '@/utils/ruoyi'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
@@ -10,6 +14,8 @@ import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import { qualityTreatment as api, type Treatment, type Disposition, type AssessmentCommand, type Attribution, treatmentActionLabel } from '@/api/quality/qualityTreatment'
 import type { Version } from '@/api/quality/productionDefect'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ declarationId: string; candidates: Version[]; record?: Version; initialAction?: 'assess' | 'dispose' }>()
 const emit = defineEmits<{ changed: []; pending: [value: boolean]; dirty: [value: boolean] }>()
 const auth = useAuth()
@@ -120,7 +126,7 @@ async function submit() {
    <el-timeline v-else class="treatment-records"><el-timeline-item v-for="event in view.events" :key="event.id" :timestamp="parseTime(event.recordedAt) || ''" placement="top"><div class="record-heading"><strong>{{ treatmentActionLabel(event.actionType) }}</strong><span v-if="event.actionType==='RETURN_NODE'"> <QuantityText :value="event.returnedQty" /></span><span v-if="event.actionType==='TRANSFER_WAREHOUSE'"> <QuantityText :value="event.transferQty" /></span><span class="secondary"> · {{ event.operatorName || '操作人未返回' }}</span></div><p v-if="event.actionType==='ASSESS'">{{ event.attributionType==='INDEPENDENT'?'确认为独立申报':'确认为重复申报' }} · {{ event.basis }}</p><p v-else>{{ event.reason }}</p><p v-if="event.stockDocumentId" class="secondary">入库单 {{ event.stockDocumentId }} · 接收仓库 {{ event.targetWarehouseId }}</p></el-timeline-item></el-timeline>
    <details class="audit-records"><summary>操作留痕</summary><el-descriptions :column="1" border><el-descriptions-item label="不良记录编号">{{ view.declarationId }}</el-descriptions-item><el-descriptions-item label="当前版本">{{ view.revision }}</el-descriptions-item><el-descriptions-item label="执行单元">{{ view.executionId }}</el-descriptions-item></el-descriptions><slot name="versions" /></details>
   </template>
-  <el-dialog v-model="actionOpen" :title="actionKind==='assess'?'核实不良申报':'办理不良入仓'" width="min(540px, 94vw)" append-to-body :before-close="closeAction" destroy-on-close>
+  <PageDialog v-model="actionOpen" :title="actionKind==='assess'?'核实不良申报':'办理不良入仓'" width="min(540px, 94vw)" append-to-body :before-close="closeAction" destroy-on-close>
    <el-alert v-if="formError" :title="formError" type="error" :closable="false" />
    <p v-if="pending" role="status">上次请求结果待确认，请使用原请求核对，避免重复处理。</p>
    <el-form label-position="top" :disabled="busy || !!pending" @submit.prevent="submit">
@@ -129,7 +135,7 @@ async function submit() {
     <el-form-item label="处理说明" required><el-input v-model="form.reason" type="textarea" maxlength="500" :rows="2" /></el-form-item>
    </el-form>
    <template #footer><el-button :disabled="busy || !!pending" @click="closeAction()">取消</el-button><el-button type="primary" :loading="busy" :disabled="recoveryBlocked||pending?.kind==='retired-return'" @click="submit">{{ pending?'核对上次结果':actionKind==='assess'?'确认核实':'创建并审核入库' }}</el-button></template>
-  </el-dialog>
+  </PageDialog>
  </section>
 </template>
 <style scoped>

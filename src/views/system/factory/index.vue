@@ -15,7 +15,7 @@
     </el-table>
     <FactoryOapiDialog v-if="oapiFactory" :key="oapiFactory.factoryId" :factory="oapiFactory" @close="oapiFactory = null" @saved="load" />
     <Pagination v-model:page="pageNum" v-model:limit="pageSize" :total="total" @pagination="load" />
-    <el-dialog v-model="open" :title="editing ? '编辑工厂' : '新增工厂'" width="540px" :close-on-click-modal="false">
+    <PageDialog v-model="open" :title="editing ? '编辑工厂' : '新增工厂'" width="540px" :close-on-click-modal="false">
       <el-form ref="form" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="工厂编号" prop="factoryId"><el-input v-model="form.factoryId" :disabled="editing" @change="loadIntegrationOptions" maxlength="64" /></el-form-item>
         <el-form-item label="工厂编码" prop="factoryCode"><el-input v-model="form.factoryCode" maxlength="32" /></el-form-item>
@@ -35,16 +35,18 @@
         <p v-if="integrationLocked" class="secondary">该工厂业务运行配置已锁定；模式及 ERP 绑定变更需专门迁移流程。解绑数据源不会解除锁定。</p>
       </el-form>
       <template #footer><el-button @click="open = false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { listFactories, listDatasources, createFactory, saveFactory, deleteFactory, factoryIntegrationOptions } from '@/api/system/datasource'
 import FactoryOapiDialog from './FactoryOapiDialog.vue'
 import { refreshFactory } from '@/utils/factory'
 export default {
   name: 'ManagedFactory',
-  components: { FactoryOapiDialog },
+  components: { PageDialog, FactoryOapiDialog },
   data() {
     return { oapiFactory: null, rows: [], pageNum: 1, pageSize: 20, total: 0, sources: [], loading: false, saving: false, open: false, editing: false, integrationLocked: false, integrationOptions: [], optionsLoading: false, optionsError: '', optionsRevision: 0, form: { factoryId: '', factoryCode: '', enterpriseId: '', factoryName: '', datasourceId: null, status: 'ENABLED', runtimeMode: 'LOCAL', erpProvider: null, erpConfigRef: null }, rules: {
       factoryId: [{ required: true, message: '请输入唯一的工厂编号', trigger: 'blur' }], factoryCode: [{ required: true, message: '请输入工厂编码', trigger: 'blur' }], factoryName: [{ required: true, message: '请输入工厂名称', trigger: 'blur' }]

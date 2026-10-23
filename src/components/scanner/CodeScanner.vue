@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { readQrImage } from './qrImage'
 const props = withDefaults(defineProps<{
@@ -46,7 +48,7 @@ function confirm() {
 </script>
 <template>
   <el-button :link="link" :disabled="disabled" @click="open">{{ buttonLabel }}</el-button>
-  <el-dialog v-model="visible" title="扫码 / 录入码值" width="min(560px, 94vw)" append-to-body @opened="input?.focus()">
+  <PageDialog v-model="visible" title="扫码 / 录入码值" width="min(560px, 94vw)" append-to-body @opened="input?.focus()">
     <el-form @submit.prevent="confirm">
       <el-form-item label="码值"><el-input ref="input" v-model="draft" :placeholder="placeholder" aria-label="扫码码值" maxlength="2048" :disabled="decoding" clearable @input="recognized = false" /></el-form-item>
       <div
@@ -71,7 +73,7 @@ function confirm() {
       <p class="secondary">请核对码值后确认；识别二维码不会自动提交业务操作。</p>
       <div class="scan-actions"><el-button @click="close">取消</el-button><el-button native-type="submit" type="primary" :disabled="disabled || decoding || !draft.trim()">使用此码值</el-button></div>
     </el-form>
-  </el-dialog>
+  </PageDialog>
 </template>
 <style scoped>
 .scan-drop { border: 1px dashed var(--ui-border); border-radius: var(--ui-radius, 6px); padding: var(--ui-space-4); cursor: pointer; text-align: center; }

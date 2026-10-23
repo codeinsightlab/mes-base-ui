@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import CrudPage from '@/components/CrudPage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import DocumentFields from './DocumentFields.vue'
 import { commandFromDraft } from '@/lib/crud'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
+const ElMessageBox = usePageMessageBox()
+
 
 const props = defineProps<{
   title: string; headerApi: CrudApi; itemApi: CrudApi;

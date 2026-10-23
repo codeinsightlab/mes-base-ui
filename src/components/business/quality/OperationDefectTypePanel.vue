@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { reactive, ref, watch, onBeforeUnmount, computed } from 'vue'
-import { ElMessageBox } from 'element-plus'
+
 import { useAuth } from '@/stores/auth'
 import Pagination from '@/components/Pagination/index.vue'
 import { qualityV2 as api, wasteLabels, type DefectType, type TypeInput, type WasteCategory } from '@/api/quality/qualityV2'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ operationId: string }>()
 const emit = defineEmits<{ pending: [value: boolean]; busy: [value: boolean] }>()
 const auth = useAuth(), can = (action: string) => auth.hasPermission('business:operation:defect:type:' + action, 'factory')
@@ -27,9 +33,9 @@ async function close() { if (busy.value) return;try { await ElMessageBox.confirm
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-table v-loading="loading" :data="rows" row-key="id"><el-table-column prop="code" label="编码" /><el-table-column prop="name" label="名称" /><el-table-column label="默认工废/料废类别"><template #default="{row}">{{ wasteLabels[row.defaultWasteCategory] }}</template></el-table-column><el-table-column label="状态"><template #default="{row}">{{ row.status==='ENABLED'?'启用':'停用' }}</template></el-table-column><el-table-column prop="sort" label="排序" width="80" /><el-table-column label="操作"><template #default="{row}"><el-button v-if="can('update')" link @click="begin(row)">编辑/启停</el-button><el-button v-if="can('delete')" link type="danger" @click="remove(row)">删除</el-button></template></el-table-column></el-table>
     <Pagination v-model:page="page" :total="total" :limit="20" @pagination="load" />
-    <el-dialog v-model="open" :title="editing?'修改不良类型':'新增不良类型'" width="min(560px, 95vw)" :before-close="close" append-to-body>
+    <PageDialog v-model="open" :title="editing?'修改不良类型':'新增不良类型'" width="min(560px, 95vw)" :before-close="close" append-to-body>
       <el-form label-width="100px" :disabled="busy" @submit.prevent="save"><el-form-item label="编码" required><el-input v-model="form.code" maxlength="64" /></el-form-item><el-form-item label="名称" required><el-input v-model="form.name" maxlength="255" /></el-form-item><el-form-item label="默认工废/料废类别" required><el-select v-model="form.defaultWasteCategory" :placeholder="chosenCategory?'':'请明确选择工废/料废类别'" @change="chosenCategory=true"><el-option v-for="v in ['PROCESS','MATERIAL','BOTH']" :key="v" :value="v" :label="wasteLabels[v]" /></el-select><span v-if="!chosenCategory">请明确选择，不自动采用默认值。</span></el-form-item><el-form-item label="状态"><el-select v-model="form.status"><el-option label="启用" value="ENABLED" /><el-option label="停用" value="DISABLED" /></el-select></el-form-item><el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" :precision="0" /></el-form-item><el-form-item label="备注"><el-input v-model="form.remark" type="textarea" maxlength="500" /></el-form-item></el-form>
       <template #footer><el-button @click="close">取消</el-button><el-button type="primary" :loading="busy" :disabled="!chosenCategory" @click="save">保存配置</el-button></template>
-    </el-dialog>
+    </PageDialog>
   </section>
 </template>

@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import MaterialPicker from './MaterialPicker.vue'
 import BomVersionSelect from './BomVersionSelect.vue'
 import { bomApi, bomItemApi, structure, transition, type BomGraph } from '@/api/basic/materialBom'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
+const ElMessageBox = usePageMessageBox()
+
 const props = defineProps<{ material: Row; unitNames: Record<string, string> }>()
 const auth = useAuth(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
 const revision = ref(''), graph = ref<BomGraph | null>(null), graphId = ref(''), quantity = ref('1'), error = ref(''), graphLoading = ref(false), acting = ref(false)

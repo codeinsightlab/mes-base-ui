@@ -1,13 +1,16 @@
+import { createPageMessageBox } from '@/lib/pageMessageBox'
+import { pageOverlayScopeKey } from '@/lib/pageOverlay'
 import CodeText from '@/components/CodeText.vue'
 import MethodBadge from '@/components/MethodBadge.vue'
 import MetricValue from '@/components/MetricValue.vue'
 import ScopeTag from '@/components/ScopeTag.vue'
 import PageHeader from '@/components/PageHeader.vue';import StatusTag from '@/components/StatusTag.vue'
 import { saveAs } from 'file-saver'
-import type { App } from 'vue';import router from '@/router';import { ElMessage, ElMessageBox, ElLoading } from 'element-plus';import { requestBlob } from '@/lib/request';import request from '@/utils/request';import { parseTime, handleTree, addDateRange } from '@/utils/ruoyi'
+import type { App } from 'vue';import router from '@/router';import { ElMessage, ElLoading } from 'element-plus';import { requestBlob } from '@/lib/request';import request from '@/utils/request';import { parseTime, handleTree, addDateRange } from '@/utils/ruoyi'
 import Pagination from '@/components/Pagination/index.vue';import DictTag from '@/components/DictTag/index.vue';import RightToolbar from '@/components/RightToolbar/index.vue';import Editor from '@/components/Editor/index.vue';import { useAuth } from '@/stores/auth'
 import SvgIcon from '@/components/SvgIcon/index.vue';import { watch } from 'vue';import { dictionary, clearDictionaries, refreshDictionaries } from '@/utils/dictionaries'
 export function installSystem(app:App) {
+  const ElMessageBox = createPageMessageBox(undefined, app._context)
   for (const [name, component] of Object.entries({ Pagination, DictTag, RightToolbar, Editor, SvgIcon, PageHeader, StatusTag, ScopeTag, CodeText, MethodBadge, MetricValue }))app.component(name, component)
   const tab = { closePage() { history.back() }, openPage(path:string) { router.push(path) }, closeOpenPage(target:{ path: string }) { router.push(target.path) } };Object.assign(app.config.globalProperties, { $tab: tab, $alert: (text:string, title:string) => ElMessageBox.alert(text, title), $message: ElMessage })
   let loading:ReturnType<typeof ElLoading.service> | undefined
@@ -15,5 +18,5 @@ export function installSystem(app:App) {
   Object.assign(app.config.globalProperties, { $modal: modal, hasPermi: (codes:string[]) => codes.some(code => useAuth().hasPermission(code, 'platform')), parseTime, handleTree, addDateRange, resetForm(this:any, name:string) { this.$refs[name]?.resetFields() }, selectDictLabel: (items:any[], value:any) => items?.find(i => String(i.value) === String(value))?.label ?? String(value ?? ''), selectDictLabels: (items:any[], value:any) => String(value ?? '').split(',').map(v => items?.find(i => String(i.value) === v)?.label ?? v).join(','), getConfigKey: (key:string) => request({ url: '/common/config/' + key }), $set: (obj:any, key:string, value:any) => { obj[key] = value }, async download(path:string, params:Record<string, any>, filename:string) { const query:Record<string, string> = {};for (const [k, v] of Object.entries(params)) if (v != null && typeof v !== 'object')query[k] = String(v);try { const blob = await requestBlob('/api/' + path.replace(/^\//, ''), { method: 'POST', query, scope: 'platform' });saveAs(blob, filename) } catch(error) { ElMessage.error(error instanceof Error ? error.message : '下载失败') } } })
   app.directive('hasPermi', { mounted(el, binding) { el.hidden = !(binding.value as string[]).some(p => useAuth().hasPermission(p, 'platform')) }, updated(el, binding) { el.hidden = !(binding.value as string[]).some(p => useAuth().hasPermission(p, 'platform')) } })
   watch(() => useAuth().revision, () => { if (useAuth().loggedIn) void refreshDictionaries();else clearDictionaries() })
-  app.mixin({ data() { return { dict: { type: {} as Record<string, any[]> }} }, created(this:any) { for (const code of this.$options.dicts ?? []) this.dict.type[code] = dictionary(code) } })
+  app.mixin({ inject: { mesPageOverlayScope: { from: pageOverlayScopeKey, default: undefined } }, data() { return { dict: { type: {} as Record<string, any[]> }} }, created(this:any) { const box = createPageMessageBox(this.mesPageOverlayScope, app._context); this.$modal = { ...modal, confirm: (text:string) => box.confirm(text, '操作确认', { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }), prompt: (text:string) => box.prompt(text, '操作确认', { inputType: 'password' }) }; this.$alert = box.alert; this.$confirm = box.confirm; this.$prompt = box.prompt; for (const code of this.$options.dicts ?? []) this.dict.type[code] = dictionary(code) } })
 }

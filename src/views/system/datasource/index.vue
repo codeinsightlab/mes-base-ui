@@ -29,7 +29,7 @@
     <Pagination v-model:page="pageNum" v-model:limit="pageSize" :total="total" @pagination="load" />
     <p class="secondary">DDL 仅包含表结构和索引，不包含数据、外键、视图及触发器等对象。下载优先使用缓存；首次下载和手动刷新会读取源库结构。请导入空库，源库结构变更后需手动刷新。</p>
     <p v-if="rows.length" class="secondary">当前节点：{{ rows[0].nodeId }}</p>
-    <el-dialog v-model="open" :title="form.datasourceId === null ? '新增数据源' : '编辑数据源'" width="560px" :close-on-click-modal="false">
+    <PageDialog v-model="open" :title="form.datasourceId === null ? '新增数据源' : '编辑数据源'" width="560px" :close-on-click-modal="false">
       <el-form ref="form" :model="form" :rules="rules" label-width="95px">
         <el-form-item label="名称" prop="datasourceName"><el-input v-model="form.datasourceName" maxlength="64" /></el-form-item>
         <el-form-item label="服务器" prop="dbHost"><el-input v-model="form.dbHost" placeholder="主机名或 IPv4 地址" /></el-form-item>
@@ -39,13 +39,16 @@
         <el-form-item label="连接密码"><el-input v-model="form.password" type="password" show-password autocomplete="new-password" :placeholder="form.datasourceId === null ? '填写该数据库的连接密码' : '不回显；留空保持原密码'" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="open = false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存登记</el-button></template>
-    </el-dialog>
+    </PageDialog>
   </div>
 </template>
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { listDatasources, createDatasource, updateDatasource, enableDatasource, disableDatasource, deleteDatasource, downloadDatasourceDdl, refreshDatasourceDdl } from '@/api/system/datasource'
 const empty = () => ({ datasourceId: null, revision: null, datasourceName: '', dbHost: '', dbPort: 3306, dbName: '', dbUsername: '', password: '' })
 export default {
+  components: { PageDialog },
   name: 'ManagedDatasource',
   data() {
     return { rows: [], pageNum: 1, pageSize: 20, total: 0, ddlBusyId: null, ddlAction: '', loading: false, saving: false, open: false, form: empty(), rules: {

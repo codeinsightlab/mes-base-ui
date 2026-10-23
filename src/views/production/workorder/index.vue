@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
+import PageDialog from '@/components/page/PageDialog.vue'
+import PageDrawer from '@/components/page/PageDrawer.vue'
+
 import QueryForm from '@/components/QueryForm.vue'
 
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { quantityColumn } from '@/lib/production/quantity'
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { routeLocationKey } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import E10SyncPreview from '@/components/business/E10SyncPreview.vue'
 import StatusTag from '@/components/StatusTag.vue'
@@ -20,6 +25,8 @@ import WorkOrderRoutePreview from '@/components/business/production/WorkOrderRou
 import { api, type BatchHistory, type Detail, type RoutingOption, type Save } from '@/api/production/workorder'
 import { api as materials, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
+const ElMessageBox = usePageMessageBox()
+
 const route = inject(routeLocationKey, undefined)
 const auth = useAuth()
 const can = (action: string) => auth.hasPermission('workorder:' + action, 'factory')
@@ -199,7 +206,7 @@ onMounted(load)
       </template></el-table-column>
     </el-table>
     <Pagination :total="total" v-model:page="page" v-model:limit="pageSize" @pagination="load" />
-    <el-dialog v-model="dialog" :title="editId?'编辑工单':'新增工单'" width="min(760px,94vw)">
+    <PageDialog v-model="dialog" :title="editId?'编辑工单':'新增工单'" width="min(760px,94vw)">
       <el-form label-width="110px">
         <el-form-item label="工单号" required><el-input v-model="form.code" maxlength="64" /></el-form-item>
         <el-form-item label="产出物料" required><el-select v-model="form.productId" filterable remote :remote-method="searchProducts" @change="productChanged"><el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="p.code+' · '+p.name" /></el-select></el-form-item>
@@ -213,8 +220,8 @@ onMounted(load)
       </el-form>
       <p class="secondary">仅草稿工单允许编辑。已下达工单需先退回草稿；存在下游记录时不能退回或删除。计划数量不能低于已分配的执行目标数量。</p>
       <template #footer><el-button @click="dialog=false">取消</el-button><el-button type="primary" :loading="busy" @click="save">保存</el-button></template>
-    </el-dialog>
-    <el-drawer @close="closeHistory" v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close>
+    </PageDialog>
+    <PageDrawer @close="closeHistory" v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close>
       <template v-if="detail">
         <WorkOrderCancellation history :order="detail.workorder" @changed="load();open(detail.workorder.id)" />
         <el-descriptions :column="detailColumns" border>
@@ -233,7 +240,7 @@ onMounted(load)
           <el-table :data="detail.batches" row-key="id"><el-table-column label="历史批次号" prop="batchNo" min-width="140" /><el-table-column :formatter="quantityColumn" label="历史计划量" prop="plannedQty" min-width="140" /><el-table-column label="旧路径状态" prop="routeStatus" min-width="130" /><el-table-column label="出库锁定时间" prop="lockedAt" min-width="180" /><el-table-column label="历史所选节点" min-width="200"><template #default="{row}"><template v-if="histories[row.id]">{{ histories[row.id]!.path.map(n=>n.routingNodeId).join(' → ') || '无历史所选节点' }}</template><el-button v-else-if="auth.hasPermission('batch:query', 'factory')" link :loading="historyLoading[row.id]" @click="loadHistory(row.id)">读取历史路径</el-button><span v-else>需要历史批次查询权限</span></template></el-table-column></el-table>
         </el-collapse-item></el-collapse>
       </template><el-empty v-else-if="!busy" description="未读取到工单" />
-    </el-drawer>
+    </PageDrawer>
   </div>
 </template>
 

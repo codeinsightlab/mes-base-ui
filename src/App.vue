@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { dictionaryState, refreshDictionaries } from '@/utils/dictionaries'
 import { useAuth, type Menu } from '@/stores/auth'
+import PageBoundary from '@/components/page/PageBoundary.vue'
 import SidebarNode from '@/components/SidebarNode.vue'
 import { menuWorkspaces } from '@/lib/menuWorkspaces'
 import { workspaceTabs, visitTab, resetTabs, closeTabs } from '@/lib/workspaceTabs'
@@ -75,7 +76,7 @@ function userCommand(command:string) { if (command === 'profile')router.push('/u
       </header>
       <nav class="tags" aria-label="已打开页面"><div ref="tagList" class="tag-list"><el-dropdown v-for="tag in workspaceTabs.items" :key="tag.path" trigger="contextmenu" @command="(command:string)=>tagCommand(command,tag.path)"><div class="workspace-tag" :class="{active:route.fullPath===tag.path}"><RouterLink :to="tag.path" :aria-current="route.fullPath===tag.path?'page':undefined">{{ tag.title }}</RouterLink><button v-if="tag.path!=='/'" type="button" :aria-label="'关闭'+tag.title" @click="close(tag.path)"><el-icon><Close /></el-icon></button></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新页面</el-dropdown-item><el-dropdown-item command="one" :disabled="tag.path==='/'">关闭页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown></div><el-dropdown trigger="click" @command="(command:string)=>tagCommand(command,route.fullPath)"><el-button text aria-label="页面标签操作" icon="MoreFilled" /><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新当前页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
       </nav>
-      <main class="workspace-main"><el-alert v-if="Object.keys(dictionaryState.errors).length" type="error" :closable="false" title="部分选项加载失败，请重试"><el-button text @click="refreshDictionaries">重新加载选项</el-button></el-alert><RouterView v-if="pageVisible" v-slot="{Component,route:pageRoute}"><KeepAlive :key="auth.revision+':'+workspaceTabs.refresh" :max="10"><component :is="Component" v-if="pageRoute.meta.keepAlive" :key="pageRoute.fullPath" /></KeepAlive><component :is="Component" v-if="!pageRoute.meta.keepAlive" :key="auth.revision+':'+workspaceTabs.refresh+':'+pageRoute.fullPath" /></RouterView></main>
+      <main class="workspace-main"><el-alert v-if="Object.keys(dictionaryState.errors).length" type="error" :closable="false" title="部分选项加载失败，请重试"><el-button text @click="refreshDictionaries">重新加载选项</el-button></el-alert><RouterView v-if="pageVisible" v-slot="{Component,route:pageRoute}"><KeepAlive :key="auth.revision+':'+workspaceTabs.refresh" :max="10"><PageBoundary v-if="pageRoute.meta.keepAlive" :key="pageRoute.fullPath" :page-key="pageRoute.fullPath"><component :is="Component" /></PageBoundary></KeepAlive><PageBoundary v-if="!pageRoute.meta.keepAlive" :key="auth.revision+':'+workspaceTabs.refresh+':'+pageRoute.fullPath" :page-key="pageRoute.fullPath"><component :is="Component" /></PageBoundary></RouterView></main>
     </div>
   </div>
 </template>

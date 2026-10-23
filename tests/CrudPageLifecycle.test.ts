@@ -14,7 +14,7 @@ const wrappers: ReturnType<typeof mount>[] = []
 function page(api: CrudApi) {
   const pinia = createPinia();setActivePinia(pinia)
   const auth = useAuth();auth.platformPermissions = ['read', 'create', 'update', 'delete'].map(action => 'acceptance:person:' + action)
-  const wrapper = mount(CrudPage, { props: { title: '人员', permission: 'acceptance:person', permissionScope: 'platform', api, fields: [{ key: 'id', label: '编号', kind: 'text', readonly: true }, { key: 'name', label: '姓名', kind: 'text', required: true, maxLength: 64 }] }, global: { plugins: [pinia], stubs: { ElButton: button, ElDialog: dialog, ElTable: true, ElTableColumn: true, ElForm: { template: '<form><slot /></form>' }, ElFormItem: { template: '<div><slot /></div>' }, ElInput: true, ElAlert: true, Pagination: true, RightToolbar: true }}})
+  const wrapper = mount(CrudPage, { props: { title: '人员', permission: 'acceptance:person', permissionScope: 'platform', api, fields: [{ key: 'id', label: '编号', kind: 'text', readonly: true }, { key: 'name', label: '姓名', kind: 'text', required: true, maxLength: 64 }] }, global: { plugins: [pinia], stubs: { ElButton: button, PageDialog: dialog, ElTable: true, ElTableColumn: true, ElForm: { template: '<form><slot /></form>' }, ElFormItem: { template: '<div><slot /></div>' }, ElInput: true, ElAlert: true, Pagination: true, RightToolbar: true }}})
   wrappers.push(wrapper);return { wrapper, auth }
 }
 const api = (): CrudApi => ({ list: vi.fn().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 20 }), create: vi.fn(), update: vi.fn(), remove: vi.fn() })

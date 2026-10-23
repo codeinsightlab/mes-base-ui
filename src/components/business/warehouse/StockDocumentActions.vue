@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+
 import type { Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
 import { useClosureCommand } from '@/composables/useClosureCommand'
 import { stockDocuments, stockDocumentPermission as p, stockDocumentPurpose, type ApprovalIntent, type CancellationBasis, type ProductionBasis } from '@/api/wm/stockDocuments'
+const ElMessageBox = usePageMessageBox()
+
 const props=defineProps<{row:Row;dirty:boolean;refresh:()=>Promise<void>}>()
 const emit=defineEmits<{pending:[string|null]}>()
 const auth=useAuth(),basis=ref<CancellationBasis|null>(null),production=ref<ProductionBasis|null>(null),error=ref(''),cancelBusy=ref(false)

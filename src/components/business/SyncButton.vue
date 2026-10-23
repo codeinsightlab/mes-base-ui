@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { usePageMessageBox } from '@/lib/pageMessageBox'
+
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import type { PermissionScope } from '@/lib/request'
 
 interface SyncCounts { fetched: number; created: number; updated: number; skipped: number }
 const props = defineProps<{ permission: string; scope: PermissionScope; run: () => Promise<SyncCounts>; confirmText?: string }>()
 import { useAuth } from '@/stores/auth'
+const ElMessageBox = usePageMessageBox()
+
 
 const auth = useAuth()
 const emit = defineEmits<{ completed: [] }>()

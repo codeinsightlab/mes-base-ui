@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-if="showFlag" v-model="showFlag" title="人员选择" :modal="false" width="80%" center>
+  <PageDialog v-if="showFlag" v-model="showFlag" title="人员选择" :modal="false" width="80%" center>
     <el-row :gutter="20">
       <!--部门数据-->
       <el-col :span="4" :xs="24">
@@ -130,15 +130,18 @@
       <el-button type="primary" @click="confirmSelect">确 定</el-button>
       <el-button @click="showFlag = false">取 消</el-button>
     </div></template>
-  </el-dialog>
+  </PageDialog>
 </template>
 
 <script>
+import PageDialog from '@/components/page/PageDialog.vue'
+
 import { listUser } from '@/api/system/user'
 
 import { treeselect } from '@/api/system/dept'
 
 export default {
+  components: { PageDialog },
   name: 'UserSingleSelect',
   emits: ['onSelected'],
   dicts: ['sys_normal_disable', 'sys_user_sex'],

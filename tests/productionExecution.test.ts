@@ -102,7 +102,7 @@ it.each(['factory','permission','switching','close','native close','unmount'])('
  const context=setup(),wrapper=mount(Lookup,{global:context.global})
  const state=(wrapper.vm.$ as unknown as {setupState:Record<string,any>}).setupState
  state.visible=true;state.code='WO:PRODUCT#BATCH';const wait=state.resolve()
- expect(scan).toHaveBeenCalledOnce()
+ expect(scan).toHaveBeenCalledOnce();await flushPromises()
  if(mode==='factory')context.auth.factoryId='B'
  else if(mode==='permission')context.auth.factoryPermissions=[]
  else if(mode==='switching')context.auth.factorySwitching=true
