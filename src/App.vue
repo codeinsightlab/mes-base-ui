@@ -9,6 +9,7 @@ import SidebarNode from '@/components/SidebarNode.vue'
 import { menuWorkspaces } from '@/lib/menuWorkspaces'
 import { workspaceTabs, visitTab, resetTabs, closeTabs } from '@/lib/workspaceTabs'
 const auth = useAuth(), route = useRoute(), router = useRouter(), collapsed = ref(false), mobile = ref(false), pageVisible = ref(true)
+const activePageBoundary = ref<InstanceType<typeof PageBoundary>>()
 const environment = import.meta.env.DEV ? 'DEV' : 'PROD BUILD'
 const tagList = ref<HTMLElement>()
 watch(() => route.fullPath, async() => { await nextTick();tagList.value?.querySelector('.workspace-tag.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) })
@@ -39,9 +40,18 @@ async function select(value:string) { try { await auth.selectFactory(value);awai
 async function refreshNavigation() { try { await auth.refreshNavigation();await router.replace('/');ElMessage.success('权限与菜单已刷新') } catch(e) { ElMessage.error(e instanceof Error ? e.message : '权限刷新失败') } }
 async function logout() { try { await auth.logout() } catch(e) { ElMessage.error(e instanceof Error ? e.message : '服务端注销未确认') } finally { router.replace('/login') } }
 async function retrySession() { try { await auth.restoreSession();await router.replace(window.location.pathname + window.location.search + window.location.hash) } catch(e) { ElMessage.error(e instanceof Error ? e.message : '登录状态恢复失败，请重试') } }
-function close(target:string, mode:'one' | 'others' | 'all' = 'one') { router.push(closeTabs(target, mode, route.fullPath)) }
-async function refreshPage() { pageVisible.value = false;workspaceTabs.refresh++;await nextTick();pageVisible.value = true }
-function tagCommand(command:string, path:string) { if (command === 'refresh') { if (path === route.fullPath)refreshPage();else router.push(path).then(refreshPage) } else close(path, command as 'one' | 'others' | 'all') }
+async function allowPageLeave() {
+  const page = activePageBoundary.value, path = route.fullPath, revision = auth.revision
+  if (page && !await page.requestLeave()) return false
+  return path === route.fullPath && revision === auth.revision
+}
+async function close(target:string, mode:'one' | 'others' | 'all' = 'one') {
+  const leavesCurrent = mode === 'all' || (mode === 'one' ? target === route.fullPath : target !== route.fullPath)
+  if (leavesCurrent && !await allowPageLeave()) return
+  await router.push(closeTabs(target, mode, route.fullPath))
+}
+async function refreshPage() { if (!await allowPageLeave()) return;pageVisible.value = false;workspaceTabs.refresh++;await nextTick();pageVisible.value = true }
+function tagCommand(command:string, path:string) { if (command === 'refresh') { if (path === route.fullPath)refreshPage();else router.push(path).then(() => { if (route.fullPath === path)return refreshPage() }) } else close(path, command as 'one' | 'others' | 'all') }
 function userCommand(command:string) { if (command === 'profile')router.push('/user/profile');else if (command === 'permissions')refreshNavigation();else if (command === 'logout')logout() }
 </script>
 <template>
@@ -76,7 +86,7 @@ function userCommand(command:string) { if (command === 'profile')router.push('/u
       </header>
       <nav class="tags" aria-label="已打开页面"><div ref="tagList" class="tag-list"><el-dropdown v-for="tag in workspaceTabs.items" :key="tag.path" trigger="contextmenu" @command="(command:string)=>tagCommand(command,tag.path)"><div class="workspace-tag" :class="{active:route.fullPath===tag.path}"><RouterLink :to="tag.path" :aria-current="route.fullPath===tag.path?'page':undefined">{{ tag.title }}</RouterLink><button v-if="tag.path!=='/'" type="button" :aria-label="'关闭'+tag.title" @click="close(tag.path)"><el-icon><Close /></el-icon></button></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新页面</el-dropdown-item><el-dropdown-item command="one" :disabled="tag.path==='/'">关闭页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown></div><el-dropdown trigger="click" @command="(command:string)=>tagCommand(command,route.fullPath)"><el-button text aria-label="页面标签操作" icon="MoreFilled" /><template #dropdown><el-dropdown-menu><el-dropdown-item command="refresh" icon="Refresh">刷新当前页面</el-dropdown-item><el-dropdown-item command="others">关闭其他</el-dropdown-item><el-dropdown-item command="all">关闭全部</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
       </nav>
-      <main class="workspace-main"><el-alert v-if="Object.keys(dictionaryState.errors).length" type="error" :closable="false" title="部分选项加载失败，请重试"><el-button text @click="refreshDictionaries">重新加载选项</el-button></el-alert><RouterView v-if="pageVisible" v-slot="{Component,route:pageRoute}"><KeepAlive :key="auth.revision+':'+workspaceTabs.refresh" :max="10"><PageBoundary v-if="pageRoute.meta.keepAlive" :key="pageRoute.fullPath" :page-key="pageRoute.fullPath"><component :is="Component" /></PageBoundary></KeepAlive><PageBoundary v-if="!pageRoute.meta.keepAlive" :key="auth.revision+':'+workspaceTabs.refresh+':'+pageRoute.fullPath" :page-key="pageRoute.fullPath"><component :is="Component" /></PageBoundary></RouterView></main>
+      <main class="workspace-main"><el-alert v-if="Object.keys(dictionaryState.errors).length" type="error" :closable="false" title="部分选项加载失败，请重试"><el-button text @click="refreshDictionaries">重新加载选项</el-button></el-alert><RouterView v-if="pageVisible" v-slot="{Component,route:pageRoute}"><KeepAlive :key="auth.revision+':'+workspaceTabs.refresh" :max="10"><PageBoundary ref="activePageBoundary" v-if="Component && pageRoute.meta.keepAlive" :key="pageRoute.fullPath" :page-key="pageRoute.fullPath"><component :is="Component" /></PageBoundary></KeepAlive><PageBoundary ref="activePageBoundary" v-if="Component && !pageRoute.meta.keepAlive" :key="auth.revision+':'+workspaceTabs.refresh+':'+pageRoute.fullPath" :page-key="pageRoute.fullPath"><component :is="Component" /></PageBoundary></RouterView></main>
     </div>
   </div>
 </template>
