@@ -3,6 +3,9 @@ import { defineComponent, h, KeepAlive, nextTick, ref } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import ElementPlus, { ElDialog } from 'element-plus'
+import { createPinia } from 'pinia'
+import { useAuth } from '../src/stores/auth'
+import App from '../src/App.vue'
 import PageBoundary from '../src/components/page/PageBoundary.vue'
 import PageDialog from '../src/components/page/PageDialog.vue'
 import PageDrawer from '../src/components/page/PageDrawer.vue'
@@ -178,4 +181,48 @@ it('exposes the same close review to a host refresh so busy and cancelled forms 
   expect(refresh.value).toBe(1); expect(boundary.value).not.toBe(originalBoundary)
   expect(wrapper.findComponent(PageDialog).props('modelValue')).toBe(false)
   expect(document.body.style.overflow).toBe('')
+})
+
+it('allows a deliberate new dialog open after returning to its cached page', async() => {
+  const { router, dialog, wrapper } = await pageHarness()
+  dialog.value = true;await flushPromises()
+  await router.push('/second');await flushPromises()
+  expect(dialog.value).toBe(false)
+  await router.push('/first');await flushPromises()
+  dialog.value = true;await flushPromises()
+  expect(wrapper.findComponent(PageDialog).findComponent(ElDialog).props('modelValue')).toBe(true)
+  expect(document.body.style.overflow).toBe('hidden')
+  dialog.value = false;await flushPromises()
+  dialog.value = true;await flushPromises()
+  expect(wrapper.findComponent(PageDialog).findComponent(ElDialog).props('modelValue')).toBe(true)
+})
+
+it('waits for the actual App route component before creating its boundary during async initial navigation', async() => {
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const oldScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
+  try {
+    const pinia = createPinia(), auth = useAuth(pinia)
+    auth.token = 'TEST_ONLY';auth.sessionReady = true;auth.factoryId = 'TEST_ONLY'
+    const opened = ref(false)
+    const First = defineComponent({ setup: () => () => h(PageDialog, { modelValue: opened.value, title: '启动后编辑', beforeClose: () => {}, 'onUpdate:modelValue': value => { opened.value = value } }, () => '编辑内容') })
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: First, meta: { keepAlive: true }}, { path: '/other', component: { template: '<p>其他页面</p>' }}] })
+    let finish!:() => void, initial = true
+    router.beforeEach(async() => { if (initial) { initial = false;await new Promise<void>(resolve => { finish = resolve }) } })
+    const wrapper = mount(App, { attachTo: document.body, global: { plugins: [pinia, router, ElementPlus], stubs: { CodeText: true }}})
+    wrappers.push(wrapper);await flushPromises()
+    expect(wrapper.findComponent(PageBoundary).exists()).toBe(false)
+    expect(warning.mock.calls.flat().join(' ')).not.toContain('No active route record')
+    finish();await router.isReady();await flushPromises()
+    expect(wrapper.findComponent(PageBoundary).exists()).toBe(true)
+    opened.value = true;await flushPromises()
+    expect(wrapper.findComponent(PageDialog).findComponent(ElDialog).props('modelValue')).toBe(true)
+    await router.push('/other');await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
+    expect(opened.value).toBe(true)
+    expect(warning.mock.calls.flat().join(' ')).not.toContain('No active route record')
+  } finally {
+    if (oldScroll)Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', oldScroll)
+    else delete (HTMLElement.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView
+  }
 })
