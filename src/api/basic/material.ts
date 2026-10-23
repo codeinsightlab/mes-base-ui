@@ -9,7 +9,6 @@ export interface MaterialVo {
   specification: string | null;
   categoryId: string | null;
   unitId: string;
-  materialType: string;
   status: string;
   externalId: string | null;
   externalCode: string | null;
@@ -22,8 +21,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<MaterialVo, 'code' | 'name' | 'specification' | 'categoryId' | 'unitId' | 'materialType' | 'status' | 'externalId' | 'externalCode'>
-export type UpdateCommand = Pick<MaterialVo, 'code' | 'name' | 'specification' | 'categoryId' | 'unitId' | 'materialType' | 'status' | 'externalId' | 'externalCode'>
+export type CreateCommand = Pick<MaterialVo, 'code' | 'name' | 'specification' | 'categoryId' | 'unitId' | 'status' | 'externalId' | 'externalCode'>
+export type UpdateCommand = Pick<MaterialVo, 'code' | 'name' | 'specification' | 'categoryId' | 'unitId' | 'status' | 'externalId' | 'externalCode'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/basic/material', { method: 'DELETE', body: ids, scope: 'factory' })

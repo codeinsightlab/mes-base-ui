@@ -22,6 +22,7 @@ import type { PermissionScope } from '@/lib/request'
 const props = withDefaults(defineProps<{
   embedded?: boolean;
   managedEditing?: boolean;
+  beforeCreate?: () => Promise<Row | null>;
   editorWidth?: string;
   actionColumnWidth?: number;
   editorAccess?: boolean;
@@ -44,7 +45,7 @@ const props = withDefaults(defineProps<{
   readonly?: boolean;
   editableRow?: (row: Record<string, unknown>) => boolean;
   searchable?: boolean
-}>(), { idKey: 'id', fixedValues: undefined, permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
+}>(), { beforeCreate: undefined, idKey: 'id', fixedValues: undefined, permissionScope: undefined, searchable: true, listAction: 'read', detailAction: 'read' })
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth()
 const route = inject(routeLocationKey, undefined)
@@ -109,6 +110,13 @@ async function open(row?: Row) {
   error.value = ''
   editId.value = row ? String(row[props.idKey]) : null
   Object.keys(draft).forEach(k => delete draft[k])
+  if (!row && props.beforeCreate) {
+    try {
+      const initial = await props.beforeCreate()
+      if (!initial || auth.revision !== revision || context !== contextGeneration) return
+      Object.assign(draft, initial)
+    } catch(reason) { error.value = reason instanceof Error ? reason.message : '选择失败'; return }
+  }
   if (!row) Object.assign(draft, Object.fromEntries(props.fields.filter(field => field.defaultValue !== undefined).map(field => [field.key, field.defaultValue])))
   if (row) {
     try {

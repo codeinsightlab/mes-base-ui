@@ -17,6 +17,7 @@ const props = defineProps<{
   itemPermissionOverrides?: Record<string, string>;
   itemsReadonlyWhenDirty?: boolean;
   itemVersionField?: string;
+  itemBeforeCreate?: () => Promise<Row | null>;
 }>()
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
@@ -118,7 +119,7 @@ async function remove() {
   }
 }
 watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|')], clear)
-defineExpose({ open, refresh, back })
+defineExpose({ open, refresh, back, hasUnsavedChanges: () => JSON.stringify(draft) !== savedDraft })
 onBeforeUnmount(clear)
 </script>
 <template>
@@ -168,6 +169,7 @@ onBeforeUnmount(clear)
         list-action="list"
         detail-action="query"
         :fixed-values="fixedValues"
+        :before-create="itemBeforeCreate"
         :table-key="itemTableKey"
       >
         <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>

@@ -47,3 +47,5 @@ export const api = {
 
 export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
 export const sync = () => request<SyncResult>('/api/basic/material-category/actions/sync', { method: 'POST', scope: 'factory' })
+
+export const tree = () => request<Page>('/api/basic/material-category/tree', { scope: 'factory' })

@@ -1,0 +1,4 @@
+{
+  "id": "basic:materials", "name": "物料管理", "path": "/basic/materials",
+  "component": "basic/materials/index", "permission": "", "permissionScope": "factory", "kind": "MENU", "icon": "List", "children": []
+}

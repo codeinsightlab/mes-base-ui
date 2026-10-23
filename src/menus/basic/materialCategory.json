@@ -1,12 +1,20 @@
 {
-  "_generatedBy": "MES-CODEGEN",
   "id": "basic:materialCategory",
-  "name": "物料产品分类",
+  "name": "物料分类",
   "path": "/basic/materialCategory",
   "component": "basic/materialCategory/index",
   "permission": "business:material:category:list",
   "permissionScope": "factory",
   "kind": "MENU",
   "icon": "List",
-  "children": [{ "id": "basic:materialCategory:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "business:material:category:sync", "permissionScope": "factory" }]
+  "children": [
+    {
+      "id": "basic:materialCategory:sync",
+      "name": "同步",
+      "path": "#",
+      "kind": "BUTTON",
+      "permission": "business:material:category:sync",
+      "permissionScope": "factory"
+    }
+  ]
 }
