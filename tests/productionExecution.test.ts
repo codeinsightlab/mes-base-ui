@@ -14,7 +14,7 @@ vi.mock('../src/api/production/mesProductionExecution', () => ({ api }))
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   resolve.mockReset();scan.mockReset()
-  api.list.mockReset().mockResolvedValue({ items: [{ id: '9007199254740993',  workorderId: '1', routingId: '3', targetQty: '99999999999999.123456', status: 'READY' }], total: 1, offset: 0, limit: 20 })
+  api.list.mockReset().mockResolvedValue({ items: [{ id: '9007199254740993',  workorderId: '1', productId: '781234', productCode: 'P-001', routingId: '3', targetQty: '99999999999999.123456', status: 'READY' }], total: 1, offset: 0, limit: 20 })
 })
 function setup() {
   const pinia = createPinia(), auth = useAuth(pinia)
@@ -27,6 +27,10 @@ describe('production execution identity', () => {
     const context = setup(), wrapper = mount(Page, { global: context.global })
     await flushPromises()
     expect(wrapper.text()).toContain('9007199254740993')
+    expect(wrapper.text()).toContain('产出品号')
+    expect(wrapper.text()).toContain('P-001')
+    expect(wrapper.text()).not.toContain('781234')
+    expect(wrapper.text()).not.toContain('产出产品 ID')
     expect(wrapper.text()).toContain('99999999999999.12')
     expect(wrapper.find('span[title="99999999999999.123456"]').exists()).toBe(true)
     await wrapper.findAll('button').find(b => b.text() === '更多操作')!.trigger('click'); await flushPromises()
@@ -116,5 +120,12 @@ it('shows an execution with no historical batch as an ID and an ungenerated code
  await wrapper.get('button').trigger('click');await flushPromises()
  expect(resolve).toHaveBeenCalledExactlyOnceWith('9007199254740993');expect(scan).not.toHaveBeenCalled()
  expect(document.body.textContent).toContain('未生成（未记录批次）');expect(document.body.textContent).toContain('9007199254740993')
+ wrapper.unmount()
+})
+
+it('keeps executions readable when a product code is not returned without substituting the internal ID', async() => {
+ api.list.mockResolvedValueOnce({items:[{id:'1',workorderId:'1',productId:'781234',productCode:null,routingId:'3',targetQty:'1',status:'READY'}],total:1,offset:0,limit:20})
+ const context=setup(),wrapper=mount(Page,{global:context.global});await flushPromises()
+ expect(wrapper.text()).toContain('品号未记录');expect(wrapper.text()).not.toContain('781234')
  wrapper.unmount()
 })

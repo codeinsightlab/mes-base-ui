@@ -151,20 +151,29 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
  <section v-if="visible && can('quantity')" aria-label="生产数量与报工管理">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
   <div class="table-toolbar"><strong>{{ '执行 ' + executionId }}</strong><span v-if="quantity">计划数量：<QuantityText :value="quantity.targetQty" /> · 确认投产：<QuantityText :value="quantity.confirmedInputQty" /> · 撤销预留：<QuantityText :value="quantity.reservedInputQty" /> · 可支用投产额度：<QuantityText :value="quantity.productionInputQty" /> · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
-  <el-alert title="当前有效产出按正式报工与有效不良计算；历史返回及调整保留原数量含义。不良入仓不等于新增产出或最终报废。" type="info" :closable="false" />
+  <el-alert title="当前净产出按正式报工与有效不良计算。不良入仓不会增加产出，入库审核后核对完结条件。" type="info" :closable="false" />
   <p v-if="quantity && !quantity.writable" class="secondary">当前不可继续正常报工；历史补录、订正及冲销仍按独立权限与业务约束校验。</p>
   <el-alert v-if="quantity?.boundary" :title="quantity.boundary" type="warning" :closable="false" />
-  <el-alert v-if="quantity?.nodes.some(n => n.historicalConflict)" title="存在历史数量倒挂：上游晚申报不良使历史加工量超过当前输入。差额仅作投影，不会自动订正报工；新报工仍受当前有效输入限制。" type="warning" :closable="false" />
+  <el-alert v-if="quantity?.nodes.some(n => n.historicalConflict)" title="部分工序的已报数量超过当前有效输入，请核对报工和不良记录；新增报工仍按当前有效输入校验。" type="warning" :closable="false" />
   <el-alert v-if="!quantity && !loading && error" title="生产数量暂不能可靠计算，派生数量待确认；原始报工可在下方独立查看。" type="warning" :closable="false" />
   <el-alert v-if="!quantity && pathError" :title="'实际节点读取失败：' + pathError" type="error" :closable="false" />
-  <el-table v-if="quantity" v-loading="loading" :data="quantity.nodes" row-key="routingNodeId" :current-row-key="nodeId" max-height="280" border highlight-current-row empty-text="暂无已确定的执行路径" @row-click="chooseNode">
-   <el-table-column type="expand"><template #default="{row}"><el-descriptions :column="2" border><el-descriptions-item label="全部有效申报量（含待核实/重复）"><QuantityText :value="row.defectQty" /></el-descriptions-item><el-descriptions-item label="已核实独立不良"><QuantityText :value="row.directDefectQty" /></el-descriptions-item><el-descriptions-item label="历史已返回"><QuantityText :value="row.returnedQty" /></el-descriptions-item><el-descriptions-item label="当前净不良"><QuantityText :value="row.netDefectQty" /></el-descriptions-item><el-descriptions-item label="上游传播差额"><QuantityText :value="row.propagatedLossQty" /></el-descriptions-item><el-descriptions-item label="原始输入减报工差额"><QuantityText :value="row.rawAvailableQty" /></el-descriptions-item><el-descriptions-item label="未钳制产出差额"><QuantityText :value="row.rawEffectiveOutputQty" /></el-descriptions-item><el-descriptions-item label="归属待核实数量"><QuantityText :value="row.unverifiedDefectQty" /></el-descriptions-item></el-descriptions></template></el-table-column>
-   <el-table-column prop="sequenceNo" label="路径顺序" width="90" />
-   <el-table-column label="实际路径节点" min-width="190"><template #default="{row}"><el-button text type="primary" @click.stop="chooseNode(row)">{{ row.code }} · {{ row.name || '工序名称未记录' }}</el-button></template></el-table-column>
-   <el-table-column :formatter="quantityColumn" prop="inputQty" label="当前有效输入" min-width="140" /><el-table-column :formatter="quantityColumn" prop="reportedQty" label="历史加工完成数量" min-width="140" /><el-table-column :formatter="quantityColumn" prop="availableQty" label="剩余可报" min-width="140" />
-   <el-table-column label="当前净不良" min-width="110"><template #default="{row}">{{ row.qualityIntegrated ? displayQuantity(row.netDefectQty) : '未接入' }}</template></el-table-column>
-   <el-table-column :formatter="quantityColumn" prop="returnedQty" label="历史已返回量" min-width="110" /><el-table-column label="历史超报/传播差额" min-width="160"><template #default="{row}"><el-tag v-if="row.historicalConflict" type="danger"><QuantityText :value="row.historicalOverrunQty" /></el-tag><span v-else><QuantityText :value="row.historicalOverrunQty" /></span></template></el-table-column>
-   <el-table-column label="当前有效产出投影" min-width="190"><template #default="{row}"><QuantityText :value="row.effectiveOutputQty" /><span v-if="row.positiveReportBlockReason"> · 待核实，暂不可流转</span></template></el-table-column>
+  <el-table v-if="quantity" v-loading="loading" :data="quantity.nodes" row-key="routingNodeId" :current-row-key="nodeId" border highlight-current-row empty-text="暂无已确定的执行路径" @row-click="chooseNode">
+   <el-table-column type="expand"><template #default="{row}">
+    <div class="node-quality-details">
+     <el-alert v-if="row.positiveReportBlockReason" :title="row.positiveReportBlockReason" type="warning" :closable="false" />
+     <el-descriptions :column="2" border>
+      <el-descriptions-item label="不良申报数量（含待核实和重复申报）"><QuantityText :value="row.defectQty" /></el-descriptions-item>
+      <el-descriptions-item label="待核实不良数量"><QuantityText :value="row.unverifiedDefectQty" /></el-descriptions-item>
+     </el-descriptions>
+    </div>
+   </template></el-table-column>
+   <el-table-column prop="sequenceNo" label="顺序" width="75" />
+   <el-table-column label="工序" min-width="190"><template #default="{row}"><el-button text type="primary" @click.stop="chooseNode(row)">{{ row.name || '工序名称未记录' }}</el-button><span class="secondary">{{ row.code }}</span></template></el-table-column>
+   <el-table-column :formatter="quantityColumn" prop="inputQty" label="有效输入" min-width="130" />
+   <el-table-column :formatter="quantityColumn" prop="reportedQty" label="累计报工" min-width="130" />
+   <el-table-column label="有效不良" min-width="110"><template #default="{row}">{{ row.qualityIntegrated ? displayQuantity(row.netDefectQty) : '未接入' }}</template></el-table-column>
+   <el-table-column :formatter="quantityColumn" prop="availableQty" label="剩余可报" min-width="130" />
+   <el-table-column label="净产出" min-width="150"><template #default="{row}"><QuantityText :value="row.effectiveOutputQty" /><span v-if="row.positiveReportBlockReason"> · 待核实</span></template></el-table-column>
   </el-table>
   <section v-if="ledgerNode" class="report-ledger">
    <el-form v-if="!quantity" inline><el-form-item label="查看原始报工工序"><el-select :model-value="nodeId" @update:model-value="selectLedgerNode"><el-option v-for="n in ledgerNodes" :key="n.routingNodeId" :value="n.routingNodeId" :label="n.code + ' · ' + (n.name || '工序名称未记录')" /></el-select></el-form-item></el-form>
@@ -215,4 +224,5 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
 <style scoped>
 .report-command :deep(.el-select__input:focus-visible), .report-command :deep(.el-input__inner:focus-visible) { outline: none; }
 .report-ledger { margin-top: var(--ui-space-5); }
+.node-quality-details { padding: var(--ui-space-4); }
 </style>

@@ -6,6 +6,8 @@ export interface MesProductionExecutionVo {
   routingCode?: string | null; routingName?: string | null; routingVersion?: number | null; createByName?: string | null; updateByName?: string | null;
   workorderId: string;
   productId: string;
+  productCode?: string | null;
+  productName?: string | null;
   routingId: string;
   targetQty: string;
   status: string;

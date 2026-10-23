@@ -84,7 +84,7 @@ describe('production report management', () => {
  })
 
  it('shows exact quantities and explicit quality boundary without mutable CRUD', async() => {
-  await setup(); expect(document.body.textContent).toContain('99999999999999.12'); expect(document.body.textContent).toContain('当前有效产出按正式报工与有效不良计算；历史返回及调整保留原数量含义。不良入仓不等于新增产出或最终报废。')
+  await setup(); expect(document.body.textContent).toContain('99999999999999.12'); expect(document.body.textContent).toContain('当前净产出按正式报工与有效不良计算。不良入仓不会增加产出，入库审核后核对完结条件。')
   expect(document.body.textContent).toContain('历史操作人员'); expect(document.body.textContent).toContain('验收提交人员'); expect(document.body.textContent).not.toContain('实际操作人ID'); expect(document.body.textContent).toContain('1'); expect(document.body.textContent).not.toContain('未接入'); expect(document.body.textContent).not.toContain('质检合格')
   expect([...document.querySelectorAll('button')].some(b => b.textContent?.trim() === '删除')).toBe(false)
   expect(api.page).toHaveBeenCalledWith(id, node.routingNodeId, 0, 20)
@@ -155,4 +155,27 @@ it('explains closed normal reporting while preserving independently authorized h
  const {state}=await setup();expect(document.body.textContent).toContain('当前不可继续正常报工')
  await click('数量订正');Object.assign(state.form,{quantity:'-1',reason:'TEST ONLY历史订正'});await click('追加数量流水')
  expect(api.adjust).toHaveBeenCalledWith(id,'-1','TEST ONLY历史订正',expect.any(String))
+})
+
+it('lets the node table grow with expanded quality details and keeps technical differences out of routine columns',async()=>{
+ const {wrapper}=await setup()
+ const tables=wrapper.findAllComponents({name:'ElTable'}),summary=tables[0]!
+ expect(summary.props('maxHeight')).toBeUndefined();expect(summary.props('height')).toBeUndefined()
+ const labels=summary.findAll('thead th').map(cell=>cell.text()).filter(Boolean)
+ expect(labels).toEqual(['顺序','工序','有效输入','累计报工','有效不良','剩余可报','净产出'])
+ await summary.get('.el-table__expand-icon').trigger('click');await flushPromises()
+ expect(wrapper.text()).toContain('不良申报数量（含待核实和重复申报）')
+ expect(wrapper.text()).toContain('待核实不良数量')
+ for(const label of ['历史已返回','当前净不良','已核实独立不良','上游传播差额','原始输入减报工差额','未钳制产出差额','历史超报/传播差额'])expect(wrapper.text()).not.toContain(label)
+ expect(wrapper.text()).toContain('历史操作人员')
+ expect(api.page).toHaveBeenCalledWith(id,node.routingNodeId,0,20)
+})
+
+it('keeps quantity conflicts and raw reporting facts visible with the concise node layout',async()=>{
+ api.quantities.mockResolvedValueOnce({executionId:id,pathStatus:'LOCKED',nodes:[{...node,historicalConflict:true,positiveReportBlockReason:'存在待核实不良，请先核实'}]})
+ const {wrapper}=await setup()
+ expect(wrapper.text()).toContain('部分工序的已报数量超过当前有效输入')
+ expect(wrapper.text()).toContain('存在待核实不良，请先核实')
+ expect(wrapper.text()).toContain('历史操作人员')
+ expect(wrapper.text()).toContain('净产出')
 })

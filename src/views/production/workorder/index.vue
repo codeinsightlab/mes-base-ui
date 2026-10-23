@@ -178,7 +178,7 @@ onMounted(load)
       <el-form-item label="状态"><el-select v-model="status" clearable style="width:140px"><el-option v-for="(state, value) in orderStates" :key="value" :label="state.label" :value="value" /></el-select></el-form-item>
       <el-button native-type="submit" >查询</el-button>
     </QueryForm>
-    <div class="table-toolbar"><E10SyncPreview kind="workorder" permission="workorder:sync" @completed="load" /><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">执行目标合计含全部状态，不代表完成量；数量最多显示两位小数，悬停查看精确值</span></div>
+    <div class="table-toolbar"><E10SyncPreview kind="workorder" permission="workorder:sync" @completed="load" /><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量；数量最多显示两位小数，悬停查看精确值</span></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-table v-loading="loading" :data="rows" row-key="workorder.id">
       <el-table-column label="工单号" width="160"><template #default="{row}"><CodeText :value="row.workorder.code" /><el-tag v-if="row.erpExtraMissing" type="warning" size="small" title="该工单扩展记录缺失，详情和修改仍需通过完整性校验">扩展记录缺失</el-tag></template></el-table-column>
@@ -187,8 +187,7 @@ onMounted(load)
       <el-table-column label="计划数量" width="105" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.workorder.plannedQty)">{{ displayQuantity(row.workorder.plannedQty) }}</span></template></el-table-column>
       <el-table-column label="默认工艺" min-width="320"><template #default="{row}">{{ row.routingCode }} / V{{ row.routingVersion }}</template></el-table-column>
       <el-table-column label="执行目标合计" width="120" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.allocatedTargetQty)">{{ displayQuantity(row.allocation.allocatedTargetQty) }}</span></template></el-table-column>
-      <el-table-column label="尚未分配" width="105" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.remainingTargetQty)">{{ displayQuantity(row.allocation.remainingTargetQty) }}</span></template></el-table-column>
-      <el-table-column label="超额分配" width="105" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.excessTargetQty)">{{ displayQuantity(row.allocation.excessTargetQty) }}</span></template></el-table-column>
+      <el-table-column label="未分配执行数量" width="135" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.remainingTargetQty)">{{ displayQuantity(row.allocation.remainingTargetQty) }}</span></template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="{row}"><StatusTag v-bind="orderState(row.workorder.status)" /></template></el-table-column>
       <el-table-column label="创建时间" width="190" show-overflow-tooltip><template #default="{row}">{{ row.workorder.createTime || '—' }}</template></el-table-column>
       <el-table-column label="操作" fixed="right" width="280"><template #default="{row}">
@@ -221,13 +220,13 @@ onMounted(load)
         <el-descriptions :column="detailColumns" border>
           <el-descriptions-item label="来源">{{ detail.workorder.source || '历史待核实：禁止新交易' }}</el-descriptions-item><el-descriptions-item label="工单">{{ detail.workorder.code }}</el-descriptions-item><el-descriptions-item label="产出物料">{{ detail.productCode }} · {{ detail.productName }}</el-descriptions-item>
           <el-descriptions-item label="默认工艺">{{ detail.routing.code }} / V{{ detail.routing.version }}</el-descriptions-item><el-descriptions-item label="计划数量"><QuantityText :value="detail.allocation.plannedQty" /></el-descriptions-item>
-          <el-descriptions-item label="执行目标合计"><QuantityText :value="detail.allocation.allocatedTargetQty" /></el-descriptions-item><el-descriptions-item label="尚未分配"><QuantityText :value="detail.allocation.remainingTargetQty" /></el-descriptions-item>
-          <el-descriptions-item label="超额分配"><QuantityText :value="detail.allocation.excessTargetQty" /></el-descriptions-item><el-descriptions-item label="执行单元数">{{ detail.allocation.executionCount }}</el-descriptions-item>
+          <el-descriptions-item label="执行目标合计"><QuantityText :value="detail.allocation.allocatedTargetQty" /></el-descriptions-item><el-descriptions-item label="未分配执行数量"><QuantityText :value="detail.allocation.remainingTargetQty" /></el-descriptions-item>
+          <el-descriptions-item label="执行单元数">{{ detail.allocation.executionCount }}</el-descriptions-item>
         </el-descriptions>
-        <div class="table-toolbar"><span class="secondary">执行目标合计含全部状态，不代表实际完成量。</span><el-button v-if="can('release') && detail.workorder.status==='DRAFT' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" type="primary" :loading="busy" @click="release">下达工单</el-button></div>
-        <WorkorderMaterialPanel :readonly="!['DRAFT','RELEASED'].includes(detail.workorder.status)" v-if="detail.workorder.status!=='CANCELLED' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" :key="detail.workorder.id" :workorder-id="detail.workorder.id" />
-        <WorkOrderRoutePreview :workorder-id="detail.workorder.id" :routing-id="detail.workorder.routingId" />
-        <WorkOrderExecutions v-if="canExecutions" :key="detail.workorder.id" :workorder-id="detail.workorder.id" />
+        <div class="table-toolbar"><span class="secondary">未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量。</span><el-button v-if="can('release') && detail.workorder.status==='DRAFT' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" type="primary" :loading="busy" @click="release">下达工单</el-button></div>
+        <WorkorderMaterialPanel :readonly="!['DRAFT','RELEASED'].includes(detail.workorder.status)" v-if="detail.workorder.status!=='CANCELLED' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" :key="detail.workorder.id" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" />
+        <WorkOrderRoutePreview :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" :routing-id="detail.workorder.routingId" />
+        <WorkOrderExecutions v-if="canExecutions" :key="detail.workorder.id" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" />
         <el-alert v-else title="当前账号没有生产执行列表权限" type="info" :closable="false" />
         <el-collapse v-if="detail.batches.length"><el-collapse-item title="旧批次与已选路径（历史只读）">
           <el-alert title="保留旧模型数据；已确认出库或路径锁定不代表执行已开工，历史路径不参与新执行准入。" type="info" :closable="false" />

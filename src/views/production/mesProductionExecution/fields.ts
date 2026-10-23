@@ -22,13 +22,15 @@ export const fields: Field[] = [
     maxLength: 19
   },
   {
-    key: 'productId',
-    label: '产出产品 ID',
+    key: 'productCode',
+    label: '产出品号',
+    columnMinWidth: 180,
+    format: value => typeof value === 'string' && value.length ? value : '品号未记录',
     kind: 'text',
     readonly: true,
     required: false,
     searchable: false,
-    maxLength: 19
+    maxLength: 64
   },
   {
     key: 'routingId',

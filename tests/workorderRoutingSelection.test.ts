@@ -89,3 +89,14 @@ it('does not dispatch a late recall after factory selection changes during confi
   expect(recall).not.toHaveBeenCalled()
  } finally { confirm.mockRestore() }
 })
+
+it('explains unallocated execution quantity, removes excess allocation, and keeps a real negative remainder visible', async() => {
+ list.mockResolvedValue({ items: [{ workorder: { id: '1', code: 'WO', plannedQty: '100', status: 'RELEASED' },
+  allocation: { allocatedTargetQty: '110', remainingTargetQty: '-10', excessTargetQty: '10' } }], total: 1 })
+ await setup()
+ expect(wrapper.text()).toContain('未分配执行数量')
+ expect(wrapper.text()).toContain('计划数量－有效执行目标合计')
+ expect(wrapper.text()).not.toContain('尚未分配')
+ expect(wrapper.text()).not.toContain('超额分配')
+ expect(wrapper.find('span[title="-10"]').text()).toBe('-10')
+})
