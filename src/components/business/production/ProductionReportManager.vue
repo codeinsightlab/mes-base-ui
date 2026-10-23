@@ -6,12 +6,19 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ApiError } from '@/lib/request'
 import { useAuth } from '@/stores/auth'
 import Pagination from '@/components/Pagination/index.vue'
+import { executionActions, type PathView } from '@/api/production/executionActions'
 import { productionReport as api, reportPermissions, type ExecutionQuantity, type NodeQuantity, type Ledger, type Detail, type HistoricalUser } from '@/api/production/productionReport'
 const props = defineProps<{ executionId: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref('')
 const quantity = ref<ExecutionQuantity | null>(null), nodeId = ref(''), rows = ref<Ledger[]>([]), total = ref(0), page = ref(1), limit = ref(20), ledgerLoading = ref(false)
 const node = computed(() => quantity.value?.nodes.find(n => n.routingNodeId === nodeId.value))
+const path = ref<PathView | null>(null), pathError = ref(''), ledgerError = ref('')
+const ledgerNodes = computed(() => quantity.value?.nodes ?? path.value?.selectedNodeIds.flatMap(id => {
+ const n = path.value!.nodes.find(n => n.id === id)
+ return n ? [{ routingNodeId: n.id, code: n.nodeCode, name: n.operationName }] : []
+}) ?? [])
+const ledgerNode = computed(() => ledgerNodes.value.find(n => n.routingNodeId === nodeId.value))
 // This manager edits historical facts; writable only describes normal forward reporting.
 const historyWritable = computed(() => quantity.value?.pathStatus === 'LOCKED')
 const can = (action: keyof typeof reportPermissions) => auth.hasPermission(reportPermissions[action], 'factory')
@@ -25,23 +32,49 @@ let generation = 0, ledgerSequence = 0, userSequence = 0, historySequence = 0
 const commandTitle = computed(() => command.value === 'supplement' ? '管理员历史补录' : command.value === 'adjust' ? '管理员数量订正' : '原始报工整笔冲销')
 function setCommandVisible(value: boolean) { if (!value && !pending.value) clearCommand() }
 function clearCommand() { pending.value = null; userSequence++; command.value = null; original.value = null; users.value = []; usersLoading.value = false; saving.value = false; commandError.value = ''; Object.assign(form, { quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' }) }
-function clear() { generation++; ledgerSequence++; historySequence++; visible.value = false; quantity.value = null; rows.value = []; nodeId.value = ''; total.value = 0; page.value = 1; loading.value = false; ledgerLoading.value = false; error.value = ''; clearCommand(); historyVisible.value = false; detail.value = null; history.value = []; historyLoading.value = false }
+function clear() { generation++; ledgerSequence++; historySequence++; visible.value = false; quantity.value = null; path.value = null; pathError.value = ''; ledgerError.value = ''; rows.value = []; nodeId.value = ''; total.value = 0; page.value = 1; loading.value = false; ledgerLoading.value = false; error.value = ''; clearCommand(); historyVisible.value = false; detail.value = null; history.value = []; historyLoading.value = false }
 watch(() => props.executionId, () => { clear(); if (props.executionId && can('quantity')) { visible.value = true; void refresh() } }, { flush: 'sync', immediate: true })
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
 onBeforeUnmount(clear)
 async function refresh() {
- const ticket = ++generation; loading.value = true; error.value = ''
- try { const result = await api.quantities(props.executionId); if (ticket !== generation || !visible.value) return; quantity.value = result; if (!result.nodes.some(n => n.routingNodeId === nodeId.value)) nodeId.value = result.nodes[0]?.routingNodeId ?? ''; await loadLedger() }
- catch(e) { if (ticket === generation) error.value = e instanceof Error ? e.message : '数量读取失败' }
- finally { if (ticket === generation) loading.value = false }
+ const ticket = ++generation; ledgerSequence++; loading.value = true; error.value = ''; pathError.value = ''; ledgerError.value = ''
+ quantity.value = null; path.value = null; rows.value = []; total.value = 0
+ let requestedNode = ''
+ async function refreshLedger() {
+  if (ticket !== generation || !visible.value) return
+  if (!ledgerNodes.value.some(n => n.routingNodeId === nodeId.value)) { nodeId.value = ledgerNodes.value[0]?.routingNodeId ?? ''; page.value = 1 }
+  if (!nodeId.value || nodeId.value === requestedNode) return
+  requestedNode = nodeId.value
+  await loadLedger()
+ }
+ const reads = [api.quantities(props.executionId).then(async value => {
+  if (ticket !== generation || !visible.value) return
+  quantity.value = value
+  await refreshLedger()
+ }).catch(e => {
+  if (ticket === generation) error.value = e instanceof Error ? e.message : '数量读取失败'
+ })]
+ if (can('detail') && auth.hasPermission('business:mes:production:execution:query', 'factory')) {
+  reads.push(executionActions.path(props.executionId).then(async value => {
+   if (ticket !== generation || !visible.value) return
+   path.value = value
+   await refreshLedger()
+  }).catch(e => {
+   if (ticket === generation) pathError.value = e instanceof Error ? e.message : '实际节点读取失败'
+  }))
+ }
+ try {
+  await Promise.all(reads)
+ } finally { if (ticket === generation) loading.value = false }
 }
-async function chooseNode(row: NodeQuantity) { nodeId.value = row.routingNodeId; page.value = 1; await loadLedger() }
+async function chooseNode(row: { routingNodeId: string }) { nodeId.value = row.routingNodeId; page.value = 1; await loadLedger() }
+function selectLedgerNode(value: unknown) { void chooseNode({ routingNodeId: String(value) }) }
 async function loadLedger() {
- const ticket = ++ledgerSequence; rows.value = []; total.value = 0
+ const ticket = ++ledgerSequence; rows.value = []; total.value = 0; ledgerError.value = ''
  if (!visible.value || !nodeId.value || !can('detail')) return
  ledgerLoading.value = true
  try { const result = await api.page(props.executionId, nodeId.value, (page.value - 1) * limit.value, limit.value); if (ticket !== ledgerSequence) return; rows.value = result.items; total.value = result.total }
- catch(e) { if (ticket === ledgerSequence) error.value = e instanceof Error ? e.message : '流水读取失败' }
+ catch(e) { if (ticket === ledgerSequence) ledgerError.value = e instanceof Error ? e.message : '流水读取失败' }
  finally { if (ticket === ledgerSequence) ledgerLoading.value = false }
 }
 async function openCommand(mode: 'supplement' | 'adjust' | 'void', row?: Ledger) {
@@ -122,7 +155,9 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
   <p v-if="quantity && !quantity.writable" class="secondary">当前不可继续正常报工；历史补录、订正及冲销仍按独立权限与业务约束校验。</p>
   <el-alert v-if="quantity?.boundary" :title="quantity.boundary" type="warning" :closable="false" />
   <el-alert v-if="quantity?.nodes.some(n => n.historicalConflict)" title="存在历史数量倒挂：上游晚申报不良使历史加工量超过当前输入。差额仅作投影，不会自动订正报工；新报工仍受当前有效输入限制。" type="warning" :closable="false" />
-  <el-table v-loading="loading" :data="quantity?.nodes || []" row-key="routingNodeId" :current-row-key="nodeId" max-height="280" border highlight-current-row empty-text="暂无已确定的执行路径" @row-click="chooseNode">
+  <el-alert v-if="!quantity && !loading && error" title="生产数量暂不能可靠计算，派生数量待确认；原始报工可在下方独立查看。" type="warning" :closable="false" />
+  <el-alert v-if="!quantity && pathError" :title="'实际节点读取失败：' + pathError" type="error" :closable="false" />
+  <el-table v-if="quantity" v-loading="loading" :data="quantity.nodes" row-key="routingNodeId" :current-row-key="nodeId" max-height="280" border highlight-current-row empty-text="暂无已确定的执行路径" @row-click="chooseNode">
    <el-table-column type="expand"><template #default="{row}"><el-descriptions :column="2" border><el-descriptions-item label="全部有效申报量（含待核实/重复）"><QuantityText :value="row.defectQty" /></el-descriptions-item><el-descriptions-item label="已核实独立不良"><QuantityText :value="row.directDefectQty" /></el-descriptions-item><el-descriptions-item label="历史已返回"><QuantityText :value="row.returnedQty" /></el-descriptions-item><el-descriptions-item label="当前净不良"><QuantityText :value="row.netDefectQty" /></el-descriptions-item><el-descriptions-item label="上游传播差额"><QuantityText :value="row.propagatedLossQty" /></el-descriptions-item><el-descriptions-item label="原始输入减报工差额"><QuantityText :value="row.rawAvailableQty" /></el-descriptions-item><el-descriptions-item label="未钳制产出差额"><QuantityText :value="row.rawEffectiveOutputQty" /></el-descriptions-item><el-descriptions-item label="归属待核实数量"><QuantityText :value="row.unverifiedDefectQty" /></el-descriptions-item></el-descriptions></template></el-table-column>
    <el-table-column prop="sequenceNo" label="路径顺序" width="90" />
    <el-table-column label="实际路径节点" min-width="190"><template #default="{row}"><el-button text type="primary" @click.stop="chooseNode(row)">{{ row.code }} · {{ row.name || '工序名称未记录' }}</el-button></template></el-table-column>
@@ -131,12 +166,14 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
    <el-table-column :formatter="quantityColumn" prop="returnedQty" label="历史已返回量" min-width="110" /><el-table-column label="历史超报/传播差额" min-width="160"><template #default="{row}"><el-tag v-if="row.historicalConflict" type="danger"><QuantityText :value="row.historicalOverrunQty" /></el-tag><span v-else><QuantityText :value="row.historicalOverrunQty" /></span></template></el-table-column>
    <el-table-column label="当前有效产出投影" min-width="190"><template #default="{row}"><QuantityText :value="row.effectiveOutputQty" /><span v-if="row.positiveReportBlockReason"> · 待核实，暂不可流转</span></template></el-table-column>
   </el-table>
-  <section v-if="node" class="report-ledger">
-   <el-alert v-if="node.positiveReportBlockReason" :title="node.positiveReportBlockReason" type="warning" :closable="false" /><div class="table-toolbar"><strong>{{ node.code }} · {{ node.name || '工序名称未记录' }} — 数量流水</strong><el-button v-if="can('supplement')" type="primary" :disabled="!historyWritable || !!node.positiveReportBlockReason" @click="openCommand('supplement')">管理员历史补录</el-button></div>
+  <section v-if="ledgerNode" class="report-ledger">
+   <el-form v-if="!quantity" inline><el-form-item label="查看原始报工工序"><el-select :model-value="nodeId" @update:model-value="selectLedgerNode"><el-option v-for="n in ledgerNodes" :key="n.routingNodeId" :value="n.routingNodeId" :label="n.code + ' · ' + (n.name || '工序名称未记录')" /></el-select></el-form-item></el-form>
+   <el-alert v-if="ledgerError" :title="ledgerError" type="error" :closable="false" />
+   <el-alert v-if="node?.positiveReportBlockReason" :title="node.positiveReportBlockReason" type="warning" :closable="false" /><div class="table-toolbar"><strong>{{ ledgerNode.code }} · {{ ledgerNode.name || '工序名称未记录' }} — 数量流水</strong><el-button v-if="can('supplement')" type="primary" :disabled="!historyWritable || !!node?.positiveReportBlockReason" @click="openCommand('supplement')">管理员历史补录</el-button></div>
    <p class="secondary">数量流水只可追加；订正和冲销均保留原始报工及操作原因，报工只登记事实，入库审核后统一核对收尾条件。</p>
    <p v-if="!can('detail')" class="secondary">暂无查看报工流水的权限。</p>
    <template v-else>
-    <el-table v-loading="ledgerLoading" :data="rows" border :empty-text="error ? '流水读取失败，请刷新重试' : '当前节点暂无数量流水'">
+    <el-table v-loading="ledgerLoading" :data="rows" border :empty-text="ledgerError ? '流水读取失败，请刷新重试' : '当前节点暂无数量流水'">
      <el-table-column prop="id" label="流水编号" min-width="120" /><el-table-column label="类型" width="100"><template #default="{row}">{{ row.recordType === 'REPORT' ? '原始报工' : '数量调整' }}</template></el-table-column>
      <el-table-column :formatter="quantityColumn" prop="quantityDelta" label="数量变化" min-width="140" /><el-table-column prop="referenceReportId" label="原始流水" min-width="120" />
      <el-table-column label="实际操作人" min-width="150"><template #default="{row}"><span :title="'用户 ID：' + row.operatorUserId">{{ person(row.operatorName,row.operatorUserId) }}</span></template></el-table-column><el-table-column label="提交人" min-width="150"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column>
