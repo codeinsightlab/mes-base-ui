@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import QueryForm from '@/components/QueryForm.vue'
+
 import ColumnSettings from '@/components/ColumnSettings.vue'
 import { useTableColumns } from '@/lib/useTableColumns'
 import { tableRouteUrl } from '@/lib/tableColumns'
@@ -132,6 +134,16 @@ async function save() {
       return
     }
   }
+  const previous = JSON.parse(savedDraft || '{}') as Row
+  for (const field of editable.value) {
+    const value = draft[field.key]
+    if (field.kind === 'decimal' && field.fractionDigits != null && value != null && value !== '' &&
+        (!editId.value || String(value) !== String(previous[field.key])) &&
+        !new RegExp('^[+-]?\\d{1,14}(?:\\.\\d{1,' + field.fractionDigits + '})?$').test(String(value))) {
+      ElMessage.warning(field.label + '最多' + field.fractionDigits + '位小数')
+      return
+    }
+  }
   const revision = auth.revision
   const context = contextGeneration
   const scopeValues = JSON.stringify(props.fixedValues)
@@ -251,12 +263,12 @@ defineExpose({ load })
 <template>
   <section :class="embedded ? 'document-lines' : 'app-container'">
     <PageHeader v-if="!embedded" :title="title" />
-    <el-form
+    <QueryForm
       v-if="searchFields.length && can(props.listAction)"
       v-show="showSearch"
       :inline="true"
       class="filter-panel"
-      @submit.prevent="searchNow"
+      @submit="searchNow"
     >
       <el-form-item v-for="field in searchFields" :key="field.key" :label="field.label">
         <slot :name="`search-${field.key}`" :search="search" :field="field">
@@ -268,9 +280,9 @@ defineExpose({ load })
       </el-form-item>
       <el-form-item>
         <el-button type="primary" native-type="submit" icon="Search">查询</el-button>
-        <el-button icon="Refresh" @click="reset">重置</el-button>
+        <el-button native-type="button" icon="Refresh" @click="reset">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
     <div class="table-toolbar">
       <el-button v-if="!readonly && !managedEditing && can('create')" type="primary" icon="Plus" @click="open()">新增
       </el-button>
@@ -332,7 +344,8 @@ defineExpose({ load })
           <span
             v-else
             :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
-          >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? formatValue(row[field.key], field.kind)
+            :title="field.kind === 'decimal' && row[field.key] != null ? String(row[field.key]) : undefined"
+          >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? field.format?.(row[field.key]) ?? formatValue(row[field.key], field.kind)
           }}</span>
           </slot></template>
       </el-table-column>

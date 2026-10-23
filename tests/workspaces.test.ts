@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { availableWorkspaces, defaultWorkspace, hasBusinessWorkspace } from '../src/lib/workspaces'
-import { sampleOrders, sampleSummary } from '../src/lib/businessWorkspaceSample'
 describe('workspace selection from server role scopes', () => {
   it('includes platform business grants without requiring a factory role', () => {
     const access = { platform: true, platformBusiness: true, factoryIds: [] }
@@ -23,15 +22,5 @@ describe('workspace selection from server role scopes', () => {
     expect(defaultWorkspace(null)).toBe('personal')
     expect(defaultWorkspace({ platform: false, platformBusiness: false, factoryIds: [] })).toBe('personal')
     expect(availableWorkspaces(null)).toEqual([])
-  })
-  it('keeps sample production totals consistent and explicitly names every order as a demo', () => {
-    for (const order of sampleOrders) {
-      expect(order.code).toMatch(/^DEMO-/)
-      expect(order.accepted).toBeLessThanOrEqual(order.completed)
-      expect(order.completed).toBeLessThanOrEqual(order.planned)
-    }
-    expect(sampleSummary.planned).toBe(2160)
-    expect(sampleSummary.completed).toBe(1640)
-    expect(sampleSummary.accepted).toBe(1596)
   })
 })

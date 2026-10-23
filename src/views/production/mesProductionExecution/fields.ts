@@ -1,24 +1,16 @@
+import { executionStatusOptions } from '@/lib/production/executionState'
+import { displayQuantity } from '@/lib/production/quantity'
 import type { Field } from '@/lib/crud'
 
 export const fields: Field[] = [
   {
     key: 'id',
-    label: 'ID',
+    label: '执行ID',
     kind: 'text',
     readonly: true,
     required: true,
-    searchable: false,
-    maxLength: 19
-  },
-  {
-    key: 'executionNo',
-    columnMinWidth: 200,
-    label: '执行编号',
-    kind: 'text',
-    readonly: true,
-    required: false,
     searchable: true,
-    maxLength: 64
+    maxLength: 19
   },
   {
     key: 'workorderId',
@@ -52,6 +44,8 @@ export const fields: Field[] = [
     key: 'targetQty',
     label: '计划执行数量',
     kind: 'decimal',
+    fractionDigits: 2,
+    format: value => displayQuantity(typeof value === 'string' || typeof value === 'number' ? value : null),
     readonly: false,
     required: true,
     searchable: false,
@@ -61,7 +55,7 @@ export const fields: Field[] = [
     key: 'status',
     readonly: true,
     defaultValue: 'READY',
-    options: [{ label: '待执行', value: 'READY', tone: 'info' }, { label: '执行中', value: 'RUNNING', tone: 'warning' }, { label: '已结束', value: 'COMPLETED', tone: 'success' }, { label: '已取消', value: 'CANCELLED', tone: 'danger' }],
+    options: [...executionStatusOptions],
     label: '执行状态',
     kind: 'text',
     required: true,

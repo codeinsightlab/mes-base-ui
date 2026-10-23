@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onActivated } from 'vue'
 import { useRoute } from 'vue-router' 
 import MaterialIssueSubmitAction from '@/components/business/MaterialIssueSubmitAction.vue'
 import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
@@ -12,9 +12,10 @@ import { api as headerApi } from '@/api/issue/mesMaterialIssue'
 import { api as itemApi } from '@/api/issue/mesMaterialIssueItem'
 import { headerFields, itemFields } from '../fields'
 const route = useRoute(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
-function openLinkedIssue() { const id = route.query.issueId; if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({id}) }
+function openLinkedIssue() { const id = route.query.issueId; if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({id}); else if (route.query.view === 'list') void document.value?.back() }
 onMounted(openLinkedIssue)
 watch(() => route.query.issueId, openLinkedIssue)
+onActivated(() => { if (route.query.view === 'list' && !route.query.issueId) void document.value?.back() })
 </script>
 <template>
   <MasterDetailDocument ref="document"

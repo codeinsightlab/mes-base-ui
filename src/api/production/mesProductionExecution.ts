@@ -3,7 +3,6 @@ import { request } from '@/lib/request'
 export interface MesProductionExecutionVo {
   [key: string]: unknown;
   id: string;
-  executionNo: string;
   routingCode?: string | null; routingName?: string | null; routingVersion?: number | null; createByName?: string | null; updateByName?: string | null;
   workorderId: string;
   productId: string;

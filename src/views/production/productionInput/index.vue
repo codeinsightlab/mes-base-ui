@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import QueryForm from '@/components/QueryForm.vue'
+
+import CodeScanner from '@/components/scanner/CodeScanner.vue'
+import { displayQuantity } from '@/lib/production/quantity'
+import QuantityText from '@/components/business/production/QuantityText.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/stores/auth'
@@ -60,7 +65,7 @@ async function loadPreview() {
  catch (e) { if (ticket === previewSequence) error.value = e instanceof Error ? e.message : '执行工艺读取失败' }
 }
 async function calculate() {
- if (!orderId.value || !stockId.value || !/^\d{1,14}(\.\d{1,6})?$/.test(outputQty.value) || !/[1-9]/.test(outputQty.value) || busy.value || !allowed.value) return
+ if (!orderId.value || !stockId.value || !/^\d{1,14}(\.\d{1,2})?$/.test(outputQty.value) || !/[1-9]/.test(outputQty.value) || busy.value || !allowed.value) return
  const ticket = ++calculateSequence; busy.value = true; error.value = ''; calculation.value = null
  try { const data = await api.calculate({code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: outputQty.value}); if (ticket === calculateSequence) calculation.value = data }
  catch (e) { if (ticket === calculateSequence) error.value = e instanceof Error ? e.message : '用料计算失败' }
@@ -79,28 +84,30 @@ function again() { if (result.value?.status !== 'CONFIRMED') return; pending.val
 </script>
 <template>
  <section class="page-shell production-input">
-  <PageHeader title="扫码投产" description="单材料投产 · 同一产品、材料及批次复用同一执行" />
+  <PageHeader title="扫码投产" description="单材料投产 · 扫描工单、成品品号及生产批次" />
   <el-alert v-if="!allowed" title="没有正式投产权限" type="warning" :closable="false" />
   <template v-else>
    <el-alert v-if="error" :title="error" type="error" :closable="false" />
-   <el-form class="filter-panel" inline @submit.prevent="query">
-    <el-form-item label="扫码内容"><el-input v-model="code" placeholder="材料品号#批次 或 MES1 生产身份码" maxlength="2048" :disabled="busy || !!pending" /></el-form-item>
-    <el-button type="primary" :loading="busy" :disabled="!code || !!pending" @click="query">查询库存与工单</el-button>
-   </el-form>
+   <QueryForm class="filter-panel input-scan" label-position="top" @submit="query">
+    <el-form-item label="工单 / 成品品号 / 生产批次"><el-input v-model="code" placeholder="工单号:成品品号#批次号，例如 WO001:P001#LOT001" maxlength="2048" :disabled="busy || !!pending" aria-label="工单 / 成品品号 / 生产批次" aria-describedby="production-input-scan-help" /></el-form-item>
+    <el-button native-type="submit" type="primary" :loading="busy" :disabled="!code || !!pending" >查询库存与工单</el-button>
+    <CodeScanner v-model="code" :disabled="busy || !!pending || !allowed" :context-key="auth.factoryId + ':' + auth.revision" @confirm="query" />
+   </QueryForm>
+   <p id="production-input-scan-help" class="secondary">按“工单号:成品品号#批次号”填写，例如 WO001:P001#LOT001；材料由该工单的正式用料配置确定。</p>
    <template v-if="supply">
     <el-alert :title="supply.sourceMode === 'LOCAL_ONLY' ? '独立 MES 模式：使用本地批次库存与受控工单用料依据' : 'ERP 模式：由配置的适配器提供库存与工单依据'" type="info" :closable="false" />
     <el-empty v-if="!supply.stocks.length" description="没有该材料批次的合法可用库存" />
     <el-empty v-else-if="!supply.orders.length" description="没有匹配的工单；请检查已下达工单、用料配置与允许仓库" />
     <el-form v-else label-position="top" class="panel">
-     <el-form-item label="生产工单"><el-select v-model="orderId" :disabled="busy || !!pending" placeholder="选择工单、产出产品与工作中心"><el-option v-for="o in supply.orders" :key="o.workorderId" :value="o.workorderId" :label="`${o.workorderCode} · ${o.productCode} ${o.productName} · ${o.workCenter} · 计划 ${o.plannedQty} ${o.outputUnitCode} · ${o.status}`" /></el-select></el-form-item>
+     <el-form-item label="生产工单"><el-select v-model="orderId" :disabled="busy || !!pending" placeholder="选择工单、产出产品与工作中心"><el-option v-for="o in supply.orders" :key="o.workorderId" :value="o.workorderId" :label="`${o.workorderCode} · ${o.productCode} ${o.productName} · ${o.workCenter} · 计划 ${displayQuantity(o.plannedQty)} ${o.outputUnitCode} · ${o.status}`" /></el-select></el-form-item>
      <p class="secondary">已加载 {{ supply.orders.length }} / {{ supply.total ?? supply.orders.length }} 张匹配工单 <el-button v-if="supply.orders.length < supply.total" link :loading="busy" :disabled="!!pending" @click="moreOrders">加载更多匹配工单</el-button></p>
-     <el-form-item label="材料库存来源"><el-select v-model="stockId" :disabled="!orderId || busy || !!pending" placeholder="明确选择仓库、批次及库位"><el-option v-for="s in stockOptions" :key="s.reference" :value="s.reference" :label="`${s.materialCode} / ${s.lotCode} · ${s.warehouseCode}${s.binCode ? ' / '+s.binCode : ''} · 可用 ${s.availableQty} ${s.unitCode}`" /></el-select></el-form-item>
-     <el-form-item :label="'本次预计成品产出数量' + (supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode ? '（' + supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode + '）' : '')"><el-input v-model="outputQty" inputmode="decimal" :disabled="busy || !!pending" placeholder="正数，最多6位小数" /></el-form-item>
+     <el-form-item label="材料库存来源"><el-select v-model="stockId" :disabled="!orderId || busy || !!pending" placeholder="明确选择仓库、批次及库位"><el-option v-for="s in stockOptions" :key="s.reference" :value="s.reference" :label="`${s.materialCode} / ${s.lotCode} · ${s.warehouseCode}${s.binCode ? ' / '+s.binCode : ''} · 可用 ${displayQuantity(s.availableQty)} ${s.unitCode}`" /></el-select></el-form-item>
+     <el-form-item :label="'本次预计成品产出数量' + (supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode ? '（' + supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode + '）' : '')"><el-input v-model="outputQty" inputmode="decimal" :disabled="busy || !!pending" placeholder="正数，最多2位小数" /></el-form-item>
      <el-button :disabled="!stockId || !outputQty || !!pending" :loading="busy" @click="calculate">计算本次材料领用量</el-button>
-     <el-descriptions v-if="calculation" :column="1" border><el-descriptions-item label="预计产出">{{ calculation.outputQty }} {{ calculation.order.outputUnitCode }}</el-descriptions-item><el-descriptions-item label="材料领用">{{ calculation.issueQty }} {{ calculation.stock.unitCode }}</el-descriptions-item><el-descriptions-item label="库存读取时间">{{ calculation.stock.observedAt }}</el-descriptions-item></el-descriptions>
+     <el-descriptions v-if="calculation" :column="1" border><el-descriptions-item label="预计产出"><QuantityText :value="calculation.outputQty" /> {{ calculation.order.outputUnitCode }}</el-descriptions-item><el-descriptions-item label="材料领用"><QuantityText :value="calculation.issueQty" /> {{ calculation.stock.unitCode }}</el-descriptions-item><el-descriptions-item label="库存读取时间">{{ calculation.stock.observedAt }}</el-descriptions-item></el-descriptions>
      <template v-if="preview">
       <el-alert v-if="terminal" title="此生产身份已进入终态，不能继续投产或自动重新绑定" type="warning" :closable="false" />
-      <h3>{{ preview.actual ? preview.actual.executionNo + ' · ' + preview.actual.executionStatus : '首次投产将创建执行单元' }}</h3>
+      <h3>{{ preview.actual ? preview.actual.executionId + ' · ' + preview.actual.executionStatus : '首次投产将创建执行单元' }}</h3>
       <p>{{ preview.definition.routing.code }} / V{{ preview.definition.routing.version }} · {{ preview.definition.routing.name }}</p>
       <RoutingGraphPreview :nodes="preview.definition.nodes" :edges="preview.definition.edges" :selected-node-ids="selected" />
       <ol aria-label="本次实际路径"><li v-for="id in selected" :key="id">{{ preview.definition.nodes.find(n => n.id === id)?.nodeCode }} · {{ preview.definition.nodes.find(n => n.id === id)?.operationName }}</li></ol>
@@ -115,7 +122,7 @@ function again() { if (result.value?.status !== 'CONFIRMED') return; pending.val
    </template>
    <div v-if="pending && result?.status !== 'CONFIRMED'" class="table-toolbar" role="status"><span>原投产请求 {{ pending.requestId }}：结果待确认</span><el-button :loading="busy" @click="submit">使用原请求重查</el-button></div>
    <el-button v-if="result?.issueId" @click="router.push({path:'/issue/mesMaterialIssue',query:{issueId:result.issueId}})">打开本次领料单并核实</el-button>
-   <el-descriptions v-if="result" :column="1" border><el-descriptions-item label="执行单元">{{ result.executionNo }}</el-descriptions-item><el-descriptions-item label="领料结果">{{ result.status }}</el-descriptions-item><el-descriptions-item label="生产身份码">{{ result.code }}</el-descriptions-item><el-descriptions-item label="当前可支用投产额度">{{ result.productionInputQty }}</el-descriptions-item><el-descriptions-item label="首工序剩余可报">{{ result.availableQty }}</el-descriptions-item><el-descriptions-item label="请求号">{{ result.requestId }}</el-descriptions-item></el-descriptions>
+   <el-descriptions v-if="result" :column="1" border><el-descriptions-item label="执行单元">{{ result.executionId }}</el-descriptions-item><el-descriptions-item label="领料结果">{{ result.status }}</el-descriptions-item><el-descriptions-item label="生产身份码">{{ result.code || '未生成（未记录批次）' }}</el-descriptions-item><el-descriptions-item label="当前可支用投产额度"><QuantityText :value="result.productionInputQty" /></el-descriptions-item><el-descriptions-item label="首工序剩余可报"><QuantityText :value="result.availableQty" /></el-descriptions-item><el-descriptions-item label="请求号">{{ result.requestId }}</el-descriptions-item></el-descriptions>
    <el-alert v-if="result && result.status !== 'CONFIRMED'" title="本次尚未贡献投产额度，请在领料管理中核实原操作；不要重新发起同一次领料。" type="warning" :closable="false" />
    <div v-if="result?.status === 'CONFIRMED'" class="table-toolbar"><el-button @click="again">再次投产</el-button><el-button @click="router.push({path:'/production/productionReport',query:{executionId:result.executionId,workorderId:orderId}})">查看生产数量</el-button></div>
   </template>
@@ -125,8 +132,12 @@ function again() { if (result.value?.status !== 'CONFIRMED') return; pending.val
 <style scoped>
 .production-input :deep(.el-select) { width: 100%; }
 .production-input :deep(.el-descriptions__label) { width: 120px; min-width: 120px; word-break: normal; }
-.production-input .filter-panel :deep(.el-input) { width: 100%; }
+.production-input .input-scan :deep(.el-input) { width: 100% !important; }
 .production-input :deep(.el-descriptions__content) { overflow-wrap: anywhere; word-break: break-all; }
-.production-input .filter-panel { display: flex; flex-wrap: wrap; }
-.production-input .filter-panel :deep(.el-form-item) { flex: 1; min-width: min(100%, 320px); }
+.input-scan { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ui-space-3); }
+.input-scan .el-form-item { flex: 0 1 640px; min-width: min(100%, 320px); max-width: 100%; margin: 0; }
+.input-scan :deep(.el-form-item__label) { height: auto; line-height: 1.5; }
+.input-scan :deep(.el-form-item__content) { min-width: 0; }
+.input-scan :deep(.el-input__wrapper) { min-height: 44px; }
+.input-scan .el-button { flex-shrink: 0; min-height: 44px; margin-left: 0; }
 </style>

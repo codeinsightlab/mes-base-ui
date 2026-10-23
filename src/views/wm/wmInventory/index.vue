@@ -136,6 +136,7 @@ const fields: Field[] = [
     permission="business:wm:inventory"
     list-action="list"
     detail-action="query"
+    :action-column-width="280"
     :api="api"
     :readonly="auth.runtimeMode!=='LOCAL'"
     :editable-row="row => row.warehouseSource==='LOCAL'"
@@ -159,7 +160,7 @@ const fields: Field[] = [
       <span class="secondary">外部镜像仅供参考，不作为正式库存交易依据。</span>
       <SyncButton v-if="auth.runtimeMode==='ERP'" permission="business:wm:inventory:sync" scope="factory" :run="sync" @completed="page?.load()" />
     </template>
-    <template #actions="{ row }"><el-button v-if="auth.hasPermission('business:wm:inventory:query', 'factory')" link @click="stockPanel?.open(String(row.id))">库存业务 / 流水</el-button></template>
+    <template #actions="{ row }"><el-button v-if="auth.hasPermission('business:wm:inventory:query', 'factory')" text type="primary" @click="stockPanel?.open(String(row.id))">库存业务 / 流水</el-button></template>
   </CrudPage>
   <LocalStockPanel ref="stockPanel" @changed="page?.load()" />
 </template>

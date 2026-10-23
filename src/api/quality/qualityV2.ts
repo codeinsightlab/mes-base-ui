@@ -7,7 +7,7 @@ export interface TypeInput { code: string; name: string; defaultWasteCategory: W
 export interface Page<T> { items: T[]; total: number; offset: number; limit: number }
 export interface DeclarationContext { executionId: string; nodeId: string; operationId: string; operationName: string | null; productId: string; productCode: string; productName: string; types: DefectType[]; typeTotal: number; offset: number; limit: number; canOverrideWasteCategory: boolean }
 export interface Declaration { requestId: string; executionId: string; nodeId: string; defectTypeId: string; expectedTypeRevision: number; quantity: string; wasteCategory: WasteCategory; remark: string | null; occurredAt: string }
-export interface Statistics { operationId: string; defectTypeId: string | null; typeName: string | null; typeNameVariants?: number; wasteCategory: string; declaredQty: string; independentQty: string; overlapQty: string; unverifiedQty: string; recoveredQty: string; netDefectQty: string }
+export interface Statistics { operationId: string; defectTypeId: string | null; typeName: string | null; typeNameVariants?: number; wasteCategory: string; declaredQty: string; independentQty: string; overlapQty: string; unverifiedQty: string; returnedQty: string | null; netDefectQty: string | null; invalidActions: number }
 const root = '/api/quality/defects'
 const typePath = (id: string) => '/api/production/operation/' + encodeURIComponent(id) + '/defect-types'
 export const qualityV2 = {

@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ElMessageBox } from 'element-plus'
+import type { Order } from '../src/api/production/workorder'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import WorkOrders from '../src/views/production/workorder/index.vue'
 import { useAuth } from '../src/stores/auth'
-const { list, routings, materials } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn() }))
-vi.mock('../src/api/production/workorder', () => ({ api: { list, routings } }))
+const confirmed = Object.assign('confirm' as const, { value: '', action: 'confirm' as const })
+const { list, routings, materials, recall } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn(), recall: vi.fn() }))
+vi.mock('../src/api/production/workorder', () => ({ api: { list, routings, recall } }))
 vi.mock('../src/api/basic/material', () => ({ api: { list: materials } }))
 type State = { create: () => void; form: { productId: string; routingId: string }; productChanged: () => void; searchRoutes: (s?: string) => Promise<void>; routeOptions: { id: string }[]; routesLoading: boolean; dialog: boolean }
 let wrapper: ReturnType<typeof mount>
@@ -58,4 +61,31 @@ it('queries on product selection, auto-selects the only match, and leaves multip
  await flushPromises(); expect(state.form.routingId).toBe(''); expect(state.routeOptions).toHaveLength(2)
  routings.mockResolvedValueOnce([{ id: '301' }]); await state.searchRoutes('关键字')
  expect(state.form.routingId).toBe('')
+})
+
+it('returns a local released workorder to draft through the formal action and preserves its revision', async() => {
+ const { auth } = await setup()
+ auth.factoryPermissions = ['workorder:list', 'workorder:query', 'workorder:release']
+ await flushPromises()
+ const order = { id: '9007199254740993', code: 'TEST-RECALL', source: 'LOCAL', status: 'RELEASED', revision: 7 } as Order
+ recall.mockResolvedValue({ workorder: { ...order, status: 'DRAFT', revision: 8 } })
+ const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue(confirmed)
+ try {
+  await (wrapper.vm as unknown as { recall: (row: Order) => Promise<void> }).recall(order)
+  expect(recall).toHaveBeenCalledExactlyOnceWith('9007199254740993', 7)
+  expect(list).toHaveBeenCalled()
+ } finally { confirm.mockRestore() }
+})
+
+it('does not dispatch a late recall after factory selection changes during confirmation', async() => {
+ const { auth } = await setup()
+ auth.factoryPermissions = ['workorder:list', 'workorder:query', 'workorder:release']
+ await flushPromises()
+ let resolve!: (value: typeof confirmed) => void
+ const confirm = vi.spyOn(ElMessageBox, 'confirm').mockImplementationOnce(() => new Promise(r => { resolve = r }))
+ try {
+  const pending = (wrapper.vm as unknown as { recall: (row: Order) => Promise<void> }).recall({ id: '40', code: 'TEST-RECALL', revision: 0 } as Order)
+  auth.factoryId = 'B'; await flushPromises(); resolve(confirmed); await pending
+  expect(recall).not.toHaveBeenCalled()
+ } finally { confirm.mockRestore() }
 })

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import QuantityText from '@/components/business/production/QuantityText.vue'
+import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ApiError } from '@/lib/request'
@@ -63,7 +65,7 @@ async function save() {
  const mode = command.value
  if (!mode || saving.value || !can(mode) || !historyWritable.value || !node.value) return
  if (!form.reason.trim() || form.reason.length > 500) { commandError.value = '请填写操作原因（最多500字）'; return }
- if (mode !== 'void' && (!/^[+-]?\d{1,14}(\.\d{1,6})?$/.test(form.quantity) || !/[1-9]/.test(form.quantity) || mode === 'supplement' && form.quantity.startsWith('-'))) { commandError.value = '请输入非零数量，最多14位整数和6位小数；补录必须为正数'; return }
+ if (mode !== 'void' && (!/^[+-]?\d{1,14}(\.\d{1,2})?$/.test(form.quantity) || !/[1-9]/.test(form.quantity) || mode === 'supplement' && form.quantity.startsWith('-'))) { commandError.value = '请输入非零数量，最多14位整数和2位小数；补录必须为正数'; return }
  if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) { commandError.value = '请选择历史操作人员并填写实际生产时间'; return }
  if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) { commandError.value = '工作站编号应为正整数'; return }
  if (!pending.value) {
@@ -115,28 +117,28 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
 <template>
  <section v-if="visible && can('quantity')" aria-label="生产数量与报工管理">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
-  <div class="table-toolbar"><strong>{{ quantity?.executionNo || '执行 ' + executionId }}</strong><span v-if="quantity">计划数量：{{ quantity.targetQty }} · 确认投产：{{ quantity.confirmedInputQty }} · 撤销预留：{{ quantity.reservedInputQty }} · 可支用投产额度：{{ quantity.productionInputQty }} · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
-  <el-alert title="历史加工完成数量保持不变；当前有效产出考虑直接不良、返工恢复及上游传播差额。返工加工量不增加正常报工。" type="info" :closable="false" />
+  <div class="table-toolbar"><strong>{{ '执行 ' + executionId }}</strong><span v-if="quantity">计划数量：<QuantityText :value="quantity.targetQty" /> · 确认投产：<QuantityText :value="quantity.confirmedInputQty" /> · 撤销预留：<QuantityText :value="quantity.reservedInputQty" /> · 可支用投产额度：<QuantityText :value="quantity.productionInputQty" /> · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
+  <el-alert title="当前有效产出按正式报工与有效不良计算；历史返回及调整保留原数量含义。不良入仓不等于新增产出或最终报废。" type="info" :closable="false" />
   <p v-if="quantity && !quantity.writable" class="secondary">当前不可继续正常报工；历史补录、订正及冲销仍按独立权限与业务约束校验。</p>
   <el-alert v-if="quantity?.boundary" :title="quantity.boundary" type="warning" :closable="false" />
   <el-alert v-if="quantity?.nodes.some(n => n.historicalConflict)" title="存在历史数量倒挂：上游晚申报不良使历史加工量超过当前输入。差额仅作投影，不会自动订正报工；新报工仍受当前有效输入限制。" type="warning" :closable="false" />
   <el-table v-loading="loading" :data="quantity?.nodes || []" row-key="routingNodeId" :current-row-key="nodeId" max-height="280" border highlight-current-row empty-text="暂无已确定的执行路径" @row-click="chooseNode">
-   <el-table-column type="expand"><template #default="{row}"><el-descriptions :column="2" border><el-descriptions-item label="全部有效申报量（含待核实/重复）">{{ row.defectQty }}</el-descriptions-item><el-descriptions-item label="已核实独立不良">{{ row.directDefectQty }}</el-descriptions-item><el-descriptions-item label="返工恢复">{{ row.recoveredQty }}</el-descriptions-item><el-descriptions-item label="已核实未恢复不良">{{ row.netDefectQty }}</el-descriptions-item><el-descriptions-item label="上游传播差额">{{ row.propagatedLossQty }}</el-descriptions-item><el-descriptions-item label="原始输入减报工差额">{{ row.rawAvailableQty }}</el-descriptions-item><el-descriptions-item label="未钳制产出差额">{{ row.rawEffectiveOutputQty }}</el-descriptions-item><el-descriptions-item label="归属待核实数量">{{ row.unverifiedDefectQty }}</el-descriptions-item></el-descriptions></template></el-table-column>
+   <el-table-column type="expand"><template #default="{row}"><el-descriptions :column="2" border><el-descriptions-item label="全部有效申报量（含待核实/重复）"><QuantityText :value="row.defectQty" /></el-descriptions-item><el-descriptions-item label="已核实独立不良"><QuantityText :value="row.directDefectQty" /></el-descriptions-item><el-descriptions-item label="历史已返回"><QuantityText :value="row.returnedQty" /></el-descriptions-item><el-descriptions-item label="当前净不良"><QuantityText :value="row.netDefectQty" /></el-descriptions-item><el-descriptions-item label="上游传播差额"><QuantityText :value="row.propagatedLossQty" /></el-descriptions-item><el-descriptions-item label="原始输入减报工差额"><QuantityText :value="row.rawAvailableQty" /></el-descriptions-item><el-descriptions-item label="未钳制产出差额"><QuantityText :value="row.rawEffectiveOutputQty" /></el-descriptions-item><el-descriptions-item label="归属待核实数量"><QuantityText :value="row.unverifiedDefectQty" /></el-descriptions-item></el-descriptions></template></el-table-column>
    <el-table-column prop="sequenceNo" label="路径顺序" width="90" />
    <el-table-column label="实际路径节点" min-width="190"><template #default="{row}"><el-button text type="primary" @click.stop="chooseNode(row)">{{ row.code }} · {{ row.name || '工序名称未记录' }}</el-button></template></el-table-column>
-   <el-table-column prop="inputQty" label="当前有效输入" min-width="140" /><el-table-column prop="reportedQty" label="历史加工完成数量" min-width="140" /><el-table-column prop="availableQty" label="剩余可报" min-width="140" />
-   <el-table-column label="已核实未恢复不良" min-width="110"><template #default="{row}">{{ row.qualityIntegrated ? row.netDefectQty : '未接入' }}</template></el-table-column>
-   <el-table-column prop="recoveredQty" label="返工恢复量" min-width="110" /><el-table-column label="历史超报/传播差额" min-width="160"><template #default="{row}"><el-tag v-if="row.historicalConflict" type="danger">{{ row.historicalOverrunQty }}</el-tag><span v-else>{{ row.historicalOverrunQty }}</span></template></el-table-column>
-   <el-table-column label="当前有效产出投影" min-width="190"><template #default="{row}">{{ row.effectiveOutputQty }}<span v-if="row.positiveReportBlockReason"> · 待核实，暂不可流转</span></template></el-table-column>
+   <el-table-column :formatter="quantityColumn" prop="inputQty" label="当前有效输入" min-width="140" /><el-table-column :formatter="quantityColumn" prop="reportedQty" label="历史加工完成数量" min-width="140" /><el-table-column :formatter="quantityColumn" prop="availableQty" label="剩余可报" min-width="140" />
+   <el-table-column label="当前净不良" min-width="110"><template #default="{row}">{{ row.qualityIntegrated ? displayQuantity(row.netDefectQty) : '未接入' }}</template></el-table-column>
+   <el-table-column :formatter="quantityColumn" prop="returnedQty" label="历史已返回量" min-width="110" /><el-table-column label="历史超报/传播差额" min-width="160"><template #default="{row}"><el-tag v-if="row.historicalConflict" type="danger"><QuantityText :value="row.historicalOverrunQty" /></el-tag><span v-else><QuantityText :value="row.historicalOverrunQty" /></span></template></el-table-column>
+   <el-table-column label="当前有效产出投影" min-width="190"><template #default="{row}"><QuantityText :value="row.effectiveOutputQty" /><span v-if="row.positiveReportBlockReason"> · 待核实，暂不可流转</span></template></el-table-column>
   </el-table>
   <section v-if="node" class="report-ledger">
    <el-alert v-if="node.positiveReportBlockReason" :title="node.positiveReportBlockReason" type="warning" :closable="false" /><div class="table-toolbar"><strong>{{ node.code }} · {{ node.name || '工序名称未记录' }} — 数量流水</strong><el-button v-if="can('supplement')" type="primary" :disabled="!historyWritable || !!node.positiveReportBlockReason" @click="openCommand('supplement')">管理员历史补录</el-button></div>
-   <p class="secondary">数量流水只可追加；订正和冲销均保留原始报工及操作原因，不自动完工。</p>
+   <p class="secondary">数量流水只可追加；订正和冲销均保留原始报工及操作原因，报工只登记事实，入库审核后统一核对收尾条件。</p>
    <p v-if="!can('detail')" class="secondary">暂无查看报工流水的权限。</p>
    <template v-else>
     <el-table v-loading="ledgerLoading" :data="rows" border :empty-text="error ? '流水读取失败，请刷新重试' : '当前节点暂无数量流水'">
      <el-table-column prop="id" label="流水编号" min-width="120" /><el-table-column label="类型" width="100"><template #default="{row}">{{ row.recordType === 'REPORT' ? '原始报工' : '数量调整' }}</template></el-table-column>
-     <el-table-column prop="quantityDelta" label="数量变化" min-width="140" /><el-table-column prop="referenceReportId" label="原始流水" min-width="120" />
+     <el-table-column :formatter="quantityColumn" prop="quantityDelta" label="数量变化" min-width="140" /><el-table-column prop="referenceReportId" label="原始流水" min-width="120" />
      <el-table-column label="实际操作人" min-width="150"><template #default="{row}"><span :title="'用户 ID：' + row.operatorUserId">{{ person(row.operatorName,row.operatorUserId) }}</span></template></el-table-column><el-table-column label="提交人" min-width="150"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column>
      <el-table-column label="生产时间" min-width="180"><template #default="{row}">{{ time(row.reportTime) }}</template></el-table-column>
      <el-table-column label="记录时间" min-width="180"><template #default="{row}">{{ time(row.createTime) }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" show-overflow-tooltip />
@@ -152,14 +154,14 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
  </section>
  <el-dialog v-model="historyVisible" title="原始报工与调整历史" width="min(1040px, 94vw)" append-to-body destroy-on-close @close="closeHistory">
   <el-alert v-if="historyError" :title="historyError" type="error" :closable="false" />
-  <p v-if="detail">原始流水 {{ detail.record.id }} · 原始数量 {{ detail.record.quantityDelta }} · 当前有效余额 {{ detail.originalEffectiveQty }} · 操作人 {{ person(detail.record.operatorName,detail.record.operatorUserId) }}</p>
-  <el-table v-loading="historyLoading" :data="history" border empty-text="暂无调整记录"><el-table-column prop="id" label="流水编号" /><el-table-column prop="quantityDelta" label="调整数量" /><el-table-column label="订正提交人"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column><el-table-column label="订正时间" min-width="180"><template #default="{row}">{{ time(row.createTime) }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" /></el-table>
+  <p v-if="detail">原始流水 {{ detail.record.id }} · 原始数量 <QuantityText :value="detail.record.quantityDelta" /> · 当前有效余额 <QuantityText :value="detail.originalEffectiveQty" /> · 操作人 {{ person(detail.record.operatorName,detail.record.operatorUserId) }}</p>
+  <el-table v-loading="historyLoading" :data="history" border empty-text="暂无调整记录"><el-table-column prop="id" label="流水编号" /><el-table-column :formatter="quantityColumn" prop="quantityDelta" label="调整数量" /><el-table-column label="订正提交人"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column><el-table-column label="订正时间" min-width="180"><template #default="{row}">{{ time(row.createTime) }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" /></el-table>
   <Pagination v-model:page="historyPage" v-model:limit="historyLimit" :total="historyTotal" :auto-scroll="false" @pagination="loadHistory()" />
  </el-dialog>
  <el-dialog :model-value="Boolean(command)" :title="commandTitle" width="min(640px, 94vw)" append-to-body destroy-on-close :before-close="closeCommand" :show-close="!saving" :close-on-click-modal="!saving" :close-on-press-escape="!saving" @update:model-value="setCommandVisible">
   <el-alert v-if="commandError" :title="commandError" type="error" :closable="false" />
-  <p>{{ quantity?.executionNo }} · {{ node?.code }} · {{ node?.name || '工序名称未记录' }}</p>
-  <p v-if="original">原始流水：{{ original.id }}，原始报工量：{{ original.quantityDelta }}。调整继承原操作人员及实际生产时间。</p>
+  <p>{{ quantity?.executionId }} · {{ node?.code }} · {{ node?.name || '工序名称未记录' }}</p>
+  <p v-if="original">原始流水：{{ original.id }}，原始报工量：<QuantityText :value="original.quantityDelta" />。调整继承原操作人员及实际生产时间。</p>
   <p v-if="command === 'void'" class="secondary">将追加一笔负向调整，把原始报工当前有效余额调整为零；上下游数量仍须满足约束。</p>
   <el-form class="report-command" label-position="top" :disabled="saving || !!pending" @submit.prevent="save">
    <el-form-item v-if="command !== 'void'" :label="command === 'supplement' ? '本次加工完成数量' : '数量变化（正数增加，负数减少）'" required><el-input v-model="form.quantity" inputmode="decimal" /></el-form-item>

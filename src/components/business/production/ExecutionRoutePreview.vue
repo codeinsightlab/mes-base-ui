@@ -35,7 +35,7 @@ async function open() {
  <el-dialog v-model="visible" title="执行单元实际工艺路线" width="min(1180px,96vw)" append-to-body destroy-on-close @close="clear">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
   <section v-if="view" v-loading="loading">
-   <p><strong>{{ view.executionNo }}</strong> · {{ view.routingCode }} / V{{ view.routingVersion }} · 工艺版本 ID：{{ view.routingId }}</p>
+   <p><strong>{{ view.executionId }}</strong> · {{ view.routingCode }} / V{{ view.routingVersion }} · 工艺版本 ID：{{ view.routingId }}</p>
    <el-alert v-if="view.pathStatus === 'UNSELECTED'" title="尚未选择实际执行路径；下图仅为该执行版本的完整工艺定义。" type="info" :closable="false" />
    <p v-else>{{ view.pathStatus === 'LOCKED' ? '已锁定的实际执行路径' : '已选择，尚未锁定的执行路径' }}；突出节点及连接表示当前已选路径。</p>
    <RoutingGraphPreview :nodes="nodes" :edges="edges" :selected-node-ids="selected" />

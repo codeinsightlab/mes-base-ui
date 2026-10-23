@@ -1,16 +1,19 @@
 <script setup lang="ts">
+import { displayQuantity } from '@/lib/production/quantity'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
-import WorkOrderSelect from '@/components/business/production/WorkOrderSelect.vue'
+import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
+import { useRoute } from 'vue-router'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
-import { stockDocumentApis, stockDocumentPermission as p } from '@/api/wm/stockDocuments'
+import { stockDocumentApis, stockDocumentPermission as p, stockDocumentTypes } from '@/api/wm/stockDocuments'
 import { useAuth } from '@/stores/auth'
 import { request } from '@/lib/request'
 import type { StockAction } from '@/api/wm/localStock'
 import type { Field, Row } from '@/lib/crud'
+const route=useRoute()
 const pendingDocument=ref<string|null>(null)
 const auth=useAuth(),document=ref<InstanceType<typeof MasterDetailDocument>|null>(null)
 const {headerApi,itemApi,clear}=stockDocumentApis(async()=>{await document.value?.refresh()})
@@ -24,14 +27,16 @@ async function showAction(id:unknown){
  const g=++generation;action.value=null;actionError.value='';actionVisible.value=true
  try{const result=await request<StockAction>('/api/wm/wm-stock-action/'+encodeURIComponent(String(id)),{scope:'factory'});if(g===generation)action.value=result}catch(e){if(g===generation)actionError.value=e instanceof Error?e.message:'动作读取失败'}
 }
+const manualDocumentTypes=stockDocumentTypes.filter(t=>!['DEFECT_RECEIPT','SCRAP_RECEIPT'].includes(t.value))
 const headerFields:Field[]=[
  {key:'documentNo',label:'单号',kind:'text',readonly:true,searchable:true,columnMinWidth:240},
- {key:'documentType',label:'单据类型',kind:'select',required:true,defaultValue:'OTHER_RECEIPT',searchable:true,options:[{value:'OTHER_RECEIPT',label:'其他入库'},{value:'OTHER_ISSUE',label:'其他出库'}]},
- {key:'status',label:'状态',kind:'select',readonly:true,searchable:true,options:[{value:'DRAFT',label:'草稿',tone:'warning'},{value:'POSTED',label:'已过账',tone:'success'},{value:'CANCELLED',label:'已作废',tone:'info'}]},
- {key:'sourceWorkorderId',label:'关联已作废工单（可选）',kind:'text'},
+ {key:'documentType',label:'单据类型',kind:'select',required:true,defaultValue:typeof route.query.executionId==='string'?'PRODUCTION_RECEIPT':'OTHER_RECEIPT',searchable:true,options:stockDocumentTypes.map(t=>({value:t.value,label:t.label}))},
+ {key:'status',label:'状态',kind:'select',readonly:true,searchable:true,options:[{value:'DRAFT',label:'草稿',tone:'warning'},{value:'POSTED',label:'已审核',tone:'success'},{value:'CANCELLED',label:'已作废',tone:'info'}]},
+ {key:'sourceExecutionId',label:'生产来源执行单元',kind:'text',defaultValue:typeof route.query.executionId==='string'?route.query.executionId:undefined},
+ {key:'sourceWorkorderId',label:'历史作废工单来源',kind:'text',readonly:true},
  {key:'reason',label:'处理原因 / 实物依据',kind:'textarea',required:true,maxLength:500},
  {key:'remark',label:'备注',kind:'textarea',maxLength:500},
- {key:'postedAt',label:'过账时间',kind:'datetime',readonly:true,columnMinWidth:180},
+ {key:'postedAt',label:'审核时间',kind:'datetime',readonly:true,columnMinWidth:180},
 ]
 const itemFields:Field[]=[
  {key:'lineNo',label:'行号',kind:'number',readonly:true},
@@ -40,7 +45,7 @@ const itemFields:Field[]=[
  {key:'stockId',label:'确切库存来源',kind:'text',required:true},
  {key:'batchNo',label:'批次',kind:'text'}, {key:'binCode',label:'库位',kind:'text'},
  {key:'unitId',label:'基本单位ID',kind:'text',required:true},
- {key:'quantity',label:'本次收发数量',kind:'decimal',required:true},
+ {key:'quantity',label:'本次收发数量',kind:'decimal',required:true,fractionDigits:2,format:value=>displayQuantity(value as string)},
  {key:'remark',label:'明细 / 实物清点依据',kind:'textarea',maxLength:500},
  {key:'stockActionId',label:'库存动作',kind:'text',readonly:true,columnMinWidth:260},
 ]
@@ -48,21 +53,22 @@ function resetIdentity(draft:Row){draft.stockId=null;draft.batchNo=null;draft.bi
 </script>
 <template>
  <div class="stock-documents">
- <MasterDetailDocument item-version-field="revision" items-readonly-when-dirty ref="document" title="其他出入库单" :header-api="headerApi" :item-api="itemApi" :header-fields="headerFields" :item-fields="itemFields" :header-permission="p" :item-permission="p" parent-key="documentId" :header-readonly="row=>row.status!=='DRAFT'||auth.runtimeMode!=='LOCAL'||pendingDocument===row.id" :item-permission-overrides="{list:p+':query',query:p+':query',create:p+':update',update:p+':update',delete:p+':update'}">
+ <el-alert title="新建单据只保存草稿，审核通过后才执行库存业务。生产入库请选择生产完工入库类型及执行单元，并核对可入库额度；其他物料入库填写实物依据，不需要生产交接。" type="info" :closable="false"/>
+ <MasterDetailDocument item-version-field="revision" items-readonly-when-dirty ref="document" title="出入库单" :header-api="headerApi" :item-api="itemApi" :header-fields="headerFields" :item-fields="itemFields" :header-permission="p" :item-permission="p" parent-key="documentId" :header-readonly="row=>row.status!=='DRAFT'||auth.runtimeMode!=='LOCAL'||pendingDocument===row.id" :item-permission-overrides="{list:p+':query',query:p+':query',create:p+':update',update:p+':update',delete:p+':update'}">
   <template #header-actions="{row,refresh,dirty}"><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
-  <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id"><el-option label="其他入库（增加库存）" value="OTHER_RECEIPT"/><el-option label="其他出库（减少库存）" value="OTHER_ISSUE"/></el-select></template>
-  <template #field-sourceWorkorderId="{draft,disabled}"><WorkOrderSelect v-model="draft.sourceWorkorderId as string|null" source="LOCAL" status="CANCELLED" :disabled="disabled||!!draft.id||draft.documentType!=='OTHER_RECEIPT'" /></template>
+  <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" @change="()=>{draft.sourceExecutionId=null}" :disabled="disabled||!!draft.id"><el-option v-for="type in draft.id?stockDocumentTypes:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value"/></el-select></template>
+  <template #field-sourceExecutionId="{draft,disabled}"><ProductionExecutionSelect v-model="draft.sourceExecutionId as string|null" :statuses="['RUNNING','COMPLETED']" :disabled="disabled||!!draft.id||draft.documentType!=='PRODUCTION_RECEIPT'" /></template>
   <template #field-materialId="{draft,disabled}"><MaterialSelect v-model="draft.materialId as string|null" :disabled="disabled" @update:model-value="resetIdentity(draft)"/></template>
   <template #field-warehouseId="{draft,disabled}"><WarehouseSelect v-model="draft.warehouseId as string|null" source="LOCAL" :disabled="disabled" @update:model-value="resetIdentity(draft)"/></template>
   <template #field-stockId="{draft,disabled}"><StockSourceSelect v-model="draft.stockId as string|null" :material-id="draft.materialId as string|null" :warehouse-id="draft.warehouseId as string|null" :disabled="disabled" receipt @selected="(s,unit)=>{draft.materialId=s.materialId;draft.warehouseId=s.warehouseId;draft.batchNo=s.batchNo;draft.binCode=s.binCode;draft.unitId=unit}"/></template>
   <template #field-batchNo="{draft}"><el-input :model-value="draft.batchNo" disabled placeholder="来自库存来源" /></template>
   <template #field-binCode="{draft}"><el-input :model-value="draft.binCode" disabled placeholder="来自库存来源" /></template>
   <template #field-unitId="{draft}"><el-input :model-value="draft.unitId" disabled placeholder="物料基本单位" /></template>
-  <template #cell-stockActionId="{row}"><el-button v-if="row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="showAction(row.stockActionId)">{{row.stockActionId}}</el-button><span v-else>{{row.stockActionId||'未过账'}}</span></template>
+  <template #cell-stockActionId="{row}"><el-button v-if="row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="showAction(row.stockActionId)">{{row.stockActionId}}</el-button><span v-else>{{row.stockActionId||'待审核执行'}}</span></template>
  </MasterDetailDocument>
  <el-dialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
   <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" />
-  <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{action.id}}</el-descriptions-item><el-descriptions-item label="过账UUID">{{action.operationId||'—'}}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{action.documentLineId||'—'}}</el-descriptions-item><el-descriptions-item label="业务来源">{{action.sourceType}} / {{action.sourceId}}</el-descriptions-item><el-descriptions-item label="库存来源">{{action.stockId}}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{action.batchNo}} / {{action.binCode}}</el-descriptions-item><el-descriptions-item label="变动量">{{action.quantityDelta}}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{action.quantityBefore}} / {{action.quantityAfter}}</el-descriptions-item><el-descriptions-item label="操作人">{{action.operatorUserId}}</el-descriptions-item><el-descriptions-item label="原因">{{action.reason}}</el-descriptions-item></el-descriptions>
+  <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{action.id}}</el-descriptions-item><el-descriptions-item label="审核UUID">{{action.operationId||'—'}}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{action.documentLineId||'—'}}</el-descriptions-item><el-descriptions-item label="业务来源">{{action.sourceType}} / {{action.sourceId}}</el-descriptions-item><el-descriptions-item label="库存来源">{{action.stockId}}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{action.batchNo}} / {{action.binCode}}</el-descriptions-item><el-descriptions-item label="变动量">{{action.quantityDelta}}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{action.quantityBefore}} / {{action.quantityAfter}}</el-descriptions-item><el-descriptions-item label="操作人">{{action.operatorUserId}}</el-descriptions-item><el-descriptions-item label="原因">{{action.reason}}</el-descriptions-item></el-descriptions>
  </el-dialog>
  </div>
 </template>

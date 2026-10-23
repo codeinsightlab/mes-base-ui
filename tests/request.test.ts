@@ -73,6 +73,7 @@ describe('Base request contract', () => {
     expect(unauthorized).not.toHaveBeenCalled()
   })
   it.each([
+    ['QUALITY_DATA_INVALID', 409, '当前记录暂不能处理，请先核对处置记录'],
     ['SYNC_RUNNING', 409, '同步正在进行，请稍后重试'],
     ['SYNC_EXECUTION_LOST', 409, '同步执行权已失效，请重新发起'],
     ['ERP_OPERATION_NOT_CONFIGURED', 422, '暂未配置工序 ERP 同步数据来源'],

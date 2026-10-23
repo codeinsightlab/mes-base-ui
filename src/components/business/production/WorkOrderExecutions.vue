@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { executionStatusLabel } from '@/lib/production/executionState'
+import { quantityColumn } from '@/lib/production/quantity'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/stores/auth'
@@ -24,7 +26,7 @@ onBeforeUnmount(clear)
   <div class="table-toolbar"><strong>生产执行摘要</strong><el-button type="primary" @click="router.push({path:'/production/mesProductionExecution',query:{workorderId}})">进入生产执行</el-button></div>
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
   <el-table v-loading="loading" :data="rows" row-key="id">
-   <el-table-column prop="executionNo" label="执行编号" min-width="210" /><el-table-column label="实际工艺版本" min-width="260"><template #default="{row}"><span :title="'版本 ID：'+row.routingId">{{ row.routingCode || '工艺名称未记录' }} / V{{ row.routingVersion ?? '未记录' }} · {{ row.routingName || '名称未记录' }}</span></template></el-table-column><el-table-column prop="targetQty" label="目标数量" min-width="140" /><el-table-column prop="status" label="执行状态" width="120" />
+   <el-table-column prop="id" label="执行ID" min-width="210" /><el-table-column label="实际工艺版本" min-width="260"><template #default="{row}"><span :title="'版本 ID：'+row.routingId">{{ row.routingCode || '工艺名称未记录' }} / V{{ row.routingVersion ?? '未记录' }} · {{ row.routingName || '名称未记录' }}</span></template></el-table-column><el-table-column :formatter="quantityColumn" prop="targetQty" label="目标数量" min-width="140" /><el-table-column label="执行状态" width="120"><template #default="{row}">{{executionStatusLabel(row.status)}}</template></el-table-column>
    <el-table-column label="查看 / 跳转" min-width="280"><template #default="{row}"><ExecutionRoutePreview :execution-id="row.id" /><el-button v-if="auth.hasPermission('business:production:report:quantity','factory')" link type="primary" @click="router.push({path:'/production/productionReport',query:{executionId:row.id,workorderId}})">查看生产数量</el-button></template></el-table-column>
   </el-table>
   <Pagination v-model:page="page" v-model:limit="limit" :total="total" @pagination="load" />

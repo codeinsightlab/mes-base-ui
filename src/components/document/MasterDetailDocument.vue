@@ -118,7 +118,7 @@ async function remove() {
   }
 }
 watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|')], clear)
-defineExpose({ open, refresh })
+defineExpose({ open, refresh, back })
 onBeforeUnmount(clear)
 </script>
 <template>

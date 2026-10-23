@@ -115,8 +115,8 @@ describe('production operator configuration', () => {
  })
  it('shows the current context and explains an empty eligible candidate list', async() => {
   config.candidates.mockResolvedValue({ items: [], hasMore: false, nextOffset: 0 })
-  const { wrapper } = setup(true); await wrapper.setProps({ contextLabel: 'EXE-9007199254740995' }); await open(wrapper); await select(wrapper, 0, '11')
-  expect(document.body.textContent).toContain('生产执行：EXE-9007199254740995')
+  const { wrapper } = setup(true); await wrapper.setProps({ contextLabel: '9007199254740995' }); await open(wrapper); await select(wrapper, 0, '11')
+  expect(document.body.textContent).toContain('生产执行：9007199254740995')
   expect(document.body.textContent).toContain('该工序暂无可派工人员，请配置此工序人员能力')
   expect(assignment.create).not.toHaveBeenCalled()
  })

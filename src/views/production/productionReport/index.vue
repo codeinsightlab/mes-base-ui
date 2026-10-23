@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import QueryForm from '@/components/QueryForm.vue'
+
+import { quantityColumn } from '@/lib/production/quantity'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
@@ -49,16 +52,16 @@ async function changed() {
   <PageHeader title="生产数量管理" description="查询执行单元的实际节点数量与不可变报工流水，管理历史补录、订正和冲销。" />
   <el-alert v-if="!allowed" title="当前账号没有生产数量查询权限" type="info" :closable="false" />
   <template v-else>
-   <el-form class="filter-panel report-filter" inline @submit.prevent="page=1;load()">
+   <QueryForm class="filter-panel report-filter" inline @submit="page=1;load()">
     <el-form-item label="工单"><WorkOrderSelect v-model="workorderId" /></el-form-item>
     <el-form-item label="执行单元"><ExecutionSelect v-model="executionId" :workorder-id="workorderId" /></el-form-item>
-    <el-button type="primary" @click="page=1;load()">查询</el-button>
-    <el-button v-if="auth.hasPermission('workorder:list','factory')" @click="router.push('/production/workorder')">返回工单</el-button>
-   </el-form>
+    <el-button native-type="submit" type="primary" >查询</el-button>
+    <el-button native-type="button" v-if="auth.hasPermission('workorder:list','factory')" @click="router.push('/production/workorder')">返回工单</el-button>
+   </QueryForm>
    <el-alert v-if="error" :title="error" type="error" :closable="false" />
    <section v-if="rows.length || loading" aria-label="Execution 数量摘要">
     <el-table v-loading="loading" :data="rows" row-key="executionId" :current-row-key="selectedId" highlight-current-row @row-click="selectRow">
-     <el-table-column prop="executionId" label="Execution ID" width="140" /><el-table-column prop="executionNo" label="执行编号" min-width="200" /><el-table-column prop="targetQty" label="计划数量" min-width="140" /><el-table-column prop="productionInputQty" label="可支用投产额度" min-width="160" /><el-table-column label="实际工艺版本" min-width="260"><template #default="{row}"><span :title="'版本 ID：'+row.routingId">{{ row.routingLabel || '工艺名称未记录' }}</span></template></el-table-column><el-table-column label="路径状态" width="150"><template #default="{row}">{{ pathLabel(row.pathStatus) }}</template></el-table-column><el-table-column prop="lastNodeReportedQty" label="末节点累计报工" min-width="160" />
+     <el-table-column prop="executionId" label="Execution ID" width="140" /><el-table-column :formatter="quantityColumn" prop="targetQty" label="计划数量" min-width="140" /><el-table-column :formatter="quantityColumn" prop="productionInputQty" label="可支用投产额度" min-width="160" /><el-table-column label="实际工艺版本" min-width="260"><template #default="{row}"><span :title="'版本 ID：'+row.routingId">{{ row.routingLabel || '工艺名称未记录' }}</span></template></el-table-column><el-table-column label="路径状态" width="150"><template #default="{row}">{{ pathLabel(row.pathStatus) }}</template></el-table-column><el-table-column :formatter="quantityColumn" prop="lastNodeReportedQty" label="末节点累计报工" min-width="160" />
      <el-table-column label="操作" width="120"><template #default="{row}"><el-button link type="primary" @click.stop="select(row.executionId)">查看数量</el-button></template></el-table-column>
     </el-table>
     <Pagination v-model:page="page" v-model:limit="limit" :total="total" @pagination="load" />

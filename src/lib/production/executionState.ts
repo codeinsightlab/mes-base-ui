@@ -1,0 +1,2 @@
+export const executionStatusOptions = [{ label: '待执行', value: 'READY', tone: 'info' }, { label: '执行中', value: 'RUNNING', tone: 'warning' }, { label: '完全入库', value: 'FULLY_RECEIVED', tone: 'success' }, { label: '历史已结束', value: 'COMPLETED', tone: 'info' }, { label: '已取消', value: 'CANCELLED', tone: 'danger' }] as const
+export const executionStatusLabel = (value: string) => executionStatusOptions.find(status => status.value === value)?.label ?? value

@@ -34,3 +34,12 @@ export function menuWorkspaces(...sources: Menu[][]): { platform: Menu[]; factor
   }
   return split(merge(sources.flat()))
 }
+
+/** Resolve a business link from the authorized server menu, including customized parent paths. */
+export function menuPathForComponent(menus: Menu[], component: string): string | undefined {
+  for (const menu of menus) {
+    if (menu.kind === 'MENU' && menu.component === component) return menu.path
+    const path = menuPathForComponent(menu.children, component)
+    if (path) return path
+  }
+}

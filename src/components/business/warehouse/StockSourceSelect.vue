@@ -25,7 +25,7 @@ async function selected(id:string|null){
 async function create(){
  if(!allowed.value||loading.value||!auth.hasPermission('business:wm:inventory:create','factory'))return
  const g=++generation;loading.value=true
- try{const s=await api.create({materialId:props.materialId,warehouseId:props.warehouseId,batchNo:batch.value||null,binCode:bin.value||null,status:'ENABLED',remark:'其他入库受控零余额来源'});if(g!==generation)return;rows.value=[s,...rows.value];await selected(s.id);batch.value='';bin.value='';creating.value=false}catch(e){if(g===generation)error.value=e instanceof Error?e.message:'零余额来源创建失败'}finally{if(g===generation)loading.value=false}
+ try{const s=await api.create({materialId:props.materialId,warehouseId:props.warehouseId,batchNo:batch.value||null,binCode:bin.value||null,status:'ENABLED',remark:'入库单受控零余额来源'});if(g!==generation)return;rows.value=[s,...rows.value];await selected(s.id);batch.value='';bin.value='';creating.value=false}catch(e){if(g===generation)error.value=e instanceof Error?e.message:'零余额来源创建失败'}finally{if(g===generation)loading.value=false}
 }
 async function close(done?:()=>void){
  const g=generation

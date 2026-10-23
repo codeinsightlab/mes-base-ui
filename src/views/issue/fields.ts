@@ -1,3 +1,4 @@
+import { displayQuantity } from '@/lib/production/quantity'
 import type { Field } from '@/lib/crud'
 
 export const headerFields: Field[] = [
@@ -197,7 +198,7 @@ export const itemFields: Field[] = [
     key: 'quantity',
     columnMinWidth: 200,
     label: '领料数量',
-    kind: 'decimal',
+    kind: 'decimal', fractionDigits: 2, format: value => displayQuantity(typeof value === 'string' || typeof value === 'number' ? value : null),
     readonly: false,
     required: true,
     searchable: true,

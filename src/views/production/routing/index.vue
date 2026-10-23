@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import QueryForm from '@/components/QueryForm.vue'
+
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
@@ -213,12 +215,12 @@ onMounted(load)
 <template>
   <div class="app-container">
     <PageHeader title="工艺路线" description="按版本维护产品与工艺拓扑，发布后冻结内容" />
-    <el-form v-show="showSearch" inline class="filter-panel" @submit.prevent="page = 1; load()">
+    <QueryForm v-show="showSearch" inline class="filter-panel" @submit="page = 1; load()">
       <el-form-item label="路线编码"><el-input v-model="filters.code" clearable maxlength="64" /></el-form-item>
       <el-form-item label="名称"><el-input v-model="filters.name" clearable maxlength="255" /></el-form-item>
       <el-form-item label="状态"><el-select v-model="filters.status" clearable placeholder="全部" style="width: 120px"><el-option v-for="(label, value) in labels" :key="value" :label="label" :value="value" /></el-select></el-form-item>
-      <el-form-item><el-button type="primary" native-type="submit">查询</el-button><el-button @click="Object.assign(filters, { code: '', name: '', status: '' }); page = 1; load()">重置</el-button></el-form-item>
-    </el-form>
+      <el-form-item><el-button type="primary" native-type="submit">查询</el-button><el-button native-type="button" @click="Object.assign(filters, { code: '', name: '', status: '' }); page = 1; load()">重置</el-button></el-form-item>
+    </QueryForm>
     <div class="table-toolbar">
       <el-button v-if="can('create')" type="primary" :disabled="busy" @click="Object.assign(createForm, { code: '', name: '', description: '' }); createDialog = true">新增路线</el-button>
       <SyncButton permission="routing:sync" scope="factory" :run="sync" confirm-text="同步将更新草稿；已发布内容变化会创建新草稿，不自动发布。确认继续？" @completed="load" />

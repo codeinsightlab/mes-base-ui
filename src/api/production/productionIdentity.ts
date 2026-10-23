@@ -1,15 +1,14 @@
 import { request } from '@/lib/request'
 
 export interface ProductionIdentity {
-  identityType: 'EXECUTION' | 'SINGLE_MATERIAL_V1';
   executionId: string;
-  executionNo: string;
-  qrCode: string;
+  qrCode: string | null;
   workorderId: string;
   workorderCode: string;
   productId: string;
   productCode: string;
   productName: string;
+  batchNo: string | null;
   routingId: string;
   routingCode: string;
   routingVersion: number;
@@ -17,5 +16,5 @@ export interface ProductionIdentity {
   targetQty: string;
 }
 
-export const resolveProductionIdentity = (code: string) =>
-  request<ProductionIdentity>('/api/production/identity', { query: { code }, scope: 'factory' })
+export const readProductionIdentity = (executionId: string) =>
+  request<ProductionIdentity>('/api/production/identity/' + encodeURIComponent(executionId), { scope: 'factory' })

@@ -1,80 +1,137 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { parseTime } from '@/utils/ruoyi'
+import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
+import QuantityText from '@/components/business/production/QuantityText.vue'
+import { quantityInput } from '@/lib/production/quantity'
+import { positiveQuantity, exceedsQuantity, qualityStateLabel, qualityStateTone, qualityReceiptLabel } from '@/lib/quality/presentation'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
-import { qualityTreatment as api, type Treatment, type Command, type Action, type Attribution } from '@/api/quality/qualityTreatment'
+import { qualityTreatment as api, type Treatment, type Disposition, type AssessmentCommand, type Attribution, treatmentActionLabel } from '@/api/quality/qualityTreatment'
 import type { Version } from '@/api/quality/productionDefect'
-const props = defineProps<{ declarationId: string; candidates: Version[] }>()
-const emit = defineEmits<{ changed: []; pending: [value: boolean] }>()
-const current = computed(() => props.candidates.find(d => d.declarationId === props.declarationId))
-const auth = useAuth(), allowed = computed(() => auth.hasPermission('business:quality:defect:read', 'factory')), writable = computed(() => auth.hasPermission('business:quality:defect:revise', 'factory') && current.value?.recordAction !== 'VOID')
-const view = ref<Treatment | null>(null), error = ref(''), loading = ref(false), busy = ref(false), pending = ref<Command | null>(null)
-const action = ref<Action>('ASSESS'), attribution = ref<Attribution>('INDEPENDENT'), related = ref<string | null>(null), basis = ref('')
-const form = reactive({ parentId: null as string | null, scrapQty: '', reworkQty: '', processedQty: '', recoveredQty: '', failedQty: '', reason: '', occurredAt: '' })
-watch(() => !!pending.value || busy.value, value => emit('pending', value), { flush: 'sync' })
-let generation = 0, queryAttempt = 0, uncertain = false
-const pendingKey = () => 'mes-quality-pending:' + auth.username + ':' + auth.factoryId + ':' + props.declarationId
-function clear() { generation++; queryAttempt++; view.value = null; error.value = ''; pending.value = null; uncertain = false; loading.value = busy.value = false; action.value = 'ASSESS'; basis.value = ''; related.value = null; Object.assign(form, {parentId:null,scrapQty:'',reworkQty:'',processedQty:'',recoveredQty:'',failedQty:'',reason:'',occurredAt:''}) }
-async function load() {
- const ticket = ++queryAttempt, scope = generation; if (!allowed.value || !props.declarationId) return
- loading.value = true; error.value = ''
- try { const data = await api.details(props.declarationId); if (ticket !== queryAttempt || scope !== generation) return; view.value = data;
- const saved = sessionStorage.getItem(pendingKey()); if (saved && !pending.value) { pending.value = JSON.parse(saved) as Command; uncertain = true }
- if (pending.value && data.events.some(e => e.id === pending.value?.requestId)) { sessionStorage.removeItem(pendingKey()); pending.value = null; uncertain = false }
- action.value = pending.value?.action ?? (data.attribution === 'UNVERIFIED' ? 'ASSESS' : 'ALLOCATE') }
- catch(e) { if (ticket === queryAttempt && scope === generation) error.value = e instanceof Error ? e.message : '质量处置读取失败' }
- finally { if (ticket === queryAttempt && scope === generation) loading.value = false }
+const props = defineProps<{ declarationId: string; candidates: Version[]; record?: Version; initialAction?: 'assess' | 'dispose' }>()
+const emit = defineEmits<{ changed: []; pending: [value: boolean]; dirty: [value: boolean] }>()
+const auth = useAuth()
+const current = computed(() => props.record ?? props.candidates.find(d => d.declarationId === props.declarationId))
+const allowed = computed(() => auth.hasPermission('business:quality:defect:read', 'factory'))
+const writable = computed(() => auth.hasPermission('business:quality:defect:revise', 'factory') && view.value?.recordAction !== 'VOID' && view.value?.state !== 'UNRESOLVED')
+const activeProduction = computed(() => !!current.value && (['READY','RUNNING'].includes(current.value.executionStatus ?? '') && ['DRAFT','RELEASED'].includes(current.value.workorderStatus ?? '')))
+const view = ref<Treatment | null>(null), error = ref(''), loading = ref(false), busy = ref(false)
+const actionOpen = ref(false), actionKind = ref<'assess' | 'dispose'>('dispose'), formError = ref(''), recoveryBlocked = ref(false)
+const attribution = ref<Attribution>('INDEPENDENT'), related = ref<string | null>(null), basis = ref('')
+const form = reactive({ quantity:'', warehouseId:null as string | null, reason:'' })
+type Pending = { kind:'assess'; command:AssessmentCommand } | { kind:'dispose'; command:Disposition } | { kind:'retired-return'; command:{requestId:string} }
+const pending = ref<Pending | null>(null)
+const canAssess = computed(() => writable.value && activeProduction.value && view.value?.attribution === 'UNVERIFIED')
+const canTreat = computed(() => writable.value && activeProduction.value && view.value?.attribution === 'INDEPENDENT' && positiveQuantity(view.value.pendingDispositionQty))
+const outstanding = computed(() => view.value && !['VOIDED','OVERLAP'].includes(view.value.state) ? view.value.pendingDispositionQty : '0')
+const originalForm=ref('')
+const snapshot=()=>JSON.stringify({form,attribution:attribution.value,related:related.value,basis:basis.value})
+const dirty = computed(() => actionOpen.value && !!originalForm.value && snapshot()!==originalForm.value)
+watch(() => pending.value != null && pending.value.kind !== 'retired-return' || busy.value, v => emit('pending',v), {flush:'sync'})
+watch(dirty, v => emit('dirty',v), {flush:'sync'})
+const relatedOptions = computed(() => props.candidates.filter(d => d.declarationId !== props.declarationId && d.executionId === view.value?.executionId && !['UNVERIFIED','UNRESOLVED'].includes(d.processingState) && d.recordAction !== 'VOID'))
+let generation=0, attempt=0, uncertain=false, initialOpened=false
+const pendingKey = () => `mes-quality-action:${auth.username}:${auth.factoryId}:${props.declarationId}`
+function resetForm() { Object.assign(form,{quantity:'',warehouseId:null,reason:''}); attribution.value='INDEPENDENT'; related.value=null; basis.value=''; formError.value='' }
+function clear() { generation++; attempt++; view.value=null; error.value=''; pending.value=null; busy.value=loading.value=false; actionOpen.value=false; recoveryBlocked.value=false; uncertain=false; initialOpened=false; originalForm.value=''; resetForm() }
+function restore() {
+ try {
+  const raw=sessionStorage.getItem(pendingKey()); if(!raw)return
+  const saved=JSON.parse(raw) as {kind:string;command:{requestId:string;expectedRevision:number;destination?:string;quantity?:string;warehouseId?:string;assessment?:{type:string}}}
+  if(!saved || !['assess','dispose'].includes(saved.kind) || typeof saved.command?.requestId !== 'string' || !Number.isInteger(saved.command.expectedRevision)) throw new Error('请求格式不完整')
+  if(saved.kind==='dispose' && saved.command.destination==='RETURN_NODE') { pending.value={kind:'retired-return',command:{requestId:saved.command.requestId}}; uncertain=true; return }
+  if(saved.kind==='dispose' && (saved.command.destination!=='WAREHOUSE' || typeof saved.command.quantity!=='string' || typeof saved.command.warehouseId!=='string') || saved.kind==='assess' && (!saved.command.assessment || !['INDEPENDENT','OVERLAP'].includes(saved.command.assessment.type))) throw new Error('请求内容不完整')
+  pending.value=saved as Pending; uncertain=true; actionKind.value=saved.kind as 'assess'|'dispose'; actionOpen.value=true
+ } catch { recoveryBlocked.value=true; error.value='待确认请求无法读取，请保留会话并联系管理员核对，避免重复处理。' }
 }
-watch(() => [props.declarationId,auth.factoryId,auth.revision,allowed.value,writable.value], () => { clear(); void load() }, { immediate: true, flush: 'sync' })
-onBeforeUnmount(() => { clear(); emit('pending', false) })
-watch(action, () => { form.parentId = null })
-const parents = computed(() => view.value?.events.filter(e => e.actionType === (action.value === 'CORRECT_RESULT' ? 'RESULT' : action.value === 'RESULT' || action.value === 'CANCEL_START' ? 'START' : 'ALLOCATE')) ?? [])
-const legacy = computed(() => view.value?.destinationType != null ? view.value.destinationType !== 'SAME_NODE' : current.value != null && current.value.destinationType !== 'SAME_NODE')
-const relatedOptions = computed(() => props.candidates.filter(v => v.declarationId !== props.declarationId && v.executionId === view.value?.executionId && v.recordAction !== 'VOID'))
-const eventLabel = (value: string) => ({ ASSESS: '归属核实', ALLOCATE: '报废/返工分配', START: '开始单节点返工', RESULT: '返工结果确认', CANCEL_ALLOC: '撤回未使用分配', CANCEL_START: '取消未处理开始量', CORRECT_RESULT: '订正原返工结果' }[value] ?? value)
-const stateLabel = (value: string) => ({UNVERIFIED:'归属待核实',OVERLAP:'关联重复，不再扣减',PENDING:'待处置',IN_PROGRESS:'返工处理中',WAITING_REWORK:'待返工',FAILED_SCRAPPED:'返工结束，失败部分转报废',RECOVERED:'返工成功已恢复',SCRAPPED:'已报废',VOIDED:'申报已作废，历史保留'}[value] ?? value)
+async function load() {
+ const scope=generation,ticket=++attempt; if(!allowed.value)return
+ loading.value=true; error.value=''
+ try {
+  const data=await api.details(props.declarationId); if(scope!==generation || ticket!==attempt)return
+  view.value=data
+  if(!pending.value)restore()
+  if(pending.value && data.events.some(e=>e.id===pending.value?.command.requestId)) { sessionStorage.removeItem(pendingKey()); pending.value=null; actionOpen.value=false; uncertain=false; resetForm() }
+  if(!initialOpened && props.initialAction && !pending.value && ((props.initialAction==='assess' && canAssess.value) || (props.initialAction==='dispose' && canTreat.value))) { initialOpened=true; openAction(props.initialAction) }
+ } catch(e) {if(scope===generation && ticket===attempt)error.value=e instanceof Error?e.message:'不良详情读取失败'}
+ finally {if(scope===generation && ticket===attempt)loading.value=false}
+}
+watch(()=>[props.declarationId,auth.factoryId,auth.revision,allowed.value,auth.hasPermission('business:quality:defect:revise','factory')],()=>{clear();void load()},{immediate:true,flush:'sync'})
+onBeforeUnmount(()=>{clear();emit('dirty',false);emit('pending',false)})
+function openAction(kind:'assess'|'dispose') {
+ if(recoveryBlocked.value || pending.value || (kind==='assess' ? !canAssess.value : !canTreat.value))return
+ resetForm();actionKind.value=kind;actionOpen.value=true
+ if(kind==='dispose' && view.value?.pendingDispositionQty != null)form.quantity=quantityInput(view.value.pendingDispositionQty)
+ originalForm.value=snapshot()
+}
+async function closeAction(done?:()=>void) {
+ if(busy.value)return
+ if(pending.value) {formError.value='请求结果尚未确认，请使用原请求核对结果。';return}
+ if(dirty.value) {try{await ElMessageBox.confirm('是否放弃尚未提交的处理内容？','关闭确认',{type:'warning'})}catch{return}}
+ actionOpen.value=false;resetForm();done?.()
+}
 async function submit() {
- if (!view.value || !writable.value || busy.value) return
- if (!pending.value) pending.value = {requestId:crypto.randomUUID(),expectedRevision:view.value.revision,action:action.value,parentId:action.value !== 'ASSESS' && action.value !== 'ALLOCATE' ? form.parentId : null,scrapQty:(action.value === 'ALLOCATE' || action.value === 'CANCEL_ALLOC') ? form.scrapQty || '0' : '0',reworkQty:['ALLOCATE','START','CANCEL_ALLOC','CANCEL_START'].includes(action.value) ? form.reworkQty || '0' : '0',processedQty:(action.value === 'RESULT' || action.value === 'CORRECT_RESULT') ? form.processedQty || '0' : '0',recoveredQty:(action.value === 'RESULT' || action.value === 'CORRECT_RESULT') ? form.recoveredQty || '0' : '0',failedQty:(action.value === 'RESULT' || action.value === 'CORRECT_RESULT') ? form.failedQty || '0' : '0',occurredAt:form.occurredAt,reason:form.reason,assessment:action.value === 'ASSESS' ? {type:attribution.value,relatedDeclarationId:attribution.value === 'OVERLAP' ? related.value : null,basis:basis.value} : null}
- const storageKey = pendingKey(); sessionStorage.setItem(storageKey, JSON.stringify(pending.value))
- const ticket = generation; busy.value = true; error.value = ''
- try { const data = await api.execute(props.declarationId,pending.value); sessionStorage.removeItem(storageKey); if (ticket !== generation) return; view.value = data; action.value = data.attribution === 'UNVERIFIED' ? 'ASSESS' : 'ALLOCATE'; pending.value = null; uncertain = false; form.parentId = null; emit('changed') }
- catch(e) { if (ticket !== generation) return; error.value = e instanceof Error ? e.message : '未取得确认结果，请使用原请求重查'; if (e instanceof ApiError && e.status >= 400 && e.status < 500 && !uncertain) { sessionStorage.removeItem(storageKey); pending.value = null } else { uncertain = true } }
- finally { if (ticket === generation) busy.value = false }
+ if(pending.value?.kind==='retired-return'){formError.value='原返工请求仅可查询历史记录，不再发送';return}
+ if(!view.value || !writable.value || busy.value || recoveryBlocked.value)return
+ if(!pending.value) {
+  if(!form.reason.trim()) {formError.value='请填写处理说明';return}
+  if(actionKind.value==='assess') {
+   if(!canAssess.value || !basis.value.trim() || attribution.value==='OVERLAP' && !related.value) {formError.value='请完整填写核实结论和说明';return}
+   pending.value={kind:'assess',command:{requestId:crypto.randomUUID(),expectedRevision:view.value.revision,reason:form.reason.trim(),assessment:{type:attribution.value,relatedDeclarationId:attribution.value==='OVERLAP'?related.value:null,basis:basis.value.trim()}}}
+  } else {
+   if(!canTreat.value)return
+   if(!/^\d{1,14}(?:\.\d{1,2})?$/.test(form.quantity) || !positiveQuantity(form.quantity)) {formError.value='数量须大于零，最多两位小数';return}
+   if(view.value.pendingDispositionQty == null) {formError.value='处置数量待确认，暂不能提交处理';return}
+   if(exceedsQuantity(form.quantity,view.value.pendingDispositionQty)) {formError.value='处理数量不能超过待处理数量';return}
+   if(!form.warehouseId) {formError.value='请选择接收仓库';return}
+   pending.value={kind:'dispose',command:{requestId:crypto.randomUUID(),expectedRevision:view.value.revision,destination:'WAREHOUSE',quantity:form.quantity,warehouseId:form.warehouseId,reason:form.reason.trim()}}
+  }
+ }
+ const storageKey=pendingKey(),scope=generation
+ try {sessionStorage.setItem(storageKey,JSON.stringify(pending.value))}catch{formError.value='无法保存本次请求，尚未发送。请恢复会话存储后重试。';return}
+ busy.value=true;formError.value=''
+ try {
+  const result=pending.value.kind==='assess'?await api.assess(props.declarationId,pending.value.command):await api.dispose(props.declarationId,pending.value.command)
+  sessionStorage.removeItem(storageKey);if(scope!==generation)return
+  view.value=result;pending.value=null;uncertain=false;actionOpen.value=false;resetForm();emit('changed')
+ }catch(e){if(scope!==generation)return;formError.value=e instanceof Error?e.message:'处理结果待确认';if(e instanceof ApiError && e.status>=400 && e.status<500 && !uncertain){sessionStorage.removeItem(storageKey);pending.value=null}else uncertain=true}
+ finally{if(scope===generation)busy.value=false}
 }
 </script>
 <template>
- <section class="quality-treatment" aria-label="单节点质量处置与返工">
-  <div class="table-toolbar"><strong>质量处置与单节点返工<span v-if="current?.affectedNodeName"> · {{ current.affectedNodeName }}</span></strong><el-button :loading="loading" :disabled="busy" @click="load">刷新处置</el-button></div>
+ <section v-loading="loading" class="defect-detail" aria-label="不良详情">
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
   <template v-if="view && allowed">
-   <el-alert v-if="view.attribution === 'UNVERIFIED' && view.recordAction !== 'VOID'" title="归属待核实：尚未证明与其他申报是否同一批实物。当前不重复扣减，但禁止依赖不确定额度继续报工或交接。" type="warning" :closable="false" />
-   <el-alert v-if="legacy" title="此记录保留历史退工序/退仓登记；归属可核实，返工前须由管理员留痕订正为所属工序处置。" type="info" :closable="false" />
-   <p>{{ stateLabel(view.state) }}<span v-if="view.basis"> · 核实依据：{{ view.basis }}</span></p>
-   <el-descriptions :column="2" border><el-descriptions-item label="原始直接不良">{{ view.defectQty }}</el-descriptions-item><el-descriptions-item label="当前未恢复不良">{{ view.recordAction === 'VOID' ? '已作废' : view.attribution === 'UNVERIFIED' ? '待核实' : view.netDefectQty }}</el-descriptions-item><el-descriptions-item label="直接分配报废">{{ view.allocatedScrapQty }}</el-descriptions-item><el-descriptions-item label="分配返工">{{ view.allocatedReworkQty }}</el-descriptions-item><el-descriptions-item label="返工加工完成量">{{ view.processedQty }}</el-descriptions-item><el-descriptions-item label="确认恢复量">{{ view.recoveredQty }}</el-descriptions-item><el-descriptions-item label="返工失败转报废">{{ view.failedQty }}</el-descriptions-item><el-descriptions-item label="返工处理中">{{ view.inProgressQty }}</el-descriptions-item></el-descriptions>
-   <p class="secondary">返工仅发生在本次不良所属工序；恢复只减少原有不良损失，不新增正常报工，不自动补齐末道加工或入库。</p>
-   <el-form v-if="writable && view.attribution !== 'OVERLAP' && view.recordAction !== 'VOID'" label-position="top" :disabled="busy || !!pending" @submit.prevent="submit">
-    <el-form-item label="本次质量操作"><el-select v-model="action"><el-option v-if="view.attribution === 'UNVERIFIED'" label="核实不良归属" value="ASSESS" /><template v-if="view.attribution === 'INDEPENDENT'"><el-option label="分配报废/返工" value="ALLOCATE" /><el-option label="开始所属节点返工" value="START" /><el-option label="录入返工结果并确认" value="RESULT" /><el-option label="撤回尚未使用的分配" value="CANCEL_ALLOC" /><el-option label="取消尚未处理的返工开始量" value="CANCEL_START" /><el-option label="订正原返工结果" value="CORRECT_RESULT" /></template></el-select></el-form-item>
-    <template v-if="action === 'ASSESS'"><el-form-item label="归属结论"><el-select v-model="attribution"><el-option label="已核实为独立不良，不与已有申报重复" value="INDEPENDENT" /><el-option label="与已有申报属于同一批不良，不重复扣减" value="OVERLAP" /></el-select></el-form-item><el-form-item v-if="attribution === 'OVERLAP'" label="关联原不良申报"><el-select v-model="related" placeholder="选择同执行的原申报；可先在列表筛选该执行"><el-option v-for="d in relatedOptions" :key="d.declarationId" :value="d.declarationId" :label="`${d.affectedNodeName || '工序名称未记录'} · ${d.defectQty} · ${d.defectReason}`" /></el-select></el-form-item><el-form-item label="核实依据"><el-input v-model="basis" type="textarea" maxlength="500" /></el-form-item></template>
-    <el-form-item v-if="!['ASSESS','ALLOCATE'].includes(action)" label="关联原始质量事件"><el-select v-model="form.parentId" placeholder="选择本申报的对应处理记录"><el-option v-for="e in parents" :key="e.id" :value="e.id" :label="`${eventLabel(e.actionType)} · 返工 ${e.reworkQty} / 处理 ${e.processedQty} / 恢复 ${e.recoveredQty} · ${e.occurredAt}`" /></el-select></el-form-item>
-    <el-form-item v-if="action === 'ALLOCATE' || action === 'CANCEL_ALLOC'" :label="action === 'CANCEL_ALLOC' ? '撤回报废分配数量（不恢复为合格品）' : '本次报废数量'"><el-input v-model="form.scrapQty" inputmode="decimal" /></el-form-item>
-    <el-form-item v-if="['ALLOCATE','START','CANCEL_ALLOC','CANCEL_START'].includes(action)" :label="action.startsWith('CANCEL') ? '本次取消数量（仅限未消耗余额）' : '本次返工数量'"><el-input v-model="form.reworkQty" inputmode="decimal" /></el-form-item>
-    <el-alert v-if="action === 'CORRECT_RESULT'" title="填写原结果订正后的有效总量：处理量不得增加，成功与失败之和必须等于处理量。不会修改原事件。" type="warning" :closable="false" /><template v-if="action === 'RESULT' || action === 'CORRECT_RESULT'"><el-form-item label="实际返工处理量"><el-input v-model="form.processedQty" inputmode="decimal" /></el-form-item><el-form-item label="成功恢复数量"><el-input v-model="form.recoveredQty" inputmode="decimal" /></el-form-item><el-form-item label="失败转报废数量"><el-input v-model="form.failedQty" inputmode="decimal" /></el-form-item></template>
-    <el-form-item label="实际操作时间"><el-date-picker v-model="form.occurredAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item><el-form-item label="原因"><el-input v-model="form.reason" maxlength="500" /></el-form-item>
-   </el-form>
-   <p v-if="pending" role="status">原质量请求 {{ pending.requestId }} 的结果待确认，仅允许原样重查。</p>
-   <el-button v-if="writable && view.attribution !== 'OVERLAP' && view.recordAction !== 'VOID'" type="primary" :loading="busy" :disabled="busy || (legacy && action !== 'ASSESS')" @click="submit">{{ pending ? '使用原请求重查结果' : '确认本次质量操作' }}</el-button>
-   <el-table :data="view.events" row-key="id" border><el-table-column prop="declarationRevision" label="申报版本" width="90" /><el-table-column label="动作" min-width="140"><template #default="{row}">{{ eventLabel(row.actionType) }}</template></el-table-column><el-table-column prop="scrapQty" label="直接报废" min-width="100" /><el-table-column prop="reworkQty" label="分配/开始返工" min-width="125" /><el-table-column prop="processedQty" label="返工加工量" min-width="110" /><el-table-column prop="recoveredQty" label="确认恢复量" min-width="110" /><el-table-column prop="failedQty" label="失败转报废" min-width="110" /><el-table-column prop="operatorName" label="实际操作人" min-width="120" /><el-table-column prop="confirmedByName" label="记录/确认人" min-width="120" /><el-table-column prop="occurredAt" label="处理时间" min-width="180" /><el-table-column prop="reason" label="原因" min-width="160" /></el-table>
+   <div class="detail-heading"><div><el-tag :type="qualityStateTone(view.state)">{{ qualityStateLabel(view.state) }}</el-tag><p class="detail-subject">{{ current?.defectTypeNameSnapshot || current?.defectReason || '不良记录' }}</p><span class="secondary">{{ current?.workorderCode }}<template v-if="current?.productName"> · {{ current.productName }}</template></span></div><div class="detail-actions"><el-button :disabled="busy" @click="load">刷新</el-button><el-button v-if="canAssess" type="primary" :disabled="!!pending || recoveryBlocked" @click="openAction('assess')">核实申报</el-button><el-button v-if="canTreat" type="primary" :disabled="!!pending || recoveryBlocked" @click="openAction('dispose')">办理入仓</el-button></div></div>
+   <p v-if="view.state==='UNRESOLVED'" class="next-step">记录可正常查看；处置数量暂无法确认，相关数量显示为 —，核对后再处理。</p>
+   <p v-else-if="view.state==='UNVERIFIED'" class="next-step">先确认是否与已有申报重复，核实后办理正式入仓。</p>
+   <p v-else-if="view.state==='RETURNED'" class="next-step">本记录包含历史返回事实，保留原数量含义，不再提供返工新操作。</p>
+   <p v-else-if="view.state==='TRANSFERRED'" class="next-step">已创建并审核入库单，转入接收仓库。</p>
+   <p v-else-if="view.state==='OVERLAP'" class="next-step">已标记为重复申报，不重复计入不良数量。</p>
+   <p class="next-step">入仓状态：{{qualityReceiptLabel(view.receiptState)}}</p>
+   <el-alert v-if="pending?.kind==='retired-return'" title="原返工请求仅保留原身份供查询核对，不再发送或改派，请刷新处理记录。" type="warning" :closable="false"/>
+   <div class="quantity-summary" aria-label="不良数量去向"><div><span>申报数量</span><strong><QuantityText :value="view.defectQty" /></strong></div><div><span>{{ view.attribution==='UNVERIFIED'?'待核实':'待入仓数量' }}</span><strong><QuantityText :value="outstanding" /></strong></div><div><span>历史已返回</span><strong><QuantityText :value="view.returnedQty" /></strong></div><div><span>已入仓数量</span><strong><QuantityText :value="view.transferredQty" /></strong></div></div>
+   <h3>不良信息</h3>
+   <el-descriptions :column="2" border><el-descriptions-item label="工单">{{ current?.workorderCode || '—' }}</el-descriptions-item><el-descriptions-item label="产品">{{ current?.productCode }} {{ current?.productName }}</el-descriptions-item><el-descriptions-item label="批次号">{{ current?.batchNo || '未记录' }}</el-descriptions-item><el-descriptions-item label="规格">{{ current?.specification || '—' }}</el-descriptions-item><el-descriptions-item label="申报工序">{{ current?.affectedNodeName || '—' }}</el-descriptions-item><el-descriptions-item label="申报人">{{ current?.reportedByName || '—' }}</el-descriptions-item><el-descriptions-item label="申报时间">{{ parseTime(current?.occurredAt) || '—' }}</el-descriptions-item><el-descriptions-item label="不良原因">{{ current?.defectReason || '—' }}</el-descriptions-item></el-descriptions>
+   <h3>处理记录</h3>
+   <el-empty v-if="!view.events.length" description="尚无处理记录" :image-size="48" />
+   <el-timeline v-else class="treatment-records"><el-timeline-item v-for="event in view.events" :key="event.id" :timestamp="parseTime(event.recordedAt) || ''" placement="top"><div class="record-heading"><strong>{{ treatmentActionLabel(event.actionType) }}</strong><span v-if="event.actionType==='RETURN_NODE'"> <QuantityText :value="event.returnedQty" /></span><span v-if="event.actionType==='TRANSFER_WAREHOUSE'"> <QuantityText :value="event.transferQty" /></span><span class="secondary"> · {{ event.operatorName || '操作人未返回' }}</span></div><p v-if="event.actionType==='ASSESS'">{{ event.attributionType==='INDEPENDENT'?'确认为独立申报':'确认为重复申报' }} · {{ event.basis }}</p><p v-else>{{ event.reason }}</p><p v-if="event.stockDocumentId" class="secondary">入库单 {{ event.stockDocumentId }} · 接收仓库 {{ event.targetWarehouseId }}</p></el-timeline-item></el-timeline>
+   <details class="audit-records"><summary>操作留痕</summary><el-descriptions :column="1" border><el-descriptions-item label="不良记录编号">{{ view.declarationId }}</el-descriptions-item><el-descriptions-item label="当前版本">{{ view.revision }}</el-descriptions-item><el-descriptions-item label="执行单元">{{ view.executionId }}</el-descriptions-item></el-descriptions><slot name="versions" /></details>
   </template>
+  <el-dialog v-model="actionOpen" :title="actionKind==='assess'?'核实不良申报':'办理不良入仓'" width="min(540px, 94vw)" append-to-body :before-close="closeAction" destroy-on-close>
+   <el-alert v-if="formError" :title="formError" type="error" :closable="false" />
+   <p v-if="pending" role="status">上次请求结果待确认，请使用原请求核对，避免重复处理。</p>
+   <el-form label-position="top" :disabled="busy || !!pending" @submit.prevent="submit">
+    <template v-if="actionKind==='assess'"><el-form-item label="核实结论"><el-radio-group v-model="attribution"><el-radio value="INDEPENDENT">独立申报</el-radio><el-radio value="OVERLAP">重复申报</el-radio></el-radio-group></el-form-item><el-form-item v-if="attribution==='OVERLAP'" label="关联原申报"><el-select v-model="related"><el-option v-for="row in relatedOptions" :key="row.declarationId" :value="row.declarationId" :label="`${row.defectTypeNameSnapshot || row.defectReason} · ${row.defectQty}`" /></el-select></el-form-item><el-form-item label="核实说明" required><el-input v-model="basis" type="textarea" maxlength="500" /></el-form-item></template>
+    <template v-else><p>待处理数量：<QuantityText :value="view?.pendingDispositionQty" /></p><el-form-item label="处理数量" required><el-input v-model="form.quantity" inputmode="decimal" /></el-form-item><el-form-item label="接收仓库" required><WarehouseSelect v-model="form.warehouseId" :source="current?.source" :disabled="busy || !!pending" /></el-form-item><p class="secondary">创建正式入库单并审核，审核通过后执行入库。入仓后的流转与处置由仓储办理。</p></template>
+    <el-form-item label="处理说明" required><el-input v-model="form.reason" type="textarea" maxlength="500" :rows="2" /></el-form-item>
+   </el-form>
+   <template #footer><el-button :disabled="busy || !!pending" @click="closeAction()">取消</el-button><el-button type="primary" :loading="busy" :disabled="recoveryBlocked||pending?.kind==='retired-return'" @click="submit">{{ pending?'核对上次结果':actionKind==='assess'?'确认核实':'创建并审核入库' }}</el-button></template>
+  </el-dialog>
  </section>
 </template>
 <style scoped>
-.quality-treatment :deep(.el-select), .quality-treatment :deep(.el-date-editor) { width:100%; }
-.quality-treatment :deep(.el-descriptions__content) { overflow-wrap:anywhere; }
-@media (max-width: 600px) {
- .quality-treatment :deep(.el-descriptions__table tbody) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
- .quality-treatment :deep(.el-descriptions__table tr) { display:contents; }
- .quality-treatment :deep(.el-descriptions__table td) { display:block; width:auto; }
- .quality-treatment :deep(.el-descriptions__content) { white-space:nowrap; }
-}
+.detail-heading,.detail-actions{display:flex;align-items:center;gap:12px}.detail-heading{justify-content:space-between;margin-bottom:18px}.detail-subject{font-size:20px;font-weight:600;margin:12px 0 6px}.next-step{color:var(--el-text-color-secondary);line-height:1.7}.quantity-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--el-border-color-lighter);border-radius:6px;margin:20px 0 26px}.quantity-summary>div{padding:18px 20px;border-right:1px solid var(--el-border-color-lighter)}.quantity-summary>div:last-child{border-right:0}.quantity-summary>div>span{display:block;color:var(--el-text-color-secondary);font-size:13px}.quantity-summary strong{display:block;font-size:26px;margin-top:8px}.defect-detail h3{font-size:15px;margin:24px 0 16px}.treatment-records{padding-left:8px}.treatment-records p{margin:6px 0;line-height:1.7;overflow-wrap:anywhere}.audit-records{border-top:1px solid var(--el-border-color-lighter);padding-top:16px;margin-top:24px}.audit-records summary{cursor:pointer;color:var(--el-text-color-secondary);margin-bottom:12px}.defect-detail :deep(.el-descriptions__content){overflow-wrap:anywhere}@media(max-width:600px){.detail-heading{align-items:flex-start;flex-direction:column}.quantity-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.quantity-summary>div{padding:14px}.detail-actions{flex-wrap:wrap}}
 </style>

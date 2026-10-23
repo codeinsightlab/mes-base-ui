@@ -36,6 +36,8 @@ async function send(path: string, options: RequestOptions = {}): Promise<Respons
     if (response.status === 401 && !options.public) unauthenticated()
     if (response.status === 422 && error.errorCode === 'FACTORY_SELECTION_REQUIRED' && !options.public) factorySelectionRequired()
     const businessMessages: Record<string, string> = {
+      STOCK_DOCUMENT_SOURCE_PENDING: '来源业务尚未接通或关联依据不完整，禁止审核',
+      QUALITY_DATA_INVALID: '当前记录暂不能处理，请先核对处置记录',
       WORKORDER_INVALID: '工单、批次数量、工艺引用或完整路径不符合规则',
       BATCH_ROUTE_FROZEN: '路径已锁定、正在出库或待核实，禁止更改',
       STOCK_KEY_DUPLICATE: '当前工厂已有相同仓库编码或物料仓库库存记录',

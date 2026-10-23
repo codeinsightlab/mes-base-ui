@@ -20,11 +20,11 @@ function setup(post=true){
 }
 it('freezes original post UUID/revision across UNKNOWN and later 403; scope changes reject late completion',async()=>{
  const {s,auth,refresh}=setup();mocks.request.mockRejectedValueOnce(new Error('lost')).mockRejectedValueOnce(new ApiError('FORBIDDEN','撤权','',403))
- await s.post();await s.post();const first=mocks.request.mock.calls[0]![1].body;expect(mocks.request.mock.calls[1]![1].body).toEqual(first);expect(first.expectedRevision).toBe('8');expect(Object.keys(first).sort()).toEqual(['expectedRevision','requestId']);expect(sessionStorage.length).toBe(1)
- let release!:(v:unknown)=>void;mocks.request.mockImplementationOnce(()=>new Promise(r=>release=r));const waiting=s.post();await flushPromises();auth.factoryId='B';await flushPromises();release({});await waiting;expect(refresh).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
+ await s.approve();await s.approve();const first=mocks.request.mock.calls[0]![1].body;expect(mocks.request.mock.calls[1]![1].body).toEqual(first);expect(first.expectedRevision).toBe('8');expect(Object.keys(first).sort()).toEqual(['expectedRevision','requestId']);expect(sessionStorage.length).toBe(1)
+ let release!:(v:unknown)=>void;mocks.request.mockImplementationOnce(()=>new Promise(r=>release=r));const waiting=s.approve();await flushPromises();auth.factoryId='B';await flushPromises();release({});await waiting;expect(refresh).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
 })
 it('query permission cannot post; unsaved header blocks new commands',async()=>{
- const {s,auth}=setup(false);await s.post();expect(mocks.request).not.toHaveBeenCalled();auth.factoryPermissions.push('business:wm:stock:document:post');await wrapper!.setProps({dirty:true});await s.post();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('保存主单')
+ const {s,auth}=setup(false);await s.approve();expect(mocks.request).not.toHaveBeenCalled();auth.factoryPermissions.push('business:wm:stock:document:post');await wrapper!.setProps({dirty:true});await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('保存主单')
 })
 it('uses exact string quantities and fixed parent/version without accepting writable stock facts',async()=>{
  const changed=vi.fn().mockResolvedValue(undefined),{headerApi,itemApi}=stockDocumentApis(changed)
@@ -33,4 +33,12 @@ it('uses exact string quantities and fixed parent/version without accepting writ
  mocks.request.mockResolvedValueOnce({id:'4',documentId:document.id});await itemApi.create({documentId:document.id,stockId:'99',materialId:'2',warehouseId:'3',unitId:'5',batchNo:'LOT',binCode:'BIN',quantity:'0.000001',operatorUserId:'hacker',status:'POSTED',stockActionId:'fake'})
  const [url,options]=mocks.request.mock.calls[1]!;expect(url).toBe('/api/wm/stock-documents/'+document.id+'/lines');expect(options.body.quantity).toBe('0.000001');expect(options.body.expectedRevision).toBe('2');expect(options.body).not.toHaveProperty('operatorUserId');expect(options.body).not.toHaveProperty('status');expect(options.body).not.toHaveProperty('stockActionId');expect(changed).toHaveBeenCalledOnce()
 })
-it('post endpoint preserves the exact caller intent for replay',async()=>{mocks.request.mockResolvedValue({});const body={requestId:'c7b6c1e2-2e51-41d6-86b6-620efc433027',expectedRevision:'7'};await stockDocuments.post('8',body);expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/8/actions/post',{method:'POST',body,scope:'factory'})})
+it('approval endpoint preserves the exact caller intent for replay',async()=>{mocks.request.mockResolvedValue({});const body={requestId:'c7b6c1e2-2e51-41d6-86b6-620efc433027',expectedRevision:'7'};await stockDocuments.approve('8',body);expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/8/actions/approve',{method:'POST',body,scope:'factory'})})
+
+it('creates a general inbound document with an explicit optional production execution identity',async()=>{const {headerApi}=stockDocumentApis(async()=>{});mocks.request.mockResolvedValueOnce({document:{id:'1'},lines:[]});await headerApi.create({documentType:'PRODUCTION_RECEIPT',sourceExecutionId:'9007199254740999',reason:'TEST',remark:null});expect(mocks.request.mock.calls[0]![1].body.sourceExecutionId).toBe('9007199254740999')})
+it('reads production allowance through the inbound document API without creating handover',async()=>{mocks.request.mockResolvedValue({remaining:'40'});await stockDocuments.productionBasis('9007199254740999');expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/executions/9007199254740999/basis',{scope:'factory'})})
+
+it('keeps unsupported source categories as drafts without attempting approval',async()=>{
+ const{s}=setup();await wrapper!.setProps({row:{id:'1',revision:'0',documentType:'PURCHASE_RECEIPT',status:'DRAFT'}})
+ await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('禁止审核')
+})

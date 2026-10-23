@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { menuPathForComponent } from '@/lib/menuWorkspaces'
+import { computed, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import { api, type WmInventoryVo } from '@/api/wm/wmInventory'
 import { localStock, stockOperations, type StockOperation, type StockCommand, type StockAction } from '@/api/wm/localStock'
 const emit = defineEmits<{ changed: [] }>()
+const router = useRouter()
 const auth = useAuth(), visible = ref(false), stockId = ref(''), stock = ref<WmInventoryVo | null>(null)
 const operation = ref<StockOperation>('receipt'), error = ref(''), busy = ref(false), loading = ref(false)
 const rows = ref<StockAction[]>([]), total = ref(0), offset = ref(0)
 const form = reactive({ quantity: '', reason: '', issueId: '' })
 const pending = ref<{ operation: StockOperation; command: StockCommand } | null>(null)
 const granted = computed(() => stockOperations.filter(o => auth.hasPermission('business:wm:stock:' + o.value, 'factory')))
-const options = computed(() => pending.value || auth.runtimeMode==='LOCAL' && stock.value?.warehouseSource==='LOCAL' ? granted.value : [])
+const options = computed(() => (pending.value || auth.runtimeMode==='LOCAL' && stock.value?.warehouseSource==='LOCAL' ? granted.value : []).filter(o=>o.value!=='receipt'||pending.value?.operation==='receipt'))
+const inboundPath=computed(()=>menuPathForComponent(auth.factoryMenus,'wm/stockDocuments/index'))
 const readable = computed(() => auth.hasPermission('business:wm:stock:action:list', 'factory'))
 let generation = 0, attempt = 0, uncertain = false
 const key = () => `mes-stock-pending:${auth.username}:${auth.factoryId}:${stockId.value}`
@@ -54,12 +58,23 @@ async function submit() {
  } finally { if (scope === generation) busy.value = false }
 }
 async function beforeClose(done: () => void) {
+ if (busy.value) return
+ const scope = generation
  if (form.quantity || form.reason || pending.value) { try { await ElMessageBox.confirm(pending.value ? '原请求已保留，下次打开可核实。关闭面板？' : '放弃未提交的库存操作？','关闭确认') } catch { return } }
+ if (scope !== generation) return
  clear(); done()
+}
+async function openInbound(){if(!inboundPath.value)return;const path=inboundPath.value;await beforeClose(()=>{visible.value=false;void router.push({path})})}
+async function openIssues() {
+ await beforeClose(() => {
+  visible.value = false
+  void router.push({ path: '/issue/mesMaterialIssue', query: { view: 'list' } })
+ })
 }
 watch(() => [auth.factoryId, auth.revision, granted.value.map(o => o.value).join(','), readable.value], () => { clear(); visible.value = false }, {flush:'sync'})
 onBeforeUnmount(clear)
-const label = (value: string) => ({OPENING:'期初建账',RECEIPT:'原材料入库',ISSUE:'生产领料',RETURN:'生产退料',GAIN:'盘盈',LOSS:'盘亏',CORRECTION:'业务纠错',REVERSAL:'原操作撤销',PRODUCT_RECEIPT:'成品仓储接收',PRODUCT_REVERSAL:'成品接收逆向'}[value] ?? value)
+onDeactivated(() => { visible.value = false; clear() })
+const label = (value: string) => ({OPENING:'期初建账',RECEIPT:'历史原材料入库',ISSUE:'生产领料',RETURN:'生产退料',GAIN:'盘盈',LOSS:'盘亏',CORRECTION:'业务纠错',REVERSAL:'原操作撤销',PRODUCT_RECEIPT:'历史成品入库',PRODUCT_REVERSAL:'历史成品入库逆向'}[value] ?? value)
 </script>
 <template>
  <el-drawer v-model="visible" title="LOCAL 库存业务与流水" size="min(1120px, 96vw)" :before-close="beforeClose" @closed="clear">
@@ -71,7 +86,7 @@ const label = (value: string) => ({OPENING:'期初建账',RECEIPT:'原材料入�
     <el-descriptions-item label="库存来源">{{ stock.id }}</el-descriptions-item><el-descriptions-item label="物料 / 仓库">{{ stock.materialId }} / {{ stock.warehouseId }}</el-descriptions-item>
     <el-descriptions-item label="批次 / 库位">{{ stock.batchNo || '—' }} / {{ stock.binCode || '—' }}</el-descriptions-item><el-descriptions-item label="实存 / 可用">{{ stock.quantity }} / {{ stock.availableQuantity ?? stock.quantity }}</el-descriptions-item>
    </el-descriptions>
-   <el-alert title="数量使用物料基本单位。退料仅支持未开工且无报工、质量和交接事实的原领料；退料不改变产品投产额度。整单撤销请到原领料单核实。" type="info" :closable="false" />
+   <el-alert title="数量使用物料基本单位。业务入库统一使用入库单。退料仅支持未开工且无报工、质量和库存收发事实的原领料；退料不改变产品投产额度。整单撤销请到原领料单核实。" type="info" :closable="false" />
    <el-alert v-if="pending" :title="'原请求已冻结：' + pending.command.requestId + '，请使用原请求核实结果'" type="warning" :closable="false" />
    <el-form v-if="options.length" label-width="110px" :disabled="busy || !!pending">
     <el-form-item label="业务动作"><el-select v-model="operation"><el-option v-for="o in options" :key="o.value" :value="o.value" :label="o.label" /></el-select></el-form-item>
@@ -79,7 +94,7 @@ const label = (value: string) => ({OPENING:'期初建账',RECEIPT:'原材料入�
     <el-form-item label="数量增减量"><el-input v-model="form.quantity" placeholder="盘亏填写正数；业务纠错使用有符号增减量" /></el-form-item>
     <el-form-item label="依据 / 凭据"><el-input v-model="form.reason" type="textarea" maxlength="500" placeholder="期初依据、入库来源、外部凭据或调整原因" /></el-form-item>
    </el-form>
-   <div class="table-toolbar"><el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading" @click="submit">{{ pending ? '核实原请求' : '确认库存动作' }}</el-button><el-button :disabled="busy" @click="load">刷新余额与流水</el-button><router-link to="/issue/mesMaterialIssue">原领料状态及撤销</router-link></div>
+   <div class="table-toolbar"><el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading" @click="submit">{{ pending ? '核实原请求' : '确认库存动作' }}</el-button><el-button :disabled="busy" @click="load">刷新余额与流水</el-button><el-button v-if="inboundPath" :disabled="busy" @click="openInbound">办理入库单</el-button><el-button type="primary" plain :disabled="busy" @click="openIssues">原领料状态及撤销</el-button></div>
    <el-alert v-if="!readable" title="当前账号未获库存流水查询权限" type="info" :closable="false" />
    <el-table v-if="readable" :data="rows" empty-text="暂无库存动作；历史余额不会自动补记流水">
     <el-table-column label="动作" min-width="120"><template #default="{row}">{{ label(row.actionType) }}</template></el-table-column>

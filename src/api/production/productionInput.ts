@@ -8,7 +8,7 @@ export interface Supply { sourceMode: 'LOCAL_ONLY' | 'CONNECTED'; stocks: Stock[
 export interface Calculation { sourceMode: string; order: Order; stock: Stock; outputQty: string; issueQty: string; calculationKey: string }
 export interface Preview { definition: RoutingDetail; actual: PathView | null }
 export interface Command { requestId: string; code: string; workorderId: string; stockReference: string; outputQty: string; routingId: string; routingNodeIds: string[]; inputKind: 'PRODUCTION_INPUT'; calculationKey: string }
-export interface Result { requestId: string; issueId: string; executionId: string; executionNo: string; code: string; status: string; productionInputQty: string; availableQty: string }
+export interface Result { requestId: string; issueId: string; executionId: string; code: string | null; status: string; productionInputQty: string; availableQty: string }
 const base = '/api/production/input'
 export const productionInput = {
  query: (code: string, offset = 0, limit = 20) => request<Supply>(base, { query: { code, offset, limit }, scope: 'factory' }),

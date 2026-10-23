@@ -30,10 +30,26 @@ function setup(permissions: string[]) {
   return { auth, global: { plugins: [pinia, ElementPlus] } }
 }
 describe('single active execution chain', () => {
+  it('shows the server creation time and does not label historical workorders as released', async() => {
+    wo.list.mockResolvedValueOnce({ items: [{ workorder: { ...order, status: 'HISTORICAL', createTime: '2026-10-20T16:10:00' }, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
+    const c = setup(['workorder:list']), w = mount(WorkOrder, { global: c.global })
+    await flushPromises()
+    expect(w.find('.el-table__body .status-tag').text()).toBe('HISTORICAL')
+    expect(w.find('.el-table__header').text()).toContain('创建时间')
+    expect(w.find('.el-table__body').text()).toContain('2026-10-20T16:10:00')
+    w.unmount()
+  })
+  it('keeps an unknown workorder status visible instead of inventing a released status', async() => {
+    wo.list.mockResolvedValueOnce({ items: [{ workorder: { ...order, status: 'NEW_SERVER_STATE' }, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
+    const c = setup(['workorder:list']), w = mount(WorkOrder, { global: c.global })
+    await flushPromises()
+    expect(w.find('.el-table__body .status-tag').text()).toBe('NEW_SERVER_STATE')
+    w.unmount()
+  })
   it('shows signed allocation and historical batches as read-only, with execution list permission required', async() => {
     const c = setup(['workorder:list', 'workorder:query']), w = mount(WorkOrder, { global: c.global })
     await flushPromises()
-    expect(w.text()).toContain('-300.000000')
+    expect(w.find('span[title="-300.000000"]').text()).toBe('-300')
     expect(w.text()).toContain('默认工艺')
     await w.findAll('button').find(b => b.text() === '详情 / 执行')!.trigger('click')
     await flushPromises()
@@ -72,11 +88,13 @@ describe('single active execution chain', () => {
     const state = w.vm as unknown as { form: Record<string, unknown>; save: () => Promise<void> }
     expect(state.form).not.toHaveProperty('batches')
     expect(document.body.textContent).not.toContain('添加批次')
-    Object.assign(state.form, { code: 'WO_NEW', productId: '1', routingId: '1', plannedQty: '1000.000001' })
+    Object.assign(state.form, { code: 'WO_NEW', productId: '1', routingId: '1', plannedQty: '1000.01' })
+    state.form.plannedQty = '1000.001'; await state.save(); expect(wo.create).not.toHaveBeenCalled()
+    state.form.plannedQty = '1000.01'
     wo.create.mockResolvedValue(detail()); await state.save(); await flushPromises()
     expect(wo.create).toHaveBeenCalled()
     expect(wo.create.mock.calls[0]![0]).not.toHaveProperty('batches')
-    expect(wo.create.mock.calls[0]![0].plannedQty).toBe('1000.000001')
+    expect(wo.create.mock.calls[0]![0].plannedQty).toBe('1000.01')
     w.unmount()
   })
   it('binds execution queries and creates to the selected workorder using existing CRUD', async() => {
