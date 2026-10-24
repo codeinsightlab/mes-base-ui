@@ -41,6 +41,12 @@ const dirty = computed(() => actionOpen.value && !!originalForm.value && snapsho
 watch(() => pending.value != null && pending.value.kind !== 'retired-return' || busy.value, v => emit('pending', v), { flush: 'sync' })
 watch(dirty, v => emit('dirty', v), { flush: 'sync' })
 const relatedOptions = computed(() => props.candidates.filter(d => d.declarationId !== props.declarationId && d.executionId === view.value?.executionId && !['UNVERIFIED', 'UNRESOLVED'].includes(d.processingState) && d.recordAction !== 'VOID'))
+function assessmentAttributionLabel(value: string | null | undefined) {
+  if (value === 'INDEPENDENT') return '确认为独立申报'
+  if (value === 'OVERLAP') return '确认为重复申报'
+  if (!value) return '归属待确认'
+  return `归属待确认（${value}）`
+}
 let generation = 0, attempt = 0, uncertain = false, initialOpened = false
 const pendingKey = () => `mes-quality-action:${auth.username}:${auth.factoryId}:${props.declarationId}`
 function resetForm() { Object.assign(form, { quantity: '', warehouseId: null, reason: '' }); attribution.value = 'INDEPENDENT'; related.value = null; basis.value = ''; formError.value = '' }
@@ -146,7 +152,7 @@ async function submit() {
       <h3>处理记录</h3><el-button @click="loadEvents">重新读取处理记录</el-button>
       <el-alert v-if="eventError" :title="eventError" type="error" :closable="false" />
       <el-empty v-if="!eventLoading && !eventError && !events.length" description="尚无处理记录" :image-size="48" />
-      <el-timeline v-if="events.length" class="treatment-records"><el-timeline-item v-for="event in events" :key="event.id" :timestamp="parseTime(event.recordedAt) || ''" placement="top"><div class="record-heading"><strong>{{ treatmentActionLabel(event.actionType) }}</strong><span v-if="event.actionType==='RETURN_NODE'"> <QuantityText :value="event.returnedQty" /></span><span v-if="event.actionType==='TRANSFER_WAREHOUSE'"> <QuantityText :value="event.transferQty" /></span><span class="secondary"> · {{ event.operatorName || '操作人未返回' }}</span></div><p v-if="event.actionType==='ASSESS'">{{ event.attributionType==='INDEPENDENT'?'确认为独立申报':'确认为重复申报' }} · {{ event.basis }}</p><p v-else>{{ event.reason }}</p><p v-if="event.stockDocumentId" class="secondary">入库单 {{ event.stockDocumentId }} · 接收仓库 {{ event.targetWarehouseId }}</p></el-timeline-item></el-timeline>
+      <el-timeline v-if="events.length" class="treatment-records"><el-timeline-item v-for="event in events" :key="event.id" :timestamp="parseTime(event.recordedAt) || ''" placement="top"><div class="record-heading"><strong>{{ treatmentActionLabel(event.actionType) }}</strong><span v-if="event.actionType==='RETURN_NODE'"> <QuantityText :value="event.returnedQty" /></span><span v-if="event.actionType==='TRANSFER_WAREHOUSE'"> <QuantityText :value="event.transferQty" /></span><span class="secondary"> · {{ event.operatorName || '操作人未返回' }}</span></div><p v-if="event.actionType==='ASSESS'">{{ assessmentAttributionLabel(event.attributionType) }} · {{ event.basis }}</p><p v-else>{{ event.reason }}</p><p v-if="event.stockDocumentId" class="secondary">入库单 {{ event.stockDocumentId }} · 接收仓库 {{ event.targetWarehouseId }}</p></el-timeline-item></el-timeline>
       <Pagination v-model:page="eventPage" :total="eventTotal" :limit="20" @pagination="loadEvents" />
     </section>
     <section v-if="allowed">

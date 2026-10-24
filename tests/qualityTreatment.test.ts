@@ -13,6 +13,31 @@ beforeEach(()=>{sessionStorage.clear();vi.resetAllMocks();vi.stubGlobal('ResizeO
 afterEach(()=>{wrapper?.unmount();document.body.innerHTML='';vi.unstubAllGlobals()})
 async function setup(write=true){const pinia=createPinia(),auth=useAuth(pinia);auth.factoryId='A';auth.username='tester';auth.factoryPermissions=['business:quality:defect:read',...(write?['business:quality:defect:revise']:[])];wrapper=mount(Panel,{props:{declarationId:'d1',candidates:[],record:{declarationId:'d1',executionStatus:'RUNNING',workorderStatus:'RELEASED',source:'LOCAL'} as any},global:{plugins:[pinia,ElementPlus]}});await flushPromises();const s=(wrapper.vm.$ as unknown as {setupState:Record<string,any>}).setupState;return{s,auth}}
 it('opens as a read-only document with explicit actions and no implementation concepts',async()=>{await setup();expect(wrapper.text()).toContain('不良信息');expect(wrapper.text()).toContain('处理记录');expect(wrapper.text()).toContain('办理入仓');expect(wrapper.text()).not.toContain('旧流程');expect(wrapper.text()).not.toContain('本次处理');expect(wrapper.text()).not.toContain('净损失');expect(wrapper.find('.el-dialog').exists()).toBe(false);expect(api.dispose).not.toHaveBeenCalled()})
+it.each([
+  { name: 'null', field: { attributionType: null }, label: '归属待确认' },
+  { name: 'missing', field: {}, label: '归属待确认' },
+  { name: 'unknown', field: { attributionType: 'FUTURE_ATTRIBUTION' }, label: '归属待确认（FUTURE_ATTRIBUTION）' },
+  { name: 'untrusted text', field: { attributionType: '<img src=x onerror=alert(1)>' }, label: '归属待确认（<img src=x onerror=alert(1)>）' },
+  { name: 'independent', field: { attributionType: 'INDEPENDENT' }, label: '确认为独立申报' },
+  { name: 'overlap', field: { attributionType: 'OVERLAP' }, label: '确认为重复申报' }
+])('renders assessment attribution honestly for $name and preserves the raw history', async({ field, label }) => {
+  api.history.mockResolvedValueOnce({ items: [
+    { id: 'assessment', actionType: 'ASSESS', ...field, basis: '原始核实依据', recordedAt: '2026-01-01T10:00:00', operatorName: '核实人员' },
+    { id: 'other', actionType: 'TRANSFER_WAREHOUSE', transferQty: '2', reason: '其他原始事件', recordedAt: '2026-01-01T11:00:00', operatorName: '入仓人员' }
+  ], total: 41, offset: 0, limit: 20 })
+  const { s } = await setup(false)
+  const records = wrapper.findAll('.el-timeline-item')
+  expect(records).toHaveLength(2)
+  expect(records[0]!.text()).toContain(label + ' · 原始核实依据')
+  expect(records[0]!.text()).toContain('核实人员')
+  if (field.attributionType !== 'OVERLAP')expect(records[0]!.text()).not.toContain('确认为重复申报')
+  if (field.attributionType !== 'INDEPENDENT')expect(records[0]!.text()).not.toContain('确认为独立申报')
+  expect(records[0]!.find('img').exists()).toBe(false)
+  expect(records[1]!.text()).toContain('其他原始事件')
+  expect(s.eventTotal).toBe(41)
+  expect(api.history).toHaveBeenCalledWith('d1', 0, 20)
+  expect(api.assess).not.toHaveBeenCalled();expect(api.dispose).not.toHaveBeenCalled();expect(api.check).not.toHaveBeenCalled()
+})
 it('hides processing once all declared quantity has been assigned',async()=>{api.details.mockResolvedValueOnce({...view,pendingDispositionQty:'0',returnedQty:'6',transferredQty:'4',state:'DISPOSED'});const{s}=await setup();expect(s.canTreat).toBe(false);expect(wrapper.findAll('button').some(b=>b.text()==='办理入仓')).toBe(false);expect(wrapper.text()).toContain('历史已返回');expect(wrapper.text()).toContain('已入仓数量')})
 it('requires an explicit disposition action and preserves its UUID on uncertainty',async()=>{const{s}=await setup();s.openAction('dispose');s.form.quantity='4';s.form.reason='现场确认';s.form.warehouseId='3';api.dispose.mockRejectedValueOnce(new Error('响应丢失'));await s.submit();const first=JSON.parse(JSON.stringify(api.dispose.mock.calls[0]![1]));expect(first).toMatchObject({destination:'WAREHOUSE',quantity:'4',warehouseId:'3',expectedRevision:1});expect(first).not.toHaveProperty('occurredAt');s.form.quantity='5';await s.submit();expect(api.dispose.mock.calls[1]![1]).toEqual(first)})
 it('submits the selected receiving warehouse with exact IDs',async()=>{const{s}=await setup();s.openAction('dispose');s.form.quantity='3';s.form.warehouseId='9007199254740999';s.form.reason='转入不良品库';await s.submit();expect(api.dispose.mock.calls[0]![1]).toMatchObject({destination:'WAREHOUSE',quantity:'3',warehouseId:'9007199254740999'});expect(api.dispose.mock.calls[0]![1]).not.toHaveProperty('productId')})
