@@ -4,10 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useAuth } from '@/stores/auth'
 import ExecutionActions from '@/components/business/production/ExecutionActions.vue'
-import SubmitAction from '@/components/business/MaterialIssueSubmitAction.vue'
-const mocks = vi.hoisted(() => ({ path: vi.fn(), select: vi.fn(), start: vi.fn(), submit: vi.fn(), reopen: vi.fn() }))
+const mocks = vi.hoisted(() => ({ path: vi.fn(), select: vi.fn(), start: vi.fn() }))
 vi.mock('@/api/production/executionActions', () => ({ executionActions: { path: mocks.path, select: mocks.select, start: mocks.start } }))
-vi.mock('@/api/issue/mesMaterialIssue', () => ({ submitMaterialIssue: mocks.submit, reopenRejectedIssue: mocks.reopen }))
 function setup(permissions: string[]) {
  const pinia = createPinia(); setActivePinia(pinia)
  const auth = useAuth(); auth.factoryId = 'SIMPLE_B'; auth.factoryPermissions = permissions
@@ -39,14 +37,5 @@ describe('Production Core V1 commands', () => {
   let release!: (value: unknown)=>void;mocks.path.mockImplementation(()=>new Promise(r=>{release=r}))
   const context=setup([prefix+'query']);const w=mount(ExecutionActions,{props:{id:'1'},global:context.global});await w.find('button').trigger('click');context.auth.factoryId='OTHER';context.auth.revision++;await flushPromises();release(path);await flushPromises()
   expect(document.body.textContent).not.toContain('同工序');w.unmount()
- })
- it('submits a saved clean issue once and clearly labels LOCAL_ONLY confirmation', async() => {
-  let release!: (value: unknown)=>void; mocks.submit.mockImplementation(()=>new Promise(r=>{release=r}));const refresh=vi.fn().mockResolvedValue(undefined)
-  const context=setup(['business:mes:material:issue:update']);const w=mount(SubmitAction,{props:{row:{id:'1',executionId:'9',status:'DRAFT'},refresh,dirty:false},global:context.global})
-  await w.find('button').trigger('click'); await w.find('button').trigger('click');release({status:'CONFIRMED',sourceExecutionMode:'LOCAL_ONLY'});await flushPromises();expect(mocks.submit).toHaveBeenCalledTimes(1);expect(refresh).toHaveBeenCalledTimes(1);expect(w.text()).toContain('本地模式，领料已确认');w.unmount()
- })
- it('blocks dirty submission, hides submission for UNKNOWN, and ignores late results on permission loss', async() => {
-  const context=setup(['business:mes:material:issue:update']);const refresh=vi.fn();let release!:(v:unknown)=>void;mocks.submit.mockImplementation(()=>new Promise(r=>{release=r}))
-  const w=mount(SubmitAction,{props:{row:{id:'1',executionId:'9',status:'DRAFT'},refresh,dirty:true},global:context.global});expect(w.find('button').attributes('disabled')).toBeDefined();await w.setProps({dirty:false});await w.find('button').trigger('click');context.auth.factoryPermissions=[];await flushPromises();release({status:'CONFIRMED',sourceExecutionMode:'LOCAL_ONLY'});await flushPromises();expect(refresh).not.toHaveBeenCalled();expect(w.text()).not.toContain('本地模式，领料已确认');await w.setProps({row:{id:'1',status:'SUBMIT_UNKNOWN',submissionId:'2'}});expect(w.text()).toContain('不要重复创建');expect(w.find('button').exists()).toBe(false);w.unmount()
  })
 })

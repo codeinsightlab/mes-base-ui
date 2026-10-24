@@ -70,13 +70,12 @@ describe('master detail material issue document', () => {
     expect(wrapper.findAll('button').some(b => ['新增', '保存主单', '删除主单', '编辑'].includes(b.text()))).toBe(false)
     wrapper.unmount()
   })
-  it('never lists unbound lines before a new parent is saved', async() => {
+  it('directs new issues to the formal BOM draft flow and never creates an unbound legacy parent', async() => {
     const { wrapper } = setup(['list', 'query', 'create'])
     await flushPromises()
-    await wrapper.findAll('button').find(b => b.text() === '新增单据')!.trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).toContain('先保存主单')
-    expect(item.list).not.toHaveBeenCalled()
+    expect(wrapper.findAll('button').some(b => b.text() === '新增单据')).toBe(false)
+    expect(wrapper.text()).toContain('按BOM与库存来源保存正式出库草稿')
+    expect(item.list).not.toHaveBeenCalled();expect(header.create).not.toHaveBeenCalled()
     wrapper.unmount()
   })
   it('rejects late parent detail after changing factory', async() => {
@@ -93,31 +92,23 @@ describe('master detail material issue document', () => {
     expect(item.list).not.toHaveBeenCalled()
     wrapper.unmount()
   })
-  it('fixes parent query and create command even if a child draft supplies another parent', async() => {
+  it('keeps legacy header and lines read only even for a user with edit permissions', async() => {
     const { wrapper } = setup(['list', 'query', 'create', 'update'])
     await open(wrapper)
     const lines = wrapper.findAllComponents(CrudPage).find(c => c.props('embedded'))!
-    const vm = lines.vm as unknown as { open(): Promise<void>; draft: Record<string, unknown>; save(): Promise<void> }
-    await vm.open()
-    Object.assign(vm.draft, { issueId: 'forged-parent', materialId: '1', quantity: '0.12' })
-    item.create.mockResolvedValue({ id: '10' })
-    await vm.save()
-    expect(item.create).toHaveBeenLastCalledWith(expect.objectContaining({ issueId: parent, quantity: '0.12' }))
+    expect(lines.props('readonly')).toBe(true)
     expect(lines.props('fixedValues')).toEqual({ issueId: parent })
+    expect(wrapper.findAll('button').some(b => ['保存主单', '新增', '编辑'].includes(b.text()))).toBe(false)
+    expect(item.create).not.toHaveBeenCalled();expect(header.update).not.toHaveBeenCalled()
     wrapper.unmount()
   })
-  it('does not apply a late successful save after the context changed', async() => {
-    let release!: (value: unknown) => void
-    header.update.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+  it('does not invoke old saves and clears the read-only document when scope changes', async() => {
     const { wrapper, auth } = setup(['list', 'query', 'update'])
     await open(wrapper)
     const doc = wrapper.findComponent(Document)
-    const saving = (doc.vm as unknown as { save(): Promise<void> }).save()
-    auth.revision++; auth.factoryId = 'B'
-    await flushPromises()
-    release({ id: parent, issueNo: '过期保存结果' })
-    await saving; await flushPromises()
-    expect(wrapper.text()).not.toContain('过期保存结果')
+    await (doc.vm as unknown as { save(): Promise<void> }).save()
+    expect(header.update).not.toHaveBeenCalled()
+    auth.revision++; auth.factoryId = 'B';await flushPromises()
     expect(wrapper.text()).not.toContain('主单信息')
     wrapper.unmount()
   })

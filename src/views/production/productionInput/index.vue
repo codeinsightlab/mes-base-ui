@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import QueryForm from '@/components/QueryForm.vue'
+import { menuPathForComponent } from '@/lib/menuWorkspaces'
+import type { Detail as StockDocumentDetail } from '@/api/wm/stockDocuments'
 import { ApiError } from '@/lib/request'
 
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
@@ -13,6 +15,10 @@ import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
 import { productionInput as api, inputPermission, type Supply, type Preview, type Calculation, type Command, type Result } from '@/api/production/productionInput'
 const auth = useAuth(), router = useRouter()
 const allowed = computed(() => auth.hasPermission(inputPermission, 'factory'))
+const canDraft = computed(() => allowed.value && auth.runtimeMode === 'LOCAL' && ['create','update'].every(action => auth.hasPermission('business:wm:stock:document:' + action, 'factory')))
+const canConfirm = computed(() => allowed.value && (auth.runtimeMode === 'ERP' || canDraft.value && auth.hasPermission('business:wm:stock:document:post', 'factory')))
+const documentPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
+const draftResult = ref<StockDocumentDetail | null>(null), pendingKind = ref<'draft' | 'confirm'>('confirm')
 const code = ref(''), orderId = ref(''), stockId = ref(''), outputQty = ref(''), nextNode = ref('')
 const supply = ref<Supply | null>(null), preview = ref<Preview | null>(null), calculation = ref<Calculation | null>(null)
 const selected = ref<string[]>([]), pending = ref<Command | null>(null), result = ref<Result | null>(null)
@@ -29,15 +35,15 @@ const pathComplete = computed(() => {
  const graph = preview.value?.definition, last = graph?.nodes.find(n => n.id === selected.value.at(-1))
  return !!graph && !!last && !graph.edges.some(e => e.fromNodeCode === last.nodeCode) && graph.nodes.filter(n => n.isKey).every(n => selected.value.includes(n.id!))
 })
-function clear() { generation++; contextSequence++; previewSequence++; calculateSequence++; supply.value = null; preview.value = null; calculation.value = null; selected.value = []; pending.value = null; pendingSourceMode.value = null; result.value = null; error.value = ''; busy.value = false; orderId.value = ''; stockId.value = ''; outputQty.value = ''; nextNode.value = '' }
+function clear() { generation++; contextSequence++; previewSequence++; calculateSequence++; supply.value = null; preview.value = null; calculation.value = null; selected.value = []; pending.value = null; pendingSourceMode.value = null; result.value = null; draftResult.value = null; error.value = ''; busy.value = false; orderId.value = ''; stockId.value = ''; outputQty.value = ''; nextNode.value = '' }
 const recoveryKey = () => 'mes-production-input-pending:' + auth.username + ':' + auth.factoryId
 function restorePending() {
  if (!allowed.value) return
  const saved = sessionStorage.getItem(recoveryKey()); if (!saved) return
- try { const savedValue = JSON.parse(saved) as Command | { command: Command; sourceMode: string | null }; const request = 'command' in savedValue ? savedValue.command : savedValue; code.value = request.code; pending.value = request; pendingSourceMode.value = 'command' in savedValue ? savedValue.sourceMode : null; error.value = '存在结果待确认的投产请求，请使用原请求重查，不能发起替代领料。' }
+ try { const savedValue = JSON.parse(saved) as Command | { command: Command; sourceMode: string | null; kind?: 'draft' | 'confirm' }; const request = 'command' in savedValue ? savedValue.command : savedValue; code.value = request.code; pending.value = request; pendingSourceMode.value = 'command' in savedValue ? savedValue.sourceMode : null; pendingKind.value = 'command' in savedValue ? savedValue.kind ?? 'confirm' : 'confirm'; error.value = '存在结果待确认的投产请求，请使用原请求重查，不能发起替代领料。' }
  catch { error.value = '待确认投产请求无法读取，请联系管理员核实原记录。' }
 }
-watch(() => [auth.factoryId, auth.revision, allowed.value], () => { clear(); code.value = ''; restorePending() }, {flush: 'sync'})
+watch(() => [auth.factoryId, auth.revision, allowed.value, auth.factoryPermissions.join('|'), auth.runtimeMode], () => { clear(); code.value = ''; restorePending() }, {flush: 'sync'})
 watch(code, clear, {flush: 'sync'})
 restorePending()
 watch([stockId, outputQty], () => { calculateSequence++; calculation.value = null }, {flush: 'sync'})
@@ -73,12 +79,17 @@ async function calculate() {
  catch (e) { if (ticket === calculateSequence) error.value = e instanceof Error ? e.message : '用料计算失败' }
  finally { if (ticket === calculateSequence) busy.value = false }
 }
-async function submit() {
- if (!allowed.value || busy.value || (!pending.value && (!calculation.value || !preview.value || !pathComplete.value))) return
- if (!pending.value) { pendingSourceMode.value = calculation.value!.sourceMode; pending.value = {requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: outputQty.value, routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey} }
- const storageKey = recoveryKey(); sessionStorage.setItem(storageKey, JSON.stringify({ command: pending.value, sourceMode: pendingSourceMode.value }))
+async function submit(kind: 'draft' | 'confirm' = pending.value ? pendingKind.value : 'confirm') {
+ if (!(kind === 'draft' ? canDraft.value : canConfirm.value) || busy.value || (!pending.value && (!calculation.value || !preview.value || !pathComplete.value))) return
+ if (pending.value && kind !== pendingKind.value) return
+ if (!pending.value) { pendingKind.value = kind; pendingSourceMode.value = calculation.value!.sourceMode; pending.value = {requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: outputQty.value, routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey} }
+ const storageKey = recoveryKey(); sessionStorage.setItem(storageKey, JSON.stringify({ command: pending.value, sourceMode: pendingSourceMode.value, kind: pendingKind.value }))
  const ticket = generation; busy.value = true; error.value = ''
- try { const data = await api.submit(pending.value); if (data.status === 'CONFIRMED') sessionStorage.removeItem(storageKey); if (ticket !== generation) return; result.value = data; if (data.status === 'CONFIRMED') await loadPreview() }
+ try {
+  if (pendingKind.value === 'draft') {
+   const data = await api.draft(pending.value); sessionStorage.removeItem(storageKey); if (ticket !== generation) return; draftResult.value = data; pending.value = null; pendingSourceMode.value = null; calculation.value = null; return
+  }
+  const data = await api.submit(pending.value); if (data.status === 'CONFIRMED') sessionStorage.removeItem(storageKey); if (ticket !== generation) return; result.value = data; if (data.status === 'CONFIRMED') await loadPreview() }
  catch (e) {
   const localRejected = pendingSourceMode.value === 'LOCAL_ONLY' && e instanceof ApiError
    && ['BAD_REQUEST', 'PRODUCTION_INPUT_STALE', 'PRODUCTION_INPUT_QUOTA_EXCEEDED', 'WORKORDER_CANCELLED', 'WORKORDER_NOT_RELEASED', 'BUSINESS_SOURCE_CONFLICT'].includes(e.code)
@@ -89,7 +100,7 @@ async function submit() {
  }
  finally { if (ticket === generation) busy.value = false }
 }
-function again() { if (result.value?.status !== 'CONFIRMED') return; pending.value = null; pendingSourceMode.value = null; calculation.value = null; result.value = null; outputQty.value = ''; void query() }
+function again() { if (result.value?.status !== 'CONFIRMED' && !draftResult.value) return; draftResult.value = null; pending.value = null; pendingSourceMode.value = null; calculation.value = null; result.value = null; outputQty.value = ''; void query() }
 </script>
 <template>
  <section class="page-shell production-input">
@@ -126,10 +137,15 @@ function again() { if (result.value?.status !== 'CONFIRMED') return; pending.val
       </template>
       <p class="secondary">实际路径在首次领料确认后锁定；追加投产不会改变工艺版本或路径。</p>
      </template>
-     <div class="table-toolbar"><el-button type="primary" :loading="busy" :disabled="terminal || result?.status === 'CONFIRMED' || (!pending && (!calculation || !pathComplete))" @click="submit">{{ pending ? '使用原请求重查结果' : '确认正式投产' }}</el-button></div>
+     <div class="table-toolbar">
+      <el-button v-if="canDraft && (!pending || pendingKind==='draft')" :loading="busy" :disabled="terminal || !!draftResult || result?.status==='CONFIRMED' || (!pending && (!calculation || !pathComplete))" @click="submit('draft')">{{pending ? '核对原草稿请求' : '保存正式领料草稿'}}</el-button>
+      <el-button v-if="canConfirm && (!pending || pendingKind==='confirm')" type="primary" :loading="busy" :disabled="terminal || !!draftResult || result?.status==='CONFIRMED' || (!pending && (!calculation || !pathComplete))" @click="submit('confirm')">{{ pending ? '使用原请求重查结果' : '确认正式投产' }}</el-button>
+     </div>
+     <p class="secondary">保存草稿不扣库存、不形成生产投入或执行；审核通过才生效。便捷投产在后端同一事务新增正式出库单、明细并审核，需具备审核权限。</p>
     </el-form>
    </template>
-   <div v-if="pending && result?.status !== 'CONFIRMED'" class="table-toolbar" role="status"><span>原投产请求 {{ pending.requestId }}：结果待确认</span><el-button :loading="busy" @click="submit">使用原请求重查</el-button></div>
+   <div v-if="pending && result?.status !== 'CONFIRMED'" class="table-toolbar" role="status"><span>原投产请求 {{ pending.requestId }}：结果待确认</span><el-button :loading="busy" @click="submit()">使用原请求重查</el-button></div>
+   <div v-if="draftResult" class="panel"><el-alert title="正式领料草稿已保存，库存和生产投入未改变。请稍后打开出入库单核对并独立审核。冻结的BOM、数量及库存明细不可直接修改；变更需取消后重新计算建草稿。" type="success" :closable="false" /><p>单号 {{draftResult.document.documentNo}} · {{draftResult.document.id}}</p><router-link v-if="documentPath" :to="{path:documentPath,query:{documentId:draftResult.document.id}}">打开领料出库草稿</router-link><el-button @click="again">新增下一张领料草稿</el-button></div>
    <el-button v-if="result?.issueId" @click="router.push({path:'/issue/mesMaterialIssue',query:{issueId:result.issueId}})">打开本次领料单并核实</el-button>
    <el-descriptions v-if="result" :column="1" border><el-descriptions-item label="执行单元">{{ result.executionId }}</el-descriptions-item><el-descriptions-item label="领料结果">{{ result.status }}</el-descriptions-item><el-descriptions-item label="生产身份码">{{ result.code || '未生成（未记录批次）' }}</el-descriptions-item><el-descriptions-item label="累计正式投入（产出基本单位）"><QuantityText :value="result.productionInputQty" /></el-descriptions-item><el-descriptions-item label="首工序剩余可报"><QuantityText :value="result.availableQty" /></el-descriptions-item><el-descriptions-item label="请求号">{{ result.requestId }}</el-descriptions-item></el-descriptions>
    <el-alert v-if="result && result.status !== 'CONFIRMED'" title="本次尚未贡献投产额度，请在领料管理中核实原操作；不要重新发起同一次领料。" type="warning" :closable="false" />

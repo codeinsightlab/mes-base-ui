@@ -10,6 +10,7 @@ export const stockDocumentTypes = [
  {value:'DEFECT_RECEIPT',label:'不良品入库',origin:'不良品转入不良品仓',basis:'原不良记录、处置流水',approvalAvailable:true},
  {value:'SCRAP_RECEIPT',label:'报废品入库',origin:'不良品转入报废品仓',basis:'原不良记录、处置流水',approvalAvailable:true},
  {value:'OTHER_RECEIPT',label:'其他入库',origin:'盘盈、期初等特殊业务',basis:'原因及实物、审批或调整依据',approvalAvailable:true},
+ {value:'MATERIAL_ISSUE',label:'生产领料出库',origin:'工单BOM正式领料',basis:'工单、已发布BOM、实际路径及精确库存来源',approvalAvailable:true},
  {value:'OTHER_ISSUE',label:'其他出库',origin:'其他库存发出',basis:'原因及实物、审批或调整依据',approvalAvailable:true}
 ] as const
 export type StockDocumentType = typeof stockDocumentTypes[number]['value']
@@ -20,7 +21,9 @@ export interface Header extends Row {
  reason:string; remark:string|null; revision:string; sourceWorkorderId:string|null; sourceExecutionId:string|null; postRequestId:string|null
 }
 export interface Line extends Row {id:string;documentId:string;lineNo:number;stockId:string;materialId:string;warehouseId:string;unitId:string;batchNo:string|null;binCode:string|null;quantity:string;remark:string|null;stockActionId:string|null}
-export interface Detail { document:Header; lines:Line[]; qualitySource?:{sourceDeclarationId:string;sourceTreatmentId:string;sourceQualityExecutionId:string}|null }
+export interface MaterialIssueBasis {requestId:string;code:string;workorderId:string;outputQty:string;routingId:string;routingNodeIds:string[]}
+export interface Detail { materialIssueBasis?:MaterialIssueBasis|null; document:Header; lines:Line[]; qualitySource?:{sourceDeclarationId:string;sourceTreatmentId:string;sourceQualityExecutionId:string}|null }
+export interface ProductionReceiptCommand { requestId:string; stockId:string; quantity:string; reason:string }
 export interface ApprovalIntent {requestId:string;expectedRevision:string}
 export interface ProductionBasis {executionId:string;productId:string;effective:string;received:string;remaining:string;canReceive:boolean;blockedReason:string|null}
 export interface CancellationBasis {workorderId:string;productId:string;status:string;handedOver:string;accepted:string;manuallyReceived:string;remaining:string}
@@ -35,6 +38,7 @@ export const stockDocuments={
  cancel:(id:string,expectedRevision:string)=>request<Detail>(path(id)+'/actions/cancel',{method:'POST',body:{expectedRevision},scope:'factory'}),
  putLine:(id:string,lineId:string|null,body:unknown)=>request<Line>(path(id)+'/lines'+(lineId?'/'+encodeURIComponent(lineId):''),{method:lineId?'PUT':'POST',body,scope:'factory'}),
  removeLine:(id:string,lineId:string,expectedRevision:string)=>request<void>(path(id)+'/lines/'+encodeURIComponent(lineId),{method:'DELETE',body:{expectedRevision},scope:'factory'}),
+ receiveProduction:(id:string,body:ProductionReceiptCommand)=>request<Detail>('/api/production/executions/'+encodeURIComponent(id)+'/inbound',{method:'POST',body,scope:'factory'}),
  productionBasis:(id:string)=>request<ProductionBasis>(root+'/executions/'+encodeURIComponent(id)+'/basis',{scope:'factory'}),
  basis:(id:string)=>request<CancellationBasis>(root+'/cancelled-workorders/'+encodeURIComponent(id)+'/basis',{scope:'factory'}),
 }
@@ -42,7 +46,7 @@ export const stockDocuments={
 export function stockDocumentApis(changed:()=>Promise<void>){
  let header:Header|null=null
  const parents=new Map<string,string>()
- const store=(d:Detail)=>{header={...d.document,...d.qualitySource};d.lines.forEach(l=>parents.set(l.id,l.documentId));return d}
+ const store=(d:Detail)=>{header={...d.document,...d.qualitySource,materialIssueBasis:d.materialIssueBasis??null};d.lines.forEach(l=>parents.set(l.id,l.documentId));return d}
  const headerApi:CrudApi={
   list:stockDocuments.list,
   detail:async id=>{store(await stockDocuments.detail(id));return header!},

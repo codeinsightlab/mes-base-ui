@@ -12,17 +12,19 @@ import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
 
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  creatable?: boolean;
   title: string; headerApi: CrudApi; itemApi: CrudApi;
   headerFields: Field[]; itemFields: Field[];
   headerPermission: string; itemPermission: string; parentKey: string;
   headerTableKey?: string; itemTableKey?: string;
   headerReadonly?: (row: Row) => boolean;
+  itemsReadonly?: (row: Row) => boolean;
   itemPermissionOverrides?: Record<string, string>;
   itemsReadonlyWhenDirty?: boolean;
   itemVersionField?: string;
   itemBeforeCreate?: () => Promise<Row | null>;
-}>()
+}>(), { creatable: true })
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
 const draft = reactive<Row>({})
@@ -52,7 +54,7 @@ async function back() {
   if (current === generation) clear()
 }
 async function open(row?: Row) {
-  if (row ? !can('query') : !can('create')) return
+  if (row ? !can('query') : props.creatable === false || !can('create')) return
   clear()
   opened.value = true
   if (!row) {
@@ -139,7 +141,7 @@ onBeforeUnmount(clear)
     managed-editing
     :table-key="headerTableKey"
   >
-    <template #toolbar><el-button v-if="can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
+    <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
     <template #actions="{ row }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button></template>
   </CrudPage>
   <section v-else class="app-container">
@@ -163,7 +165,7 @@ onBeforeUnmount(clear)
         v-else
         :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
         embedded
-        :readonly="readonly || !!itemsReadonlyWhenDirty && JSON.stringify(draft) !== savedDraft"
+        :readonly="readonly || !!itemsReadonly?.(draft) || !!itemsReadonlyWhenDirty && JSON.stringify(draft) !== savedDraft"
         title="明细"
         :api="itemApi"
         :fields="itemFields"

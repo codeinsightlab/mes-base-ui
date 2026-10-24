@@ -42,3 +42,25 @@ it('keeps unsupported source categories as drafts without attempting approval',a
  const{s}=setup();await wrapper!.setProps({row:{id:'1',revision:'0',documentType:'PURCHASE_RECEIPT',status:'DRAFT'}})
  await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('禁止审核')
 })
+
+it('production receipt convenience preserves the caller UUID and decimal strings in one server command',async()=>{
+ mocks.request.mockResolvedValue({document:{id:'1'},lines:[]});const command={requestId:'11111111-2222-4333-8444-555555555555',stockId:'9007199254740999',quantity:'1.000001',reason:'实物核对'}
+ await stockDocuments.receiveProduction('9007199254740998',command)
+ expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/production/executions/9007199254740998/inbound',{method:'POST',body:command,scope:'factory'})
+})
+it('material issue approval is unavailable without all formal production and document permissions',async()=>{
+ const {s,auth}=setup();await wrapper!.setProps({row:{id:'1',revision:'0',status:'DRAFT',documentType:'MATERIAL_ISSUE',postRequestId:'11111111-2222-4333-8444-555555555555'}})
+ await s.approve();expect(mocks.request).not.toHaveBeenCalled()
+ auth.factoryPermissions.push('business:mes:material:issue:update','business:wm:stock:document:create','business:wm:stock:document:update');await flushPromises()
+ mocks.request.mockResolvedValue({document:{id:'1'},lines:[]});await s.approve();expect(mocks.request).toHaveBeenCalledOnce()
+ expect(mocks.confirm.mock.calls.at(-1)![0]).toContain('减少所选库存')
+ expect(mocks.request.mock.calls[0]![1].body.requestId).toBe('11111111-2222-4333-8444-555555555555')
+})
+it('keeps the safe material issue basis visible to the draft approver without exposing frozen request JSON',async()=>{
+ const basis={requestId:'11111111-2222-4333-8444-555555555555',code:'WO:M#0001 ',workorderId:'9007199254740999',outputQty:'10.000001',routingId:'7',routingNodeIds:['11','12']}
+ const {headerApi}=stockDocumentApis(async()=>{});mocks.request.mockResolvedValue({document:{id:'1',documentType:'MATERIAL_ISSUE'},lines:[],materialIssueBasis:basis})
+ const header=await headerApi.detail!('1');expect(header.materialIssueBasis).toEqual(basis);expect(header).not.toHaveProperty('sourceRequestJson')
+ const{s}=setup();await wrapper!.setProps({row:{...header,status:'DRAFT',revision:'0'}});await flushPromises()
+ expect(wrapper!.text()).toContain('10');expect(wrapper!.text()).toContain('11 → 12');expect(wrapper!.text()).toContain('WO:M#0001')
+ expect(s.materialIssueBasis.code).toBe('WO:M#0001 ')
+})

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductionReceiptAction from './ProductionReceiptAction.vue'
 import PageDrawer from '@/components/page/PageDrawer.vue'
 
 import { executionStatusLabel } from '@/lib/production/executionState'
@@ -40,6 +41,7 @@ function close(done:()=>void){clear();done()}
  <PageDrawer v-model="visible" title="生产数量与入库收尾" size="min(1160px,96vw)" append-to-body destroy-on-close :before-close="close">
   <el-alert v-if="loadError" :title="loadError" type="error" :closable="false"/>
   <div v-if="!data" v-loading="loading"><el-button v-if="loadError" @click="load">重试读取</el-button></div>
+  <ProductionReceiptAction :execution-id="id" @changed="load(); emit('changed')" />
   <section v-if="data" v-loading="loading">
    <el-alert title="报工只登记生产事实。正常品及不良品入库审核后，系统分别核对执行与工单收尾条件；一张单据审核成功不代表整张工单已完结。" type="info" :closable="false"/>
    <h3>{{data.executionId}} · {{executionStatusLabel(data.status)}} · {{receiptLabel}}</h3>
