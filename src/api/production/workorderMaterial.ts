@@ -3,6 +3,6 @@ export interface WorkorderMaterial { id: string; bomId: string | null; bomBaseQt
 export interface MaterialDemandSave { expectedRevision: string; bomId: string; warehouseIds: string[]; workCenter: string; enabled: boolean }
 const url = (id: string) => '/api/production/workorder/' + encodeURIComponent(id) + '/material'
 export const workorderMaterial = {
- get: (id: string) => request<WorkorderMaterial | null>(url(id), {scope:'factory'}).then(v=>v??null),
- save: (id: string, body: MaterialDemandSave) => request<WorkorderMaterial>(url(id), {method:'PUT',body,scope:'factory'})
+  get: (id: string) => request<WorkorderMaterial | null>(url(id), { scope: 'factory' }).then(v => v ?? null),
+  save: (id: string, body: MaterialDemandSave) => request<WorkorderMaterial>(url(id), { method: 'PUT', body, scope: 'factory' })
 }

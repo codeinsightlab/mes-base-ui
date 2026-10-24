@@ -9,7 +9,7 @@ it('removes obsolete quality routes while the real remaining page catalog stays 
   const menu = (path: string) => ({ id: path, path, name: 'TEST ONLY', permission: 'read', kind: 'MENU', children: [] })
   // A previously authorized route must disappear after navigation refresh.
   synchronizeMenuRoutes(router, [menu('/qc/qcIndex')], {
-    '/src/views/qc/qcIndex/index.vue': async () => ({})
+    '/src/views/qc/qcIndex/index.vue': async() => ({})
   }, installed)
   expect(router.hasRoute('generated:/qc/qcIndex')).toBe(true)
   synchronizeMenuRoutes(router, [menu('/basic/materials'), menu('/qc/qcIndex'), menu('/qc/qcDefect')], catalog, installed)

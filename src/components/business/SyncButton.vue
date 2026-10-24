@@ -10,7 +10,6 @@ const props = defineProps<{ permission: string; scope: PermissionScope; run: () 
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
 
-
 const auth = useAuth()
 const emit = defineEmits<{ completed: [] }>()
 const busy = ref(false)

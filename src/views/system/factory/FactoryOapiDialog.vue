@@ -40,12 +40,12 @@ import { useAuth } from '@/stores/auth'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { getFactoryOapi, saveFactoryOapi, type FactoryOapiSettings } from '@/api/system/datasource'
 
-const props = defineProps<{ factory: { factoryId: string; factoryName: string; runtimeMode: string } }>()
+const props = defineProps<{ factory: { factoryId: string; factoryName: string; runtimeMode: string }}>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 const auth = useAuth()
 watch(() => [auth.token, auth.factoryId, auth.revision, auth.platformPermissions.join(',')], () => emit('close'))
 const formRef = ref<FormInstance>()
-const settings = reactive<FactoryOapiSettings>({ endpoint: '', host: { ver: '', prod: '', timezone: '', ip: '', id: '', lang: '', acct: '' }, service: { prod: '', ip: '', id: '' } })
+const settings = reactive<FactoryOapiSettings>({ endpoint: '', host: { ver: '', prod: '', timezone: '', ip: '', id: '', lang: '', acct: '' }, service: { prod: '', ip: '', id: '' }})
 const hostFields: { key: keyof FactoryOapiSettings['host']; label: string }[] = [
   { key: 'ver', label: '版本 · ver' }, { key: 'prod', label: '调用方产品 · prod' },
   { key: 'timezone', label: '时区 · timezone' }, { key: 'ip', label: '调用方地址 · ip' },
@@ -79,7 +79,7 @@ async function load() {
     configurationRevision.value = view.configurationRevision
     if (view.settings) Object.assign(settings, view.settings)
     loaded.value = true
-  } catch (failure) {
+  } catch(failure) {
     if (active && revision === requestRevision) error.value = failure instanceof Error ? failure.message : '配置读取失败'
   } finally {
     if (active && revision === requestRevision) loading.value = false
@@ -98,7 +98,7 @@ async function save() {
     locked.value = view.locked
     ElMessage.success('OAPI 参数已保存，工厂运行模式保持不变')
     emit('saved')
-  } catch (failure) {
+  } catch(failure) {
     if (active) error.value = failure instanceof Error ? failure.message : '配置保存失败'
   } finally {
     if (active) saving.value = false

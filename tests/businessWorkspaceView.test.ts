@@ -43,14 +43,14 @@ describe('business workspace truthful tasks and unavailable integrations', () =>
   })
   it('excludes cancelled or draft workorders from actionable ready execution samples', () => {
     fixture.state.ready.value = { total: 3, items: [
-      { id: '1',  workorderId: '1', workorderStatus: 'RELEASED' },
-      { id: '2',  workorderId: '2', workorderStatus: 'CANCELLED' },
-      { id: '3',  workorderId: '3', workorderStatus: 'DRAFT' }
+      { id: '1', workorderId: '1', workorderStatus: 'RELEASED' },
+      { id: '2', workorderId: '2', workorderStatus: 'CANCELLED' },
+      { id: '3', workorderId: '3', workorderStatus: 'DRAFT' }
     ] }
     const wrapper = mount(BusinessWorkspace, { props: { factoryName: '测试工厂' }, global })
     const tasks = wrapper.find('[aria-label="工厂待办与接入事项"]')
-    expect(tasks.findAll('.business-task-list a').map(link=>link.text())).toEqual(['1'])
-    expect(tasks.findAll('.business-task-list a').map(link=>link.text())).not.toContain('2');expect(tasks.findAll('.business-task-list a').map(link=>link.text())).not.toContain('3')
+    expect(tasks.findAll('.business-task-list a').map(link => link.text())).toEqual(['1'])
+    expect(tasks.findAll('.business-task-list a').map(link => link.text())).not.toContain('2');expect(tasks.findAll('.business-task-list a').map(link => link.text())).not.toContain('3')
     expect(tasks.text()).toContain('仅列本次前 6 条'); wrapper.unmount()
   })
 })

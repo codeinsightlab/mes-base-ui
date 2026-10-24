@@ -54,7 +54,6 @@ export const api = {
   delids: removeIds
 }
 
-
 export const voidMaterialIssue = (id: string, reconcile = false) => request<MesMaterialIssueVo>(
   '/api/issue/mes-material-issue/' + encodeURIComponent(id) + '/actions/' + (reconcile ? 'reconcile-void' : 'void'),
   { method: 'POST', scope: 'factory' }

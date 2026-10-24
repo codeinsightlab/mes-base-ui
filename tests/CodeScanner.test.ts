@@ -15,7 +15,7 @@ it('allows manual entry and emits only on confirmation', async() => {
   await wrapper.get('input[aria-label="扫码码值"]').setValue('WO001:P001#9007199254740993')
   expect(wrapper.emitted('confirm')).toBeUndefined()
   await wrapper.get('form').trigger('submit')
-  expect(wrapper.emitted('confirm')).toEqual([['WO001:P001#9007199254740993','TEXT']])
+  expect(wrapper.emitted('confirm')).toEqual([['WO001:P001#9007199254740993', 'TEXT']])
   expect(wrapper.emitted('update:modelValue')).toEqual([['WO001:P001#9007199254740993']])
 })
 it('recognizes dropped images but waits for explicit confirmation', async() => {
@@ -26,7 +26,7 @@ it('recognizes dropped images but waits for explicit confirmation', async() => {
   expect(wrapper.text()).toContain('二维码识别成功')
   expect((wrapper.get('input[aria-label="扫码码值"]').element as HTMLInputElement).value).toBe('WO001:P001#9007199254740993')
   expect(wrapper.emitted('confirm')).toBeUndefined()
-  await wrapper.get('form').trigger('submit'); expect(wrapper.emitted('confirm')).toEqual([['WO001:P001#9007199254740993','IMAGE']])
+  await wrapper.get('form').trigger('submit'); expect(wrapper.emitted('confirm')).toEqual([['WO001:P001#9007199254740993', 'IMAGE']])
 })
 it('supports the file selector and surfaces failures without reusing an old code', async() => {
   const wrapper = await open()
@@ -58,15 +58,15 @@ it('rejects multiple images and ignores late recognition after close, scope chan
   }
 })
 
-it('preserves the exact text instead of trimming an identity into a different code',async()=>{
- const wrapper=await open(),code='  WO:PRODUCT#LOT  '
- await wrapper.get('input[aria-label="扫码码值"]').setValue(code);await wrapper.get('form').trigger('submit')
- expect(wrapper.emitted('confirm')).toEqual([[code,'TEXT']]);expect(wrapper.emitted('update:modelValue')).toEqual([[code]])
+it('preserves the exact text instead of trimming an identity into a different code', async() => {
+  const wrapper = await open(), code = '  WO:PRODUCT#LOT  '
+  await wrapper.get('input[aria-label="扫码码值"]').setValue(code);await wrapper.get('form').trigger('submit')
+  expect(wrapper.emitted('confirm')).toEqual([[code, 'TEXT']]);expect(wrapper.emitted('update:modelValue')).toEqual([[code]])
 })
-it('marks edited image content as text while retaining exact decoded image content when unchanged',async()=>{
- const wrapper=await open(),file=new File(['x'],'qr.png',{type:'image/png'})
- read.mockResolvedValue(' WO:PRODUCT#LOT ')
- await wrapper.get('.scan-drop').trigger('drop',{dataTransfer:{files:[file]}});await flushPromises()
- await wrapper.get('input[aria-label="扫码码值"]').setValue(' WO:PRODUCT#EDITED ');await wrapper.get('form').trigger('submit')
- expect(wrapper.emitted('confirm')).toEqual([[' WO:PRODUCT#EDITED ','TEXT']])
+it('marks edited image content as text while retaining exact decoded image content when unchanged', async() => {
+  const wrapper = await open(), file = new File(['x'], 'qr.png', { type: 'image/png' })
+  read.mockResolvedValue(' WO:PRODUCT#LOT ')
+  await wrapper.get('.scan-drop').trigger('drop', { dataTransfer: { files: [file] }});await flushPromises()
+  await wrapper.get('input[aria-label="扫码码值"]').setValue(' WO:PRODUCT#EDITED ');await wrapper.get('form').trigger('submit')
+  expect(wrapper.emitted('confirm')).toEqual([[' WO:PRODUCT#EDITED ', 'TEXT']])
 })

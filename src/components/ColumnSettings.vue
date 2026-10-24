@@ -13,21 +13,37 @@ function drop(key: string) { props.controller.move(dragging.value, key); draggin
 </script>
 <template>
   <el-button :disabled="!controller.available.value || controller.state.loading" @click="controller.edit">列配置</el-button>
-  <PageDialog v-model="controller.state.open" title="个人列配置" width="min(520px,92vw)"
-             :close-on-click-modal="!controller.state.busy" :close-on-press-escape="!controller.state.busy"
-             :show-close="!controller.state.busy">
+  <PageDialog
+    :model-value="controller.state.open"
+    title="个人列配置"
+    width="min(520px,92vw)"
+    :close-on-click-modal="!controller.state.busy"
+    :close-on-press-escape="!controller.state.busy"
+    :show-close="!controller.state.busy"
+    @update:model-value="controller.cancel"
+  >
     <p class="secondary">勾选显示列，拖动调整顺序。选择框和操作列保持固定。</p>
     <el-alert v-if="controller.state.error" :title="controller.state.error" type="error" :closable="false" />
     <ul class="column-settings-list">
-      <li v-for="(column, index) in controller.state.draft" :key="column.key" :data-column-key="column.key"
-          :draggable="!controller.state.busy && column.columnMovable !== false && !column.columnFixed"
-          @dragstart="start(column.key, $event)" @dragover.prevent @drop.prevent="drop(column.key)">
+      <li
+        v-for="(column, index) in controller.state.draft"
+        :key="column.key"
+        :data-column-key="column.key"
+        :draggable="!controller.state.busy && column.columnMovable !== false && !column.columnFixed"
+        @dragstart="start(column.key, $event)"
+        @dragover.prevent
+        @drop.prevent="drop(column.key)"
+      >
         <span aria-hidden="true">⋮⋮</span>
         <el-checkbox v-model="column.visible" :disabled="controller.state.busy || column.columnHideable === false || !!column.columnFixed">
           {{ column.label }}
         </el-checkbox>
-        <el-button text :aria-label="'上移'+column.label" :disabled="controller.state.busy || !index || column.columnMovable === false || !!column.columnFixed"
-                   @click="controller.move(column.key, controller.state.draft[index - 1]!.key)">上移</el-button>
+        <el-button
+          text
+          :aria-label="'上移'+column.label"
+          :disabled="controller.state.busy || !index || column.columnMovable === false || !!column.columnFixed"
+          @click="controller.move(column.key, controller.state.draft[index - 1]!.key)"
+        >上移</el-button>
       </li>
     </ul>
     <template #footer>

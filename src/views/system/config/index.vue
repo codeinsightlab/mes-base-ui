@@ -9,7 +9,6 @@
           placeholder="请输入参数名称"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="参数键名" prop="configKey">
@@ -18,7 +17,6 @@
           placeholder="请输入参数键名"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="系统内置" prop="configType">
@@ -43,7 +41,7 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

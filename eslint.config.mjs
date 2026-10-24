@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint'
 import vueParser from 'vue-eslint-parser'
 
 export default defineConfig([
-  globalIgnores(['**/node_modules/**', '**/dist/**', '**/target/**', '**/coverage/**', '**/.idea/**']),
+  globalIgnores(['**/node_modules/**', '**/dist/**', '**/target/**', '**/coverage/**', '**/.local/**', '**/.idea/**']),
   {
     files: ['**/*.{js,mjs,cjs}'],
     extends: [js.configs.recommended],
@@ -25,7 +25,7 @@ export default defineConfig([
     }
   },
   {
-    files: ['src/**/*.{js,ts,vue}'],
+    files: ['src/**/*.{js,ts,vue}', 'scripts/acceptance/b1b2/b2-suite.js'],
     languageOptions: { globals: globals.browser }
   },
   {

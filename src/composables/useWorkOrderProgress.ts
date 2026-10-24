@@ -28,7 +28,7 @@ export function useWorkOrderProgress(access: Access, fetch = loadWorkOrderProgre
       if (!current()) return
       result.value = value; result.state = 'ready'
       result.updatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-    } catch (e) {
+    } catch(e) {
       if (!current()) return
       result.value = null; result.updatedAt = ''
       result.state = 'error'; result.error = e instanceof Error ? e.message : '工单进度读取失败'

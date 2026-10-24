@@ -8,7 +8,6 @@
           v-model="queryParams.menuName"
           placeholder="请输入菜单名称"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -22,7 +21,7 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

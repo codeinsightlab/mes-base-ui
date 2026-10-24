@@ -13,7 +13,7 @@ import { api as itemApi } from '@/api/issue/mesMaterialIssueItem'
 import { headerFields, itemFields } from '../fields'
 const auth = useAuth()
 const route = useRoute(), router = useRouter(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
-function openLinkedIssue() { const id = route.query.issueId; if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({id}); else if (route.query.view === 'list') void document.value?.back() }
+function openLinkedIssue() { const id = route.query.issueId; if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({ id }); else if (route.query.view === 'list') void document.value?.back() }
 onMounted(openLinkedIssue)
 watch(() => route.query.issueId, openLinkedIssue)
 onActivated(() => { if (route.query.view === 'list' && !route.query.issueId) void document.value?.back() })
@@ -21,7 +21,9 @@ onActivated(() => { if (route.query.view === 'list' && !route.query.issueId) voi
 <template>
   <el-alert title="新增生产领料请按BOM与库存来源保存正式出库草稿，随后在出入库单独立审核。已保存的旧领料事实保持只读，不自动补扣库存。" type="info" :closable="false" />
   <el-button v-if="auth.hasPermission('business:mes:material:issue:update','factory')" @click="router.push('/production/productionInput')">新增正式领料草稿 / 便捷投产</el-button>
-  <MasterDetailDocument :creatable="false" ref="document"
+  <MasterDetailDocument
+    :creatable="false"
+    ref="document"
     title="领料出库"
     :header-readonly="() => true"
     :header-api="headerApi"

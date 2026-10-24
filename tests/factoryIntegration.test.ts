@@ -4,8 +4,8 @@ import Factory from '../src/views/system/factory/index.vue'
 const api = vi.hoisted(() => ({ listFactories: vi.fn(async() => ({ rows: [], total: 0 })), listDatasources: vi.fn(async() => ({ rows: [] })), factoryIntegrationOptions: vi.fn(async() => []), createFactory: vi.fn(), saveFactory: vi.fn(), deleteFactory: vi.fn() }))
 vi.mock('../src/api/system/datasource', () => api)
 vi.mock('../src/utils/factory', () => ({ refreshFactory: vi.fn() }))
-const form = { template: '<form><slot /></form>', methods: { clearValidate() {}, validate(callback: (valid: boolean) => void) { callback(true) } } }
-function mount() { return shallowMount(Factory, { global: { stubs: { ElTable: true, ElTableColumn: true, ElForm: form, PageDialog: { template: '<div><slot /><slot name="footer" /></div>' } }, directives: { hasPermi: {} }, mocks: { $message: { success: vi.fn() } } } }) }
+const form = { template: '<form><slot /></form>', methods: { clearValidate() {}, validate(callback: (valid: boolean) => void) { callback(true) } }}
+function mount() { return shallowMount(Factory, { global: { stubs: { ElTable: true, ElTableColumn: true, ElForm: form, PageDialog: { template: '<div><slot /><slot name="footer" /></div>' }}, directives: { hasPermi: {}}, mocks: { $message: { success: vi.fn() }}}}) }
 describe('factory business integration maintenance', () => {
   it('defaults new factories to LOCAL and clears ERP fields on mode change', async() => {
     const wrapper = mount(); const vm = wrapper.vm as any

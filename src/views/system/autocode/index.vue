@@ -9,7 +9,6 @@
           placeholder="请输入规则名称"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="规则编码" prop="ruleCode">
@@ -18,7 +17,6 @@
           placeholder="请输入规则编码"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="启用状态" prop="enableFlag">
@@ -37,7 +35,7 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

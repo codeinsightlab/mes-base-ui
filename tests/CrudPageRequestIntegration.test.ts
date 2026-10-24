@@ -67,12 +67,12 @@ describe('Shared CRUD detail loading', () => {
       path === '/api/material/material/' + id
         ? { id, code: 'M001', name: 'DETAIL ONLY', unitId: '1', materialType: 'ITEM', status: 'ENABLED' }
         : { items: [{ id, code: 'M001', name: 'STALE LIST' }], total: 1, offset: 0, limit: 20 }
-    ), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    ), { status: 200, headers: { 'Content-Type': 'application/json' }}))
     vi.stubGlobal('fetch', fetch)
     const pinia = createPinia(), auth = useAuth(pinia)
     auth.factoryPermissions = ['business:material:list', 'business:material:query', 'business:material:update']
     configureRequests(() => ({ token: '', factoryId: 'TEST_ONLY_A', revision: 0 }), () => {})
-    const wrapper = mount(CrudPage, { props, global: { plugins: [pinia, ElementPlus], stubs: { teleport: true, ElSelect: true, ElOption: true } } })
+    const wrapper = mount(CrudPage, { props, global: { plugins: [pinia, ElementPlus], stubs: { teleport: true, ElSelect: true, ElOption: true }}})
     try {
       await flushPromises()
       expect(wrapper.text()).toContain('STALE LIST')

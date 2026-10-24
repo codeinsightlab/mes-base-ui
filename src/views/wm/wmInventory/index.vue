@@ -15,7 +15,7 @@ import SyncButton from '@/components/business/SyncButton.vue'
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 
 const fields: Field[] = [
-  {key:'warehouseSource',label:'仓库来源',kind:'text',readonly:true,columnMinWidth:200},
+  { key: 'warehouseSource', label: '仓库来源', kind: 'text', readonly: true, columnMinWidth: 200 },
   { key: 'batchNo', label: '材料批次', kind: 'text', maxLength: 128 },
   { key: 'binCode', label: '库位', kind: 'text', maxLength: 64 },
   { key: 'materialName', columnMinWidth: 260, label: '物料', kind: 'text', readonly: true, searchable: false },

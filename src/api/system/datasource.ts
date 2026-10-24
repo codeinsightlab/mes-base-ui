@@ -15,7 +15,7 @@ export const createFactory = (data:any) => call('factory', 'POST', data)
 export const saveFactory = (data:any) => call('factory', 'PUT', data)
 export const deleteFactory = (id:any, revision:number) => request<void>(`/api/system/factory/${id}`, { method: 'DELETE', scope: 'platform', query: { revision }})
 
-export const factoryIntegrationOptions = (factoryId:string) => request<any[]>('/api/system/factory/integration-options', { scope: 'platform', query: { factoryId } })
+export const factoryIntegrationOptions = (factoryId:string) => request<any[]>('/api/system/factory/integration-options', { scope: 'platform', query: { factoryId }})
 
 export interface FactoryOapiSettings {
   syncContract?: Record<string, unknown> | null
@@ -32,4 +32,4 @@ export interface FactoryOapiView {
   settings: FactoryOapiSettings | null
 }
 export const getFactoryOapi = (id: string) => request<FactoryOapiView>(`/api/system/factory/${encodeURIComponent(id)}/oapi`, { scope: 'platform' })
-export const saveFactoryOapi = (id: string, factoryRevision: number, settings: FactoryOapiSettings) => request<FactoryOapiView>(`/api/system/factory/${encodeURIComponent(id)}/oapi`, { method: 'PUT', scope: 'platform', body: { factoryRevision, settings } })
+export const saveFactoryOapi = (id: string, factoryRevision: number, settings: FactoryOapiSettings) => request<FactoryOapiView>(`/api/system/factory/${encodeURIComponent(id)}/oapi`, { method: 'PUT', scope: 'platform', body: { factoryRevision, settings }})

@@ -7,10 +7,9 @@ const props = defineProps<{ workorderId?: string | null; disabled?: boolean }>()
 const auth = useAuth(), options = ref<RoutingOption[]>([]), error = ref('')
 let generation = 0
 watch(() => [props.workorderId, auth.factoryId, auth.revision], async() => {
- const seq = ++generation; options.value = []; error.value = ''
- if(!props.workorderId) return
- try { const order = await api.detail(props.workorderId); const rows = await api.routings(order.workorder.productId); if(seq === generation) options.value = rows }
- catch(e) { if(seq === generation) error.value = e instanceof Error ? e.message : '工艺版本读取失败' }
+  const seq = ++generation; options.value = []; error.value = ''
+  if (!props.workorderId) return
+  try { const order = await api.detail(props.workorderId); const rows = await api.routings(order.workorder.productId); if (seq === generation) options.value = rows } catch(e) { if (seq === generation) error.value = e instanceof Error ? e.message : '工艺版本读取失败' }
 }, { immediate: true })
 onBeforeUnmount(() => { generation++ })
 </script>

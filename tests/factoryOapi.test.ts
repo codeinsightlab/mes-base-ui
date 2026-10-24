@@ -4,17 +4,17 @@ import Dialog from '../src/views/system/factory/FactoryOapiDialog.vue'
 const api = vi.hoisted(() => ({ getFactoryOapi: vi.fn(), saveFactoryOapi: vi.fn() }))
 vi.mock('../src/api/system/datasource', () => api)
 vi.mock('../src/stores/auth', () => ({ useAuth: () => ({ token: 'TEST', factoryId: 'A', revision: 1, platformPermissions: ['system:factory:edit'] }) }))
-vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn() } }))
-const settings = () => ({ endpoint: 'https://erp.invalid/oapi', host: { ver: '5.7', prod: 'TEST', timezone: '8', ip: 'TEST', id: '', lang: 'zh_CN', acct: 'TEST' }, service: { prod: 'TEST', ip: 'TEST', id: 'TEST' } })
+vi.mock('element-plus', () => ({ ElMessage: { success: vi.fn() }}))
+const settings = () => ({ endpoint: 'https://erp.invalid/oapi', host: { ver: '5.7', prod: 'TEST', timezone: '8', ip: 'TEST', id: '', lang: 'zh_CN', acct: 'TEST' }, service: { prod: 'TEST', ip: 'TEST', id: 'TEST' }})
 const view = (locked = false) => ({ factoryId: 'A', factoryRevision: 7, reference: 'binding', configurationRevision: 2, locked, settings: settings() })
 function create() {
-  return mount(Dialog, { props: { factory: { factoryId: 'A', factoryName: 'TEST', runtimeMode: 'LOCAL' } }, global: { directives: { loading: {} }, stubs: {
+  return mount(Dialog, { props: { factory: { factoryId: 'A', factoryName: 'TEST', runtimeMode: 'LOCAL' }}, global: { directives: { loading: {}}, stubs: {
     PageDialog: { template: '<div><slot /><slot name="footer" /></div>' },
-    ElForm: { template: '<form><slot /></form>', methods: { validate: () => Promise.resolve(true) } },
+    ElForm: { template: '<form><slot /></form>', methods: { validate: () => Promise.resolve(true) }},
     ElFormItem: { template: '<label><slot /></label>' }, ElDivider: { template: '<div><slot /></div>' }, ElAlert: true,
     ElInput: { props: ['modelValue'], emits: ['update:modelValue'], template: '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' },
     ElButton: { template: '<button><slot /></button>' }
-  } } })
+  }}})
 }
 beforeEach(() => vi.clearAllMocks())
 describe('factory OAPI configuration', () => {

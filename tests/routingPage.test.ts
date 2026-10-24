@@ -18,7 +18,7 @@ beforeEach(() => {
 function setup() {
   const pinia = createPinia(), auth = useAuth(pinia)
   auth.factoryId = 'SIMPLE_B'; auth.factoryPermissions = ['routing:list', 'routing:query', 'routing:update']
-  return { auth, wrapper: mount(Routing, { attachTo: document.body, global: { plugins: [pinia, ElementPlus] } }) }
+  return { auth, wrapper: mount(Routing, { attachTo: document.body, global: { plugins: [pinia, ElementPlus] }}) }
 }
 describe('routing detail interactions', () => {
   it('formats mixed timestamp precision and opens topology on demand without closing its parent', async() => {
@@ -41,7 +41,7 @@ describe('routing detail interactions', () => {
   it('keeps unsaved edits when dismissal is cancelled and allows confirmed dismissal', async() => {
     const { wrapper } = setup(); await flushPromises()
     await wrapper.findAll('button').find(b => b.text() === '详情 / 工序')!.trigger('click'); await flushPromises()
-    const state = wrapper.vm as unknown as { metadata: { name: string } }
+    const state = wrapper.vm as unknown as { metadata: { name: string }}
     state.metadata.name = '未保存名称'
     const drawer = wrapper.findComponent({ name: 'ElDrawer' }), done = vi.fn()
     const confirm = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel')

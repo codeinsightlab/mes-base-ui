@@ -13,7 +13,7 @@ describe('factory reference options', () => {
     const list = vi.fn().mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
       .mockResolvedValue({ items: [{ id: '2', code: 'B', name: '当前工厂单位' }], total: 1, offset: 0, limit: 100 })
     const api: CrudApi = { list, create: vi.fn(), update: vi.fn(), remove: vi.fn() }
-    const wrapper = mount(defineComponent({ setup() { return useBasicDataReferences(api, 'business:unit:measure') }, template: '<div>{{ options }}</div>' }), { global: { plugins: [pinia] } })
+    const wrapper = mount(defineComponent({ setup() { return useBasicDataReferences(api, 'business:unit:measure') }, template: '<div>{{ options }}</div>' }), { global: { plugins: [pinia] }})
     expect(list).not.toHaveBeenCalled()
     auth.factoryPermissions = ['business:unit:measure:list']
     await flushPromises()

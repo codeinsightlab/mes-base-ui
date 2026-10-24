@@ -22,12 +22,12 @@ function login() {
   configureRequests(() => ({ token: auth.token, factoryId: auth.factoryId, revision: auth.revision }), () => {})
   return { pinia, auth }
 }
-function json(value: unknown) { return new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' } }) }
+function json(value: unknown) { return new Response(JSON.stringify(value), { status: 200, headers: { 'Content-Type': 'application/json' }}) }
 function host() {
   const { pinia, auth } = login()
   const route = reactive({ url: '/list', key: 'test:list' })
   let controller!: ReturnType<typeof useTableColumns<Field>>
-  const wrapper = mount(defineComponent({ setup() { controller = useTableColumns(() => fields, () => route.key, () => route.url); return () => null } }), { global: { plugins: [pinia] } })
+  const wrapper = mount(defineComponent({ setup() { controller = useTableColumns(() => fields, () => route.key, () => route.url); return () => null } }), { global: { plugins: [pinia] }})
   return { wrapper, auth, route, get controller() { return controller } }
 }
 
@@ -82,7 +82,7 @@ describe('personal column lifecycle', () => {
     const wrapper = mount(defineComponent({ setup: () => () => h(RouterView, {}, {
       default: ({ Component, route }: { Component: any; route: RouteLocationNormalizedLoaded }) =>
         h(KeepAlive, {}, { default: () => h(Component, { key: route.fullPath }) })
-    }) }), { global: { plugins: [pinia, router] } })
+    }) }), { global: { plugins: [pinia, router] }})
     try {
       await flushPromises()
       expect(requests).toEqual([{ url: '/one', tableKey: 'one:list', factory: 'A' }])
@@ -161,7 +161,7 @@ describe('personal column lifecycle', () => {
     const api = { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'C', name: 'N' }], total: 1, offset: 0, limit: 20 }),
       detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }
     const wrapper = mount(CrudPage, { props: { title: '生成样例', permission: 'test', tableKey: 'test:list', api, fields },
-      global: { plugins: [pinia, ElementPlus], stubs: { teleport: true, ElSelect: true, ElOption: true } } })
+      global: { plugins: [pinia, ElementPlus], stubs: { teleport: true, ElSelect: true, ElOption: true }}})
     try {
       await flushPromises()
       const headers = wrapper.findAll('.el-table__header-wrapper th').map(header => header.text())
@@ -169,7 +169,7 @@ describe('personal column lifecycle', () => {
       expect(wrapper.findComponent(ColumnSettings).exists()).toBe(true)
       await wrapper.findAll('button').find(button => button.text() === '列配置')!.trigger('click'); await flushPromises()
       expect(wrapper.findAll('[data-column-key]')).toHaveLength(3)
-      await wrapper.find('[data-column-key="name"]').trigger('dragstart', { dataTransfer: { setData() {} } })
+      await wrapper.find('[data-column-key="name"]').trigger('dragstart', { dataTransfer: { setData() {} }})
       await wrapper.find('[data-column-key="code"]').trigger('drop'); await flushPromises()
       expect(api.list).toHaveBeenCalledWith({ offset: 0, limit: 20 })
     } finally { wrapper.unmount() }

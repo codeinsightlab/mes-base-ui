@@ -11,12 +11,12 @@ export interface StockAction {
   documentLineId?: string | null; operationId?: string | null;
   executionId: string | null; operatorUserId: string; occurredAt: string; reason: string
 }
-export const stockOperations: {value: StockOperation; label: string}[] = [
+export const stockOperations: { value: StockOperation; label: string }[] = [
   { value: 'opening', label: '期初建账' }, { value: 'receipt', label: '原材料入库' },
   { value: 'gain', label: '盘盈' }, { value: 'loss', label: '盘亏' },
   { value: 'correction', label: '业务纠错（有符号增减量）' }, { value: 'return', label: '生产退料' }
 ]
 export const localStock = {
   execute: (operation: StockOperation, body: StockCommand) => request<StockAction>('/api/wm/local-stock/' + operation, { method: 'POST', body, scope: 'factory' }),
-  actions: (stockId: string, offset = 0) => request<{items: StockAction[]; total: number}>('/api/wm/wm-stock-action', { query: {stockId,offset,limit:20}, scope: 'factory' })
+  actions: (stockId: string, offset = 0) => request<{ items: StockAction[]; total: number }>('/api/wm/wm-stock-action', { query: { stockId, offset, limit: 20 }, scope: 'factory' })
 }

@@ -30,7 +30,7 @@ async function search(value: string, more = false) {
     if (current !== version) return
     rows.value = more ? [...rows.value, ...result.items] : result.items
     total.value = result.total
-  } catch (reason) {
+  } catch(reason) {
     if (current === version) error.value = reason instanceof Error ? reason.message : '工作站查询失败'
   } finally {
     if (current === version) loading.value = false
@@ -43,7 +43,7 @@ async function hydrate() {
   try {
     const row = await api.detail(props.modelValue)
     if (current === detailVersion) selected.value = row
-  } catch (reason) {
+  } catch(reason) {
     if (current === detailVersion) error.value = reason instanceof Error ? reason.message : '工作站回显失败'
   }
 }
@@ -67,9 +67,17 @@ onBeforeUnmount(clear)
 
 <template>
   <div>
-    <el-select :model-value="modelValue" clearable filterable remote :remote-method="search"
-      :loading="loading" :disabled="!allowed" placeholder="可选，搜索工作站名称"
-      @update:model-value="emit('update:modelValue', $event || null)">
+    <el-select
+      :model-value="modelValue"
+      clearable
+      filterable
+      remote
+      :remote-method="search"
+      :loading="loading"
+      :disabled="!allowed"
+      placeholder="可选，搜索工作站名称"
+      @update:model-value="emit('update:modelValue', $event || null)"
+    >
       <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name}`" :value="row.id" />
     </el-select>
     <el-button v-if="rows.length < total" link :disabled="loading" @click="search(keyword, true)">加载更多</el-button>

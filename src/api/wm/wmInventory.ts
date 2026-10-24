@@ -44,7 +44,7 @@ export const api = {
   create: (body: unknown) =>
     request<WmInventoryVo>('/api/wm/wm-inventory', { method: 'POST', body: { ...(body as Record<string, unknown>), quantity: '0', availableQuantity: '0' }, scope: 'factory' }),
 
-  update: async (id: string, body: unknown) => {
+  update: async(id: string, body: unknown) => {
     const stock = await api.detail(id)
     return request<WmInventoryVo>('/api/wm/wm-inventory/' + encodeURIComponent(id), {
       method: 'PUT', body: { ...(body as Record<string, unknown>), quantity: stock.quantity, availableQuantity: stock.availableQuantity }, scope: 'factory'

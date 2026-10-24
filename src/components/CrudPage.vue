@@ -24,7 +24,6 @@ import type { CrudApi, Field, Row } from '@/lib/crud'
 import type { PermissionScope } from '@/lib/request'
 const ElMessageBox = usePageMessageBox()
 
-
 const props = withDefaults(defineProps<{
   embedded?: boolean;
   managedEditing?: boolean;
@@ -350,18 +349,18 @@ defineExpose({ load })
       >
         <template #default="{row}">
           <slot :name="`cell-${field.key}`" :row="row" :field="field">
-          <CodeText v-if="field.key===idKey" :value="row[field.key]" />
-          <StatusTag
-            v-else-if="field.key==='status'"
-            :fallback="field.options?.find(o=>o.value===row[field.key])?.tone"
-            :label="field.options?.find(o=>o.value===row[field.key])?.label ?? formatValue(row[field.key],field.kind)"
-          />
-          <span
-            v-else
-            :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
-            :title="field.kind === 'decimal' && row[field.key] != null ? String(row[field.key]) : undefined"
-          >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? field.format?.(row[field.key]) ?? formatValue(row[field.key], field.kind)
-          }}</span>
+            <CodeText v-if="field.key===idKey" :value="row[field.key]" />
+            <StatusTag
+              v-else-if="field.key==='status'"
+              :fallback="field.options?.find(o=>o.value===row[field.key])?.tone"
+              :label="field.options?.find(o=>o.value===row[field.key])?.label ?? formatValue(row[field.key],field.kind)"
+            />
+            <span
+              v-else
+              :class="{'tabular':field.kind==='decimal'||field.kind==='number'}"
+              :title="field.kind === 'decimal' && row[field.key] != null ? String(row[field.key]) : undefined"
+            >{{ field.options?.find(option => String(option.value) === String(row[field.key]))?.label ?? field.format?.(row[field.key]) ?? formatValue(row[field.key], field.kind)
+            }}</span>
           </slot></template>
       </el-table-column>
       <el-table-column
@@ -397,12 +396,12 @@ defineExpose({ load })
       :show-close="!saving && !editorBusy"
     >
       <slot v-if="dialog" name="editor" :draft="draft" :edit-id="editId" :fields="editable" :saving="saving" :readonly="!writeAllowed" :save="save">
-      <p class="form-caption">基础信息
-        <span>{{ resolvedPermissionScope === 'factory' ? '带 * 的字段为必填；工厂身份由当前上下文确定。' : '带 * 的字段为必填；平台对象的范围按字段配置。'
-        }}</span></p>
-      <DocumentFields :fields="editable" :draft="draft" :disabled="saving || !writeAllowed" :disabled-keys="editId ? [idKey] : []" @submit="save">
-        <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
-      </DocumentFields>
+        <p class="form-caption">基础信息
+          <span>{{ resolvedPermissionScope === 'factory' ? '带 * 的字段为必填；工厂身份由当前上下文确定。' : '带 * 的字段为必填；平台对象的范围按字段配置。'
+          }}</span></p>
+        <DocumentFields :fields="editable" :draft="draft" :disabled="saving || !writeAllowed" :disabled-keys="editId ? [idKey] : []" @submit="save">
+          <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
+        </DocumentFields>
       </slot>
       <template #footer>
         <el-button :disabled="saving || editorBusy" @click="closeEditor()">{{ keepEditorOpen ? '关闭' : '取消' }}</el-button>

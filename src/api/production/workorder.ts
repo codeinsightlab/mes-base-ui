@@ -43,14 +43,14 @@ export function parseWorkOrderResponse(text: string): unknown {
   })
   return JSON.parse(decoded)
 }
-export interface CancelCommand { requestId:string; reason:string; expectedRevision?:number }
-export interface Cancellation { workOrderId:string; status:'CANCELLED'; cancellationId:string; cancelledAt:string; cancelledBy:string; reason:string; previousStatus:string; sourceSnapshot:string|null }
+export interface CancelCommand { requestId: string; reason: string; expectedRevision?: number }
+export interface Cancellation { workOrderId: string; status: 'CANCELLED'; cancellationId: string; cancelledAt: string; cancelledBy: string; reason: string; previousStatus: string; sourceSnapshot: string | null }
 const base = '/api/production/workorder'
 const path = (id: string) => base + '/' + encodeURIComponent(id)
 export const api = {
   recall: (id: string, revision: number) => request<Detail>(path(id) + '/actions/recall', { method: 'POST', body: { revision }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
-  cancel:(id:string,body:CancelCommand)=>request<Cancellation>(path(id)+'/actions/cancel',{method:'POST',body,scope:'factory'}),
-  cancellation:(id:string)=>request<Cancellation|null>(path(id)+'/cancellation',{scope:'factory'}),
+  cancel: (id:string, body:CancelCommand) => request<Cancellation>(path(id) + '/actions/cancel', { method: 'POST', body, scope: 'factory' }),
+  cancellation: (id:string) => request<Cancellation | null>(path(id) + '/cancellation', { scope: 'factory' }),
   batchHistory: (id: string) => request<BatchHistory>('/api/production/batch/' + encodeURIComponent(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; batchCount: number; erpExtraMissing: boolean; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   detail: (id: string) => request<Detail>(path(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),

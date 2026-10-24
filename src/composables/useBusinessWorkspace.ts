@@ -52,7 +52,7 @@ export function useBusinessWorkspace(access: Access, loaders = businessWorkspace
         const result = await fetch()
         if (!current()) return
         target.value = result; target.state = 'ready'; target.updatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-      } catch (e) {
+      } catch(e) {
         if (!current()) return
         target.value = null; target.updatedAt = ''
         target.state = 'error'; target.error = e instanceof Error ? e.message : '读取失败，请重试'

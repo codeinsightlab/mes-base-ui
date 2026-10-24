@@ -9,7 +9,6 @@
           placeholder="请输入用户名称"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="部门" prop="deptId">
@@ -18,11 +17,10 @@
           v-model="queryParams.deptId"
           :options="deptOptions"
           :props="{ expandTrigger: 'hover' ,label:'label',value:'id'}"
-
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

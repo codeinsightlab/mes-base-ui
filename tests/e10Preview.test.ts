@@ -21,7 +21,7 @@ function create() {
     ElAlert: { props: ['title'], template: '<p>{{ title }}</p>' },
     ElTable: { props: ['data'], template: '<div>{{ JSON.stringify(data) }}<slot /></div>' },
     ElTableColumn: true
-  } } })
+  }}})
 }
 async function click(wrapper: ReturnType<typeof create>, label: string) {
   const button = wrapper.findAll('button').find(item => item.text() === label)
@@ -68,29 +68,29 @@ describe('E10 controlled candidate preview', () => {
     expect(api.preview).toHaveBeenCalledTimes(1); wrapper.unmount()
   })
   it('runs server Dry Run without offering commit when capability denies it', async() => {
-    api.sync.mockResolvedValue({status:'DRY_RUN',factoryId:'A',provider:'DIGIWIN_E10',binding:'TEST',configurationVersion:'1',runToken:'TEST_RUN',
-      fetched:1,duplicates:0,creatable:0,updatable:0,unchanged:0,conflicts:0,blocked:1,created:0,updated:0,
-      items:[{code:'TEST_BLOCKED',action:'IDENTITY_UNVERIFIED',reasons:['IDENTITY_UNVERIFIED']}]})
+    api.sync.mockResolvedValue({ status: 'DRY_RUN', factoryId: 'A', provider: 'DIGIWIN_E10', binding: 'TEST', configurationVersion: '1', runToken: 'TEST_RUN',
+      fetched: 1, duplicates: 0, creatable: 0, updatable: 0, unchanged: 0, conflicts: 0, blocked: 1, created: 0, updated: 0,
+      items: [{ code: 'TEST_BLOCKED', action: 'IDENTITY_UNVERIFIED', reasons: ['IDENTITY_UNVERIFIED'] }] })
     const wrapper = create(); await flushPromises(); await click(wrapper, 'ERP同步准备'); await click(wrapper, 'Dry Run 校验')
     expect(api.sync).toHaveBeenCalledExactlyOnceWith('workorder', false)
     expect(wrapper.text()).toContain('IDENTITY_UNVERIFIED'); expect(wrapper.text()).toContain('DRY_RUN')
     expect(wrapper.text()).not.toContain('正式同步（重新校验）'); wrapper.unmount()
   })
   it('enables commit only after Dry Run and emits refresh with actual partial counts', async() => {
-    api.capability.mockResolvedValue({...support(),writeEnabled:true})
-    const output={status:'DRY_RUN',factoryId:'A',provider:'DIGIWIN_E10',binding:'TEST',configurationVersion:'1',runToken:'TEST_RUN',
-      fetched:2,duplicates:0,creatable:1,updatable:0,unchanged:0,conflicts:1,blocked:0,created:0,updated:0,items:[]}
-    api.sync.mockResolvedValueOnce(output).mockResolvedValueOnce({...output,status:'PARTIAL_SUCCESS',created:1})
-    const wrapper=create(); await flushPromises(); await click(wrapper,'ERP同步准备'); await click(wrapper,'Dry Run 校验')
-    await click(wrapper,'正式同步（重新校验）')
-    expect(api.sync).toHaveBeenLastCalledWith('workorder',true); expect(wrapper.text()).toContain('PARTIAL_SUCCESS')
+    api.capability.mockResolvedValue({ ...support(), writeEnabled: true })
+    const output = { status: 'DRY_RUN', factoryId: 'A', provider: 'DIGIWIN_E10', binding: 'TEST', configurationVersion: '1', runToken: 'TEST_RUN',
+      fetched: 2, duplicates: 0, creatable: 1, updatable: 0, unchanged: 0, conflicts: 1, blocked: 0, created: 0, updated: 0, items: [] }
+    api.sync.mockResolvedValueOnce(output).mockResolvedValueOnce({ ...output, status: 'PARTIAL_SUCCESS', created: 1 })
+    const wrapper = create(); await flushPromises(); await click(wrapper, 'ERP同步准备'); await click(wrapper, 'Dry Run 校验')
+    await click(wrapper, '正式同步（重新校验）')
+    expect(api.sync).toHaveBeenLastCalledWith('workorder', true); expect(wrapper.text()).toContain('PARTIAL_SUCCESS')
     expect(wrapper.text()).toContain('实际新增 1'); expect(wrapper.emitted('completed')).toHaveLength(1); wrapper.unmount()
   })
   it('discards late Dry Run and commit results when factory or permission changes', async() => {
-    let resolve!: (value: unknown)=>void
-    api.sync.mockImplementation(()=>new Promise(done=>{resolve=done}))
-    const wrapper=create(); await flushPromises(); await click(wrapper,'ERP同步准备'); await click(wrapper,'Dry Run 校验')
-    state.granted=false; await flushPromises(); resolve({status:'COMMITTED',items:[]}); await flushPromises()
+    let resolve!: (value: unknown) => void
+    api.sync.mockImplementation(() => new Promise(done => { resolve = done }))
+    const wrapper = create(); await flushPromises(); await click(wrapper, 'ERP同步准备'); await click(wrapper, 'Dry Run 校验')
+    state.granted = false; await flushPromises(); resolve({ status: 'COMMITTED', items: [] }); await flushPromises()
     expect(wrapper.text()).not.toContain('COMMITTED'); expect(wrapper.emitted('completed')).toBeUndefined(); wrapper.unmount()
   })
 

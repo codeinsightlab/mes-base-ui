@@ -68,9 +68,7 @@ export default {
       this.integrationOptions = []; this.optionsError = ''
       if (!id) { this.optionsLoading = false; return }
       this.optionsLoading = true
-      try { const options = await factoryIntegrationOptions(id); if (revision === this.optionsRevision && id === this.form.factoryId) this.integrationOptions = options }
-      catch (error) { if (revision === this.optionsRevision) this.optionsError = error instanceof Error ? error.message : '集成配置读取失败' }
-      finally { if (revision === this.optionsRevision) this.optionsLoading = false }
+      try { const options = await factoryIntegrationOptions(id); if (revision === this.optionsRevision && id === this.form.factoryId) this.integrationOptions = options } catch(error) { if (revision === this.optionsRevision) this.optionsError = error instanceof Error ? error.message : '集成配置读取失败' } finally { if (revision === this.optionsRevision) this.optionsLoading = false }
     },
     save() { this.$refs.form.validate(async valid => { if (!valid) return; this.saving = true; try { await (this.editing ? saveFactory(this.form) : createFactory(this.form)); await refreshFactory(); this.open = false; this.$message.success('工厂配置已保存'); await this.load() } finally { this.saving = false } }) },
     async remove(row) { await this.$confirm(`确认删除工厂“${row.factoryName}”吗？`, '提示', { type: 'warning' }); await deleteFactory(row.factoryId, row.revision); await refreshFactory(); this.$message.success('工厂已删除'); await this.load() }

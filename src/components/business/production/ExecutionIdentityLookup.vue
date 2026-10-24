@@ -27,11 +27,11 @@ function clear() {
   error.value = ''
   result.value = null
 }
-function close(done:()=>void) { clear();done() }
-watch(() => [props.id, auth.factoryId, auth.revision, allowed.value], clear, {flush:'sync'})
-watch(visible, value => { if(!value)clear() }, {flush:'sync'})
+function close(done:() => void) { clear();done() }
+watch(() => [props.id, auth.factoryId, auth.revision, allowed.value], clear, { flush: 'sync' })
+watch(visible, value => { if (!value)clear() }, { flush: 'sync' })
 onBeforeUnmount(clear)
-async function loadIdentity(read:()=>Promise<ProductionIdentity>) {
+async function loadIdentity(read:() => Promise<ProductionIdentity>) {
   if (!allowed.value || !visible.value || loading.value) return
   const ticket = ++sequence, revision = auth.revision, factoryId = auth.factoryId
   loading.value = true
@@ -46,20 +46,20 @@ async function loadIdentity(read:()=>Promise<ProductionIdentity>) {
     if (ticket === sequence) loading.value = false
   }
 }
-function resolve(inputMethod:ScanInputMethod='TEXT') { return loadIdentity(()=>scanExecution('EXECUTION_LOOKUP',code.value,inputMethod)) }
-function scanned(value: string,inputMethod:ScanInputMethod='TEXT') {
-  if(!allowed.value)return
+function resolve(inputMethod:ScanInputMethod = 'TEXT') { return loadIdentity(() => scanExecution('EXECUTION_LOOKUP', code.value, inputMethod)) }
+function scanned(value: string, inputMethod:ScanInputMethod = 'TEXT') {
+  if (!allowed.value) return
   clear()
   code.value = value
   visible.value = true
   void resolve(inputMethod)
 }
 function open() {
-  if(!allowed.value)return
+  if (!allowed.value) return
   clear()
   visible.value = true
   if (props.id) {
-    void loadIdentity(()=>readProductionIdentity(props.id!))
+    void loadIdentity(() => readProductionIdentity(props.id!))
   }
 }
 </script>
@@ -72,7 +72,7 @@ function open() {
       <el-form-item label="执行身份码">
         <el-input v-model="code" placeholder="工单号:品号#批次号，例如 WO001:P001#LOT001" maxlength="2048" :disabled="loading" />
       </el-form-item>
-      <el-button native-type="submit" type="primary" :loading="loading" :disabled="!code || !allowed" >查询</el-button>
+      <el-button native-type="submit" type="primary" :loading="loading" :disabled="!code || !allowed">查询</el-button>
       <CodeScanner v-model="code" button-label="图片识别 / 录入" :disabled="loading || !allowed || !visible" :context-key="auth.factoryId + ':' + auth.revision" @confirm="(value,method)=>resolve(method)" />
     </QueryForm>
     <p class="secondary">查询当前工厂的生产执行身份，不创建业务单据。</p>

@@ -32,7 +32,7 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
     try {
       const result = await tablePreferences.get(toValue(url), toValue(tableKey)!)
       if (current(version, captured)) state.saved = Array.isArray(result.columns) ? result.columns : null
-    } catch (error) {
+    } catch(error) {
       if (current(version, captured)) state.error = error instanceof Error ? error.message : '列配置读取失败，已使用默认列'
     } finally { if (current(version, captured)) state.loading = false }
   // Route changes reach cached pages too. Wait for KeepAlive activation/deactivation
@@ -64,7 +64,7 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
       if (reset) await tablePreferences.reset(toValue(url), toValue(tableKey)!)
       else await tablePreferences.save(toValue(url), toValue(tableKey)!, value)
       if (current(version, captured)) { state.saved = reset ? null : value; state.open = false }
-    } catch (error) {
+    } catch(error) {
       if (current(version, captured)) state.error = error instanceof Error ? error.message : '列配置保存失败'
     } finally { if (current(version, captured)) state.busy = false }
   }

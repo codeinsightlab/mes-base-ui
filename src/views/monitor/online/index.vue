@@ -8,7 +8,6 @@
           v-model="queryParams.ipaddr"
           placeholder="请输入登录地址"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="用户名称" prop="userName">
@@ -16,11 +15,10 @@
           v-model="queryParams.userName"
           placeholder="请输入用户名称"
           clearable
-
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
 

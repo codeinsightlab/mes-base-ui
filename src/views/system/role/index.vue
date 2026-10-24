@@ -9,7 +9,6 @@
           placeholder="请输入角色名称"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="权限字符" prop="roleKey">
@@ -18,7 +17,6 @@
           placeholder="请输入权限字符"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -48,7 +46,7 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

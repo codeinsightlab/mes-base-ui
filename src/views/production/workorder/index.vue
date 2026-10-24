@@ -34,7 +34,7 @@ const orderStates: Record<string, { label: string; tone: StatusTone }> = {
   DRAFT: { label: '草稿', tone: 'disabled' },
   COMPLETED: { label: '已完工', tone: 'success' },
   RELEASED: { label: '已下达', tone: 'running' },
-  CANCELLED: { label: '已作废', tone: 'error' },
+  CANCELLED: { label: '已作废', tone: 'error' }
 }
 const orderState = (value: string) => orderStates[value] ?? { label: value || '未知状态', tone: 'warning' as const }
 const canExecutions = computed(() => auth.hasPermission('business:mes:production:execution:list', 'factory'))
@@ -71,14 +71,11 @@ async function load() {
   if (!can('list')) return
   const attempt = ++listAttempt
   loading.value = true; error.value = ''
-  try { const result = await api.list({ code: code.value, status: status.value, offset: (page.value - 1) * pageSize.value, limit: pageSize.value }); if (attempt === listAttempt) { rows.value = result.items; total.value = result.total } }
-  catch(e) { if (attempt === listAttempt) error.value = e instanceof Error ? e.message : '读取失败' }
-  finally { if (attempt === listAttempt) loading.value = false }
+  try { const result = await api.list({ code: code.value, status: status.value, offset: (page.value - 1) * pageSize.value, limit: pageSize.value }); if (attempt === listAttempt) { rows.value = result.items; total.value = result.total } } catch(e) { if (attempt === listAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === listAttempt) loading.value = false }
 }
 async function searchProducts(search: string) {
   const attempt = ++productAttempt
-  try { const result = await materials.list({ name: search, status: 'ENABLED', limit: 100 }); if (attempt === productAttempt) productOptions.value = result.items }
-  catch(e) { if (attempt === productAttempt) error.value = e instanceof Error ? e.message : '物料读取失败' }
+  try { const result = await materials.list({ name: search, status: 'ENABLED', limit: 100 }); if (attempt === productAttempt) productOptions.value = result.items } catch(e) { if (attempt === productAttempt) error.value = e instanceof Error ? e.message : '物料读取失败' }
 }
 function resetRouteOptions() { routeAttempt++; routeOptions.value = []; routesLoading.value = false }
 watch(dialog, (visible) => { if (!visible) { productAttempt++; resetRouteOptions() } }, { flush: 'sync' })
@@ -91,9 +88,7 @@ async function searchRoutes(search = '', selectOnly = false) {
     if (attempt !== routeAttempt || productId !== form.productId) return
     routeOptions.value = result
     if (selectOnly && result.length === 1 && !form.routingId) form.routingId = result[0]!.id
-  }
-  catch(e) { if (attempt === routeAttempt) error.value = e instanceof Error ? e.message : '工艺版本读取失败' }
-  finally { if (attempt === routeAttempt) routesLoading.value = false }
+  } catch(e) { if (attempt === routeAttempt) error.value = e instanceof Error ? e.message : '工艺版本读取失败' } finally { if (attempt === routeAttempt) routesLoading.value = false }
 }
 function productChanged() { form.routingId = ''; resetRouteOptions(); void searchRoutes('', true) }
 function create() { resetRouteOptions(); editId.value = null; Object.assign(form, blank()); error.value = ''; dialog.value = true; void searchProducts('') }
@@ -102,9 +97,7 @@ async function open(id: string) {
   const attempt = ++detailAttempt
   historyAttempt++; histories.value = {}; historyLoading.value = {}
   drawer.value = true; detail.value = null; busy.value = true; error.value = ''
-  try { const value = await api.detail(id); if (attempt === detailAttempt) detail.value = value }
-  catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '详情读取失败' }
-  finally { if (attempt === detailAttempt) busy.value = false }
+  try { const value = await api.detail(id); if (attempt === detailAttempt) detail.value = value } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '详情读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 watch(() => [route?.query.workorderId, auth.factoryId, auth.revision, can('query')], () => {
   const id = route?.query.workorderId
@@ -121,8 +114,7 @@ async function edit(id: string) {
     originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty) })
     productOptions.value = [{ id: d.workorder.productId, code: d.productCode, name: d.productName } as MaterialVo]
     routeOptions.value = [d.routing]; dialog.value = true
-  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败' }
-  finally { if (attempt === detailAttempt) busy.value = false }
+  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function save() {
   if (!can(editId.value ? 'update' : 'create') || busy.value) return
@@ -133,16 +125,13 @@ async function save() {
     if (editId.value) await api.update(editId.value, form); else await api.create(form)
     if (attempt !== detailAttempt) return
     dialog.value = false; ElMessage.success('工单已保存，可独立创建生产执行单元'); await load()
-  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '保存失败' }
-  finally { if (attempt === detailAttempt) busy.value = false }
+  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '保存失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function release() {
   if (!detail.value || !can('release') || busy.value) return
   const attempt = detailAttempt, row = detail.value.workorder
   busy.value = true
-  try { const d = await api.release(row.id, row.revision); if (attempt === detailAttempt) { detail.value = d; await load() } }
-  catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '下达失败' }
-  finally { if (attempt === detailAttempt) busy.value = false }
+  try { const d = await api.release(row.id, row.revision); if (attempt === detailAttempt) { detail.value = d; await load() } } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '下达失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function recall(row: Detail['workorder']) {
   if (!can('release') || busy.value) return
@@ -155,24 +144,20 @@ async function recall(row: Detail['workorder']) {
     if (attempt !== detailAttempt) return
     if (detail.value?.workorder.id === row.id) detail.value = result
     ElMessage.success('工单已退回草稿'); await load()
-  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '退回失败' }
-  finally { if (attempt === detailAttempt) busy.value = false }
+  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '退回失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function remove(row: Detail['workorder']) {
   if (!can('delete')) return
   const attempt = detailAttempt
   try { await ElMessageBox.confirm('确认删除工单 ' + row.code + '？存在执行、领料、仓储单据或其他下游记录时不能删除。', '删除确认', { type: 'warning' }) } catch { return }
   if (attempt !== detailAttempt || !can('delete')) return
-  try { await api.remove(row.id, row.revision); if (attempt === detailAttempt) await load() }
-  catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '删除失败' }
+  try { await api.remove(row.id, row.revision); if (attempt === detailAttempt) await load() } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '删除失败' }
 }
 async function loadHistory(id: string) {
   if (!auth.hasPermission('batch:query', 'factory') || historyLoading.value[id]) return
   const attempt = historyAttempt
   historyLoading.value[id] = true
-  try { const value = await api.batchHistory(id); if (attempt === historyAttempt) histories.value[id] = value }
-  catch(e) { if (attempt === historyAttempt) error.value = e instanceof Error ? e.message : '历史路径读取失败' }
-  finally { if (attempt === historyAttempt) historyLoading.value[id] = false }
+  try { const value = await api.batchHistory(id); if (attempt === historyAttempt) histories.value[id] = value } catch(e) { if (attempt === historyAttempt) error.value = e instanceof Error ? e.message : '历史路径读取失败' } finally { if (attempt === historyAttempt) historyLoading.value[id] = false }
 }
 function closeHistory() { detailAttempt++; detail.value = null; busy.value = false; historyAttempt++; histories.value = {}; historyLoading.value = {} }
 onMounted(load)
@@ -183,7 +168,7 @@ onMounted(load)
     <QueryForm class="filter-panel" inline @submit="page=1;load()">
       <el-form-item label="工单号"><el-input v-model="code" clearable /></el-form-item>
       <el-form-item label="状态"><el-select v-model="status" clearable style="width:140px"><el-option v-for="(state, value) in orderStates" :key="value" :label="state.label" :value="value" /></el-select></el-form-item>
-      <el-button native-type="submit" >查询</el-button>
+      <el-button native-type="submit">查询</el-button>
     </QueryForm>
     <div class="table-toolbar"><E10SyncPreview kind="workorder" permission="workorder:sync" @completed="load" /><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量；数量最多显示两位小数，悬停查看精确值</span></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />

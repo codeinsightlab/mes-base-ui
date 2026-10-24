@@ -14,8 +14,8 @@ watch(() => [props.operationId, props.executionId, auth.factoryId, auth.revision
 function beforeClose(done: () => void) { if (panel.value) return panel.value.beforeClose(done); done() }
 </script>
 <template>
- <el-button v-if="canRead" text type="primary" @click="visible = true">{{ triggerLabel || (assignment ? '工序派工' : '可操作人员') }}</el-button>
- <PageDialog v-model="visible" :title="assignment ? '执行节点工序派工' : '工序能力配置'" width="min(880px, 94vw)" top="6vh" append-to-body destroy-on-close :before-close="beforeClose">
-  <OperatorConfigurationPanel v-if="visible" ref="panel" v-bind="props" @changed="emit('changed')" />
- </PageDialog>
+  <el-button v-if="canRead" text type="primary" @click="visible = true">{{ triggerLabel || (assignment ? '工序派工' : '可操作人员') }}</el-button>
+  <PageDialog v-model="visible" :title="assignment ? '执行节点工序派工' : '工序能力配置'" width="min(880px, 94vw)" top="6vh" append-to-body destroy-on-close :before-close="beforeClose">
+    <OperatorConfigurationPanel v-if="visible" ref="panel" v-bind="props" @changed="emit('changed')" />
+  </PageDialog>
 </template>

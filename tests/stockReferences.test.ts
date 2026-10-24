@@ -52,7 +52,7 @@ describe('stock reference selection', () => {
       { id: '1', code: 'L', name: '本地仓', source: 'LOCAL' },
       { id: '2', code: 'E', name: '外部仓', source: 'EXTERNAL' }
     ], total: 2 })
-    const wrapper = mount(WarehouseSelect, { props: { modelValue: null }, global: { plugins: [pinia, ElementPlus] } })
+    const wrapper = mount(WarehouseSelect, { props: { modelValue: null }, global: { plugins: [pinia, ElementPlus] }})
     await flushPromises()
     expect(warehouse.list).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'LOCAL' }))
     expect((wrapper.vm as unknown as { rows: { id: string }[] }).rows.map(row => row.id)).toEqual(['1'])
@@ -76,7 +76,7 @@ describe('stock reference selection', () => {
     expect(wrapper.text()).toContain('一号仓')
     expect(wrapper.text()).toContain('12,345,678,901,234.1234')
     expect(wrapper.findAll('button').map(b => b.text())).not.toContain('同步')
-    auth.factoryPermissions.push('business:wm:inventory:sync'); auth.runtimeMode='ERP'
+    auth.factoryPermissions.push('business:wm:inventory:sync'); auth.runtimeMode = 'ERP'
     await flushPromises()
     expect(wrapper.findAll('button').map(b => b.text())).toContain('同步')
     wrapper.unmount()

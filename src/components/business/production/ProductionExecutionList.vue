@@ -19,7 +19,7 @@ import { computed } from 'vue'
 const props = defineProps<{ workorderId?: string; embedded?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 const router = useRouter(), auth = useAuth()
-const refresh = ref(0), cancelled=ref(false)
+const refresh = ref(0), cancelled = ref(false)
 const activeActions = ref<string | null>(null)
 const canQuery = computed(() => auth.hasPermission('business:mes:production:execution:query', 'factory'))
 const canQuantity = computed(() => auth.hasPermission('business:production:report:quantity', 'factory'))
@@ -32,34 +32,55 @@ function setActionsVisible(id: string, visible: boolean) {
 function actionClicked(event: MouseEvent) {
   if (event.target instanceof Element && event.target.closest('button')) activeActions.value = null
 }
-let ticket=0
-watch(()=>[props.workorderId,auth.factoryId,auth.revision],async()=>{
- const t=++ticket;cancelled.value=!!props.workorderId
- if(!props.workorderId||!auth.hasPermission('workorder:query','factory'))return
- try{const d=await workorders.detail(props.workorderId);if(t===ticket)cancelled.value=!['DRAFT','RELEASED'].includes(d.workorder.status)}catch{if(t===ticket)cancelled.value=true}
-},{immediate:true})
-onBeforeUnmount(()=>ticket++)
+let ticket = 0
+watch(() => [props.workorderId, auth.factoryId, auth.revision], async() => {
+  const t = ++ticket;cancelled.value = !!props.workorderId
+  if (!props.workorderId || !auth.hasPermission('workorder:query', 'factory')) return
+  try { const d = await workorders.detail(props.workorderId);if (t === ticket)cancelled.value = !['DRAFT', 'RELEASED'].includes(d.workorder.status) } catch { if (t === ticket)cancelled.value = true }
+}, { immediate: true })
+onBeforeUnmount(() => ticket++)
 function changed() { activeActions.value = null; refresh.value++; emit('changed') }
 const fixed = computed(() => props.workorderId ? { workorderId: props.workorderId } : undefined)
 </script>
 <template>
   <el-alert v-if="cancelled" title="所属工单当前状态不允许新增生产或不可读取。" type="warning" :closable="false" />
-  <CrudPage :creatable="false" :readonly="cancelled" :key="refresh" :embedded="embedded" :fixed-values="fixed" table-key="business:mes:production:execution:list"
-    :editable-row="row=>['DRAFT','RELEASED'].includes(String(row.workorderStatus)) && ['READY','RUNNING'].includes(String(row.status))" :action-column-width="220" title="生产执行单元" permission="business:mes:production:execution" list-action="list" detail-action="query"
-    :api="api" :fields="fields" id-key="id" @changed="$emit('changed')">
-    <template #search-routingId="{ search }"><BusinessDirectorySelect v-model="search.routingId as string | null" resource="routings" placeholder="搜索工艺名称或编码" /></template>
-    <template #field-workorderId="{ draft }"><WorkOrderSelect :source="auth.runtimeMode==='LOCAL'?'LOCAL':auth.runtimeMode==='ERP'?'EXTERNAL':null" v-model="draft.workorderId as string | null" :disabled="Boolean(draft.id)" /></template>
-    <template #field-routingId="{ draft }"><ExecutionRoutingSelect v-model="draft.routingId as string | null" :workorder-id="draft.workorderId as string | null" :disabled="draft.status !== 'READY'" /></template>
+  <CrudPage
+    :key="refresh"
+    :creatable="false"
+    :readonly="cancelled"
+    :embedded="embedded"
+    :fixed-values="fixed"
+    table-key="business:mes:production:execution:list"
+    :editable-row="row=>['DRAFT','RELEASED'].includes(String(row.workorderStatus)) && ['READY','RUNNING'].includes(String(row.status))"
+    :action-column-width="220"
+    title="生产执行单元"
+    permission="business:mes:production:execution"
+    list-action="list"
+    detail-action="query"
+    :api="api"
+    :fields="fields"
+    id-key="id"
+    @changed="$emit('changed')"
+  >
+    <template #search-routingId="{ search }"><BusinessDirectorySelect v-model="(search.routingId as string | null)" resource="routings" placeholder="搜索工艺名称或编码" /></template>
+    <template #field-workorderId="{ draft }"><WorkOrderSelect v-model="(draft.workorderId as string | null)" :source="auth.runtimeMode==='LOCAL'?'LOCAL':auth.runtimeMode==='ERP'?'EXTERNAL':null" :disabled="Boolean(draft.id)" /></template>
+    <template #field-routingId="{ draft }"><ExecutionRoutingSelect v-model="(draft.routingId as string | null)" :workorder-id="(draft.workorderId as string | null)" :disabled="draft.status !== 'READY'" /></template>
     <template #toolbar><el-button v-if="auth.hasPermission('business:mes:material:issue:update', 'factory')" @click="router.push('/production/productionInput')">正式领料创建执行</el-button><ExecutionIdentityLookup /></template>
-    <template #cell-status="{row}">{{executionStatusLabel(String(row.status))}}<el-tag v-if="row.workorderStatus==='CANCELLED'" type="danger">所属工单已作废</el-tag></template>
+    <template #cell-status="{row}">{{ executionStatusLabel(String(row.status)) }}<el-tag v-if="row.workorderStatus==='CANCELLED'" type="danger">所属工单已作废</el-tag></template>
     <template #cell-routingId="{row}"><span :title="'工艺版本 ID：'+row.routingId">{{ row.routingCode || '工艺名称未记录' }} / V{{ row.routingVersion ?? '未记录' }} · {{ row.routingName || '名称未记录' }}</span></template>
     <template #cell-createBy="{row}"><span :title="'用户 ID：'+row.createBy">{{ row.createByName || (row.createBy ? '用户 '+row.createBy+'（名称未记录）' : '—') }}</span></template>
     <template #cell-updateBy="{row}"><span :title="'用户 ID：'+row.updateBy">{{ row.updateByName || (row.updateBy ? '用户 '+row.updateBy+'（名称未记录）' : '—') }}</span></template>
     <template #actions="{ row }">
-      <el-popover v-if="canQuery || canQuantity || (canAssign && ['DRAFT','RELEASED'].includes(String(row.workorderStatus)))"
-        placement="bottom-end" trigger="click" :width="240" :persistent="true"
-        :visible="activeActions === String(row.id)" @update:visible="setActionsVisible(String(row.id), $event)">
-        <template #reference><el-button link type="primary" :aria-expanded="activeActions === String(row.id)" @keydown.esc="activeActions = null">更多操作 <span class="execution-actions-chevron" aria-hidden="true"></span></el-button></template>
+      <el-popover
+        v-if="canQuery || canQuantity || (canAssign && ['DRAFT','RELEASED'].includes(String(row.workorderStatus)))"
+        placement="bottom-end"
+        trigger="click"
+        :width="240"
+        :persistent="true"
+        :visible="activeActions === String(row.id)"
+        @update:visible="setActionsVisible(String(row.id), $event)"
+      >
+        <template #reference><el-button link type="primary" :aria-expanded="activeActions === String(row.id)" @keydown.esc="activeActions = null">更多操作 <span class="execution-actions-chevron" aria-hidden="true" /></el-button></template>
         <div class="execution-actions" @click="actionClicked" @keydown.esc="activeActions = null">
           <div class="execution-actions-context" :title="String(row.id)">{{ row.id }}</div>
           <section v-if="canQuery || canQuantity" class="execution-actions-group" aria-label="执行查看">

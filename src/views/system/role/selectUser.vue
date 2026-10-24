@@ -13,7 +13,6 @@
           v-model="queryParams.userName"
           placeholder="请输入用户名称"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="用户昵称" prop="nickName">
@@ -21,7 +20,6 @@
           v-model="queryParams.nickName"
           placeholder="请输入用户昵称"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="部门" prop="deptId">
@@ -30,17 +28,17 @@
           v-model="queryParams.deptId"
           :options="deptOptions"
           :props="{ expandTrigger: 'hover', label: 'label', value: 'id' }"
-
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit"
+        <el-button
+          native-type="submit"
           type="primary"
           icon="Search"
           size="small"
-
         >搜索</el-button>
-        <el-button native-type="button"
+        <el-button
+          native-type="button"
           icon="Refresh"
           size="small"
           @click="resetQuery"

@@ -14,7 +14,7 @@ const first: WorkOrderProgressPage = {
   total: 12, offset: 0, limit: 5
 }
 const global = {
-  directives: { loading: {} },
+  directives: { loading: {}},
   stubs: {
     'el-form': { template: '<form><slot /></form>' },
     'el-form-item': { template: '<div><slot /></div>' },
@@ -63,7 +63,6 @@ describe('workorder progress refresh keeps the table mounted', () => {
   })
 })
 
-
 describe('workorder progress distinguishes quality outcomes', () => {
   it('shows transfers, untreated declarations and returned-to-node quantities separately', async() => {
     fixture.fetch.mockResolvedValue({ ...first, items: [{
@@ -88,7 +87,7 @@ describe('workorder progress distinguishes quality outcomes', () => {
         },
         CodeText: true, StatusTag: true, MetricValue: true, RouterLink: true, 'el-progress': true
       }
-    } })
+    }})
     await flushPromises()
     expect(wrapper.find('[aria-label="已确认报废"]').exists()).toBe(false)
     expect(wrapper.get('[aria-label="工单创建时间"]').text()).toBe('2026-10-01 09:30:45')

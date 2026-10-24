@@ -40,9 +40,9 @@ export const api = {
     request<MesProductionExecutionVo>('/api/production/mes-production-execution/' + encodeURIComponent(id), { scope: 'factory' }),
 
   // Shared CrudApi requires a creation member; this screen cannot create production executions.
-  create: async () => { throw new Error('生产执行由BOM正式领料成功后创建') },
+  create: async() => { throw new Error('生产执行由BOM正式领料成功后创建') },
 
-  update: async (id: string, body: unknown) => {
+  update: async(id: string, body: unknown) => {
     const previous = await api.detail(id)
     return request<MesProductionExecutionVo>('/api/production/mes-production-execution/' + encodeURIComponent(id), {
       method: 'PUT', body: { ...(body as object), status: previous.status, startTime: previous.startTime, endTime: previous.endTime }, scope: 'factory'

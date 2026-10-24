@@ -12,9 +12,9 @@ export interface Command { requestId: string; code: string; workorderId: string;
 export interface Result { requestId: string; issueId: string; executionId: string; code: string | null; status: string; productionInputQty: string; availableQty: string }
 const base = '/api/production/input'
 export const productionInput = {
- query: (code: string, offset = 0, limit = 20) => request<Supply>(base, { query: { code, offset, limit }, scope: 'factory' }),
- calculate: (query: {code: string; workorderId: string; stockReference: string; outputQty: string}) => request<Calculation>(base + '/calculate', {query, scope: 'factory'}),
- preview: (code: string, workorderId: string) => request<Preview>(base + '/preview', {query: {code, workorderId}, scope: 'factory'}),
- draft: (body: Command) => request<StockDocumentDetail>(base + '/drafts', {method: 'POST', body, scope: 'factory'}),
- submit: (body: Command) => request<Result>(base, {method: 'POST', body, scope: 'factory'})
+  query: (code: string, offset = 0, limit = 20) => request<Supply>(base, { query: { code, offset, limit }, scope: 'factory' }),
+  calculate: (query: { code: string; workorderId: string; stockReference: string; outputQty: string }) => request<Calculation>(base + '/calculate', { query, scope: 'factory' }),
+  preview: (code: string, workorderId: string) => request<Preview>(base + '/preview', { query: { code, workorderId }, scope: 'factory' }),
+  draft: (body: Command) => request<StockDocumentDetail>(base + '/drafts', { method: 'POST', body, scope: 'factory' }),
+  submit: (body: Command) => request<Result>(base, { method: 'POST', body, scope: 'factory' })
 }

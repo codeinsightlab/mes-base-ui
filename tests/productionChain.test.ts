@@ -11,7 +11,7 @@ const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), 
 const executions = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }))
 vi.mock('../src/api/production/workorder', () => ({ api: wo }))
 vi.mock('../src/api/production/mesProductionExecution', () => ({ api: executions }))
-vi.mock('../src/api/basic/material', () => ({ api: { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'P1', name: '产品一' }] }) } }))
+vi.mock('../src/api/basic/material', () => ({ api: { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'P1', name: '产品一' }] }) }}))
 const allocation = { workorderId: '1', plannedQty: '1000.000000', allocatedTargetQty: '1300.000000', remainingTargetQty: '-300.000000', excessTargetQty: '300.000000', executionCount: 2 }
 const order = { id: '1', code: 'WO1', productId: '1', routingId: '1', plannedQty: '1000', status: 'DRAFT', revision: 0 }
 const detail = () => ({ workorder: order, productCode: 'P1', productName: '产品一', routing: { id: '1', code: 'R1', version: 1 }, allocation, batches: [{ id: '7', batchNo: 'LEGACY_ONLY', plannedQty: '1000', routeStatus: 'LOCKED' }] })
@@ -27,7 +27,7 @@ beforeEach(() => {
 function setup(permissions: string[]) {
   const pinia = createPinia(), auth = useAuth(pinia)
   auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = permissions
-  return { auth, global: { plugins: [pinia, ElementPlus] } }
+  return { auth, global: { plugins: [pinia, ElementPlus] }}
 }
 describe('single active execution chain', () => {
   it('shows the server creation time and current completed workorder status', async() => {
@@ -107,7 +107,7 @@ describe('single active execution chain', () => {
   })
   it('opens an authorized bookmarked workorder without losing the string ID', async() => {
     const c = setup(['workorder:list', 'workorder:query'])
-    const w = mount(WorkOrder, { global: { ...c.global, provide: { [routeLocationKey as symbol]: { query: { workorderId: '9007199254740993' } } } } })
+    const w = mount(WorkOrder, { global: { ...c.global, provide: { [routeLocationKey as symbol]: { query: { workorderId: '9007199254740993' }}}}})
     await flushPromises()
     expect(wo.detail).toHaveBeenCalledWith('9007199254740993')
     expect(w.text()).toContain('工单需求与生产执行')

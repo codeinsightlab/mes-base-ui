@@ -25,7 +25,7 @@ export function useBasicDataReferences(api: CrudApi, permission: string) {
         if (rows.length >= page.total || page.items.length === 0) break
       }
       options.value = rows.map(row => ({ value: String(row.id), label: `${row.code} · ${row.name}` }))
-    } catch (error) {
+    } catch(error) {
       if (auth.revision !== revision || current !== generation) return
       options.value = []
       ElMessage.error(error instanceof Error ? error.message : '引用数据加载失败')

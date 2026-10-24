@@ -17,7 +17,7 @@ function clear() {
   sequence++; visible.value = false; busy.value = false; support.value = null; result.value = null; analysis.value = null; error.value = ''
   emit('supported', false)
 }
-watch(() => [auth.revision, auth.factoryId, allowed.value, props.kind, props.permission], async () => {
+watch(() => [auth.revision, auth.factoryId, allowed.value, props.kind, props.permission], async() => {
   clear()
   if (!allowed.value) return
   const attempt = sequence
@@ -25,7 +25,7 @@ watch(() => [auth.revision, auth.factoryId, allowed.value, props.kind, props.per
     const response = await capability(props.kind)
     if (attempt !== sequence) return
     support.value = response; emit('supported', response.supported)
-  } catch (failure) {
+  } catch(failure) {
     if (attempt === sequence) error.value = failure instanceof Error ? failure.message : '同步准备检查失败'
   }
 }, { immediate: true, flush: 'sync' })
@@ -40,7 +40,7 @@ async function read(pageNo = 1) {
   try {
     const response = await preview(props.kind, pageNo)
     if (attempt === sequence && allowed.value && visible.value) result.value = response
-  } catch (failure) {
+  } catch(failure) {
     if (attempt === sequence) error.value = failure instanceof Error ? failure.message : 'ERP候选读取失败'
   } finally {
     if (attempt === sequence) busy.value = false
@@ -55,7 +55,7 @@ async function run(commit = false) {
     if (attempt !== sequence || !allowed.value || !visible.value) return
     analysis.value = response
     if (commit) emit('completed')
-  } catch (failure) {
+  } catch(failure) {
     if (attempt === sequence) {
       error.value = failure instanceof Error ? failure.message : '同步执行失败，请按运行标识核实结果'
       if (commit) emit('completed')

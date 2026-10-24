@@ -51,7 +51,7 @@ async function close(target:string, mode:'one' | 'others' | 'all' = 'one') {
   await router.push(closeTabs(target, mode, route.fullPath))
 }
 async function refreshPage() { if (!await allowPageLeave()) return;pageVisible.value = false;workspaceTabs.refresh++;await nextTick();pageVisible.value = true }
-function tagCommand(command:string, path:string) { if (command === 'refresh') { if (path === route.fullPath)refreshPage();else router.push(path).then(() => { if (route.fullPath === path)return refreshPage() }) } else close(path, command as 'one' | 'others' | 'all') }
+function tagCommand(command:string, path:string) { if (command === 'refresh') { if (path === route.fullPath)refreshPage();else router.push(path).then(() => { if (route.fullPath === path) return refreshPage() }) } else close(path, command as 'one' | 'others' | 'all') }
 function userCommand(command:string) { if (command === 'profile')router.push('/user/profile');else if (command === 'permissions')refreshNavigation();else if (command === 'logout')logout() }
 </script>
 <template>

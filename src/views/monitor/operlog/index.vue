@@ -2,7 +2,8 @@
   <div class="app-container">
     <PageHeader section="MES BASE / MONITOR" title="操作日志" description="操作记录与结果追踪" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <QueryForm @submit="handleQuery"
+    <QueryForm
+      @submit="handleQuery"
       v-show="showSearch"
       ref="queryForm"
       class="filter-panel"
@@ -17,7 +18,6 @@
           placeholder="请输入系统模块"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="操作人员" prop="operName">
@@ -26,7 +26,6 @@
           placeholder="请输入操作人员"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="请求参数" prop="operParam">
@@ -35,7 +34,6 @@
           placeholder="请输入请求参数"
           clearable
           style="width: 240px"
-
         />
       </el-form-item>
       <el-form-item label="类型" prop="businessType">
@@ -80,13 +78,14 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit"
+        <el-button
+          native-type="submit"
           type="primary"
           icon="Search"
           size="small"
-
         >搜索</el-button>
-        <el-button native-type="button"
+        <el-button
+          native-type="button"
           icon="Refresh"
           size="small"
           @click="resetQuery"

@@ -27,7 +27,7 @@ async function search(value: string, more = false) {
   loading.value = true
   error.value = ''
   try {
-    const result = await api.list({ name: value, ...(expectedSource.value ? {source: expectedSource.value} : {}), offset: more ? rows.value.length : 0, limit: 20 })
+    const result = await api.list({ name: value, ...(expectedSource.value ? { source: expectedSource.value } : {}), offset: more ? rows.value.length : 0, limit: 20 })
     if (current !== version) return
     const matching = result.items.filter(row => (!expectedSource.value || row.source === expectedSource.value))
     rows.value = more ? [...rows.value, ...matching] : matching
@@ -48,8 +48,7 @@ async function hydrate() {
   try {
     const row = await api.detail(props.modelValue)
     if (current === detailVersion) {
-      if (expectedSource.value && row.source !== expectedSource.value) { error.value = '仓库来源与当前业务不一致'; emit('update:modelValue', null) }
-      else selected.value = row
+      if (expectedSource.value && row.source !== expectedSource.value) { error.value = '仓库来源与当前业务不一致'; emit('update:modelValue', null) } else selected.value = row
     }
   } catch(reason) {
     if (current === detailVersion) error.value = reason instanceof Error ? reason.message : '仓库回显失败'

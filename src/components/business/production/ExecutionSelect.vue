@@ -5,22 +5,20 @@ import { api, type MesProductionExecutionVo } from '@/api/production/mesProducti
 const model = defineModel<string>({ default: '' })
 const props = defineProps<{ workorderId?: string | null }>()
 const auth = useAuth(), options = ref<MesProductionExecutionVo[]>([]), loading = ref(false), error = ref('')
-const allowed = computed(() => auth.hasPermission('business:mes:production:execution:list','factory'))
+const allowed = computed(() => auth.hasPermission('business:mes:production:execution:list', 'factory'))
 let sequence = 0
 function clear() { sequence++; options.value = []; loading.value = false; error.value = '' }
 watch(() => [props.workorderId, auth.factoryId, auth.revision, allowed.value], clear, { flush: 'sync' })
 onBeforeUnmount(clear)
 async function search(id = '') {
- if (!allowed.value) return
- const ticket = ++sequence; loading.value = true; error.value = ''
- if(id&&!/^[1-9]\d{0,18}$/.test(id)){options.value=[];loading.value=false;error.value='请输入有效的执行ID';return}
- try { const data = await api.list({ ...(id?{id}:{}), ...(props.workorderId ? { workorderId: props.workorderId } : {}), offset: 0, limit: 20 }); if (ticket === sequence) options.value = data.items }
- catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '执行单元检索失败' }
- finally { if (ticket === sequence) loading.value = false }
+  if (!allowed.value) return
+  const ticket = ++sequence; loading.value = true; error.value = ''
+  if (id && !/^[1-9]\d{0,18}$/.test(id)) { options.value = [];loading.value = false;error.value = '请输入有效的执行ID';return }
+  try { const data = await api.list({ ...(id ? { id } : {}), ...(props.workorderId ? { workorderId: props.workorderId } : {}), offset: 0, limit: 20 }); if (ticket === sequence) options.value = data.items } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '执行单元检索失败' } finally { if (ticket === sequence) loading.value = false }
 }
 </script>
 <template>
- <el-select v-if="allowed" v-model="model" filterable remote allow-create clearable :remote-method="search" :loading="loading" placeholder="输入执行ID精确查询" @visible-change="(v: boolean) => v && search()"><el-option v-for="row in options" :key="row.id" :value="row.id" :label="row.id" /></el-select>
- <el-input v-else v-model="model" clearable placeholder="输入 Execution ID" maxlength="19" />
- <span v-if="error" class="secondary">{{ error }}</span>
+  <el-select v-if="allowed" v-model="model" filterable remote allow-create clearable :remote-method="search" :loading="loading" placeholder="输入执行ID精确查询" @visible-change="(v: boolean) => v && search()"><el-option v-for="row in options" :key="row.id" :value="row.id" :label="row.id" /></el-select>
+  <el-input v-else v-model="model" clearable placeholder="输入 Execution ID" maxlength="19" />
+  <span v-if="error" class="secondary">{{ error }}</span>
 </template>

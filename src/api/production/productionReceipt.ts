@@ -4,6 +4,6 @@ export interface Receipt { id: string; receiptNo: string; executionId: string; w
 export interface ReceiptPage { items: Receipt[]; total: number; offset: number; limit: number }
 const url = '/api/production/receipts'
 export const productionReceipt = {
- page: (query: Record<string, string | number>) => request<ReceiptPage>(url, { query, scope: 'factory' }),
- detail: (id: string) => request<{record: Receipt; originalBalance: string}>(url + '/' + encodeURIComponent(id), { scope: 'factory' }),
+  page: (query: Record<string, string | number>) => request<ReceiptPage>(url, { query, scope: 'factory' }),
+  detail: (id: string) => request<{ record: Receipt; originalBalance: string }>(url + '/' + encodeURIComponent(id), { scope: 'factory' })
 }

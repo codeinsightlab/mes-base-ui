@@ -10,7 +10,6 @@ import { loadLoginOptions } from '@/api/loginOptions'
 import { passwordError, type PasswordPolicy } from '@/utils/passwordPolicy'
 const ElMessageBox = usePageMessageBox()
 
-
 interface Options { captchaOnOff: boolean; registrationEnabled: boolean; passwordPolicy: PasswordPolicy; uuid?: string; img?: string }
 const router = useRouter(), form = ref({ username: '', password: '', confirmPassword: '', code: '', uuid: '' })
 const options = ref<Options>(), loading = ref(false), optionsLoading = ref(false), error = ref('')

@@ -11,7 +11,6 @@ import type { CrudApi, Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
 
-
 const props = withDefaults(defineProps<{
   creatable?: boolean;
   title: string; headerApi: CrudApi; itemApi: CrudApi;

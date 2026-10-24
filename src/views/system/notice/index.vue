@@ -8,7 +8,6 @@
           v-model="queryParams.noticeTitle"
           placeholder="请输入公告标题"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="操作人员" prop="createBy">
@@ -16,7 +15,6 @@
           v-model="queryParams.createBy"
           placeholder="请输入操作人员"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="类型" prop="noticeType">
@@ -30,7 +28,7 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

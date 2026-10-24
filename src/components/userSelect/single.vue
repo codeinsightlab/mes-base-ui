@@ -27,7 +27,8 @@
       </el-col>
       <!--用户数据-->
       <el-col :span="20" :xs="24">
-        <QueryForm @submit="handleQuery"
+        <QueryForm
+          @submit="handleQuery"
           v-show="showSearch"
           ref="queryForm"
           :model="queryParams"
@@ -41,7 +42,6 @@
               placeholder="请输入用户名称"
               clearable
               style="width: 240px"
-
             />
           </el-form-item>
           <el-form-item label="手机号码" prop="phonenumber">
@@ -50,11 +50,10 @@
               placeholder="请输入手机号码"
               clearable
               style="width: 240px"
-
             />
           </el-form-item>
           <el-form-item>
-            <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+            <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
             <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
         </QueryForm>

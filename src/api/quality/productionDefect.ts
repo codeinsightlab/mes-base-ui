@@ -9,13 +9,13 @@ export interface Acknowledgement { record: Version; success: boolean; externalEx
 const root = '/api/quality/defects'
 const path = (id: string) => root + '/' + encodeURIComponent(id)
 export const productionDefect = {
- page: (query: Record<string, string | number>) => request<Page>(root, { query, scope: 'factory' }),
- history: (id: string, offset = 0) => request<Page>(path(id) + '/history', { query: { offset, limit: 20 }, scope: 'factory' }),
- detail: (id: string) => request<Version>(path(id), { scope: 'factory' }),
- nodes: (id: string) => request<Node[]>(root + '/executions/' + encodeURIComponent(id) + '/nodes', { scope: 'factory' }),
- revise: (id: string, body: Command) => request<Acknowledgement>(path(id) + '/revisions', { method: 'POST', body, scope: 'factory' }),
- void: (id: string, body: Command) => request<Acknowledgement>(path(id) + '/void', { method: 'POST', body, scope: 'factory' })
+  page: (query: Record<string, string | number>) => request<Page>(root, { query, scope: 'factory' }),
+  history: (id: string, offset = 0) => request<Page>(path(id) + '/history', { query: { offset, limit: 20 }, scope: 'factory' }),
+  detail: (id: string) => request<Version>(path(id), { scope: 'factory' }),
+  nodes: (id: string) => request<Node[]>(root + '/executions/' + encodeURIComponent(id) + '/nodes', { scope: 'factory' }),
+  revise: (id: string, body: Command) => request<Acknowledgement>(path(id) + '/revisions', { method: 'POST', body, scope: 'factory' }),
+  void: (id: string, body: Command) => request<Acknowledgement>(path(id) + '/void', { method: 'POST', body, scope: 'factory' })
 }
 export function factsOf(row: Facts): Facts {
- return { executionId: row.executionId, affectedNodeId: row.affectedNodeId, defectQty: row.defectQty, wasteCategory: row.wasteCategory, defectReason: row.defectReason, responsibleUserId: row.responsibleUserId, responsibilityRemark: row.responsibilityRemark, occurredAt: row.occurredAt }
+  return { executionId: row.executionId, affectedNodeId: row.affectedNodeId, defectQty: row.defectQty, wasteCategory: row.wasteCategory, defectReason: row.defectReason, responsibleUserId: row.responsibleUserId, responsibilityRemark: row.responsibilityRemark, occurredAt: row.occurredAt }
 }

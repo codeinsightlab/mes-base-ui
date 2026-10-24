@@ -8,7 +8,6 @@
           v-model="queryParams.partCode"
           placeholder="请输入组成编码"
           clearable
-
         />
       </el-form-item>
       <el-form-item label="组成名称" prop="partName">
@@ -16,11 +15,10 @@
           v-model="queryParams.partName"
           placeholder="请输入组成名称"
           clearable
-
         />
       </el-form-item>
       <el-form-item>
-        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small">搜索</el-button>
         <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
     </QueryForm>

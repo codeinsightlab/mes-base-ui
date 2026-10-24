@@ -17,8 +17,7 @@ async function search(code = '') {
   try {
     const result = await api.list({ code, limit: 20, ...(props.source ? { source: props.source } : {}), ...(props.status ? { status: props.status } : {}) })
     if (current === ticket) options.value = result.items.filter(s => !props.source || s.workorder.source === props.source).map(s => ({ id: s.workorder.id, label: s.workorder.code + ' · ' + s.productCode + ' · ' + s.productName }))
-  } catch(e) { if (current === ticket) error.value = e instanceof Error ? e.message : '工单查询失败' }
-  finally { if (current === ticket) loading.value = false }
+  } catch(e) { if (current === ticket) error.value = e instanceof Error ? e.message : '工单查询失败' } finally { if (current === ticket) loading.value = false }
 }
 </script>
 <template>
