@@ -85,16 +85,14 @@ Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改�
 用户授权的工作台扩展（2026-10-06）：上述 Home 不造生产指标的约束继续适用于真实数据模式；用户明确授权 BusinessWorkspace 的独立示例视图。上下文、指标、列表与详情持续标明“示例数据”，禁止作为真实业务请求失败的兜底，禁止业务提交或写入。服务端 workspaces 契约决定工作台：有有效工厂角色或平台角色已授予业务权限（platformBusiness）默认业务；仅持有平台权限默认平台，无角色展示个人入口；双范围可切换，不由可选工厂推断授权，默认选厂按服务端规则：有效偏好优先，否则从启用且绑定启用业务库的工厂选择工厂 ID 最小值，纯数字按数值比较；选厂不授予角色或权限。平台账号可显式预览业务示例，预览不改变 Factory 或权限。侧栏一级模块默认只展开活动分支、手动展开一个模块时收起其他一级模块。Druid 目录仅覆盖当前节点中心库与工厂业务池（2026-10-09 收敛）；未初始化明确表达，不因监控主动加载业务池。验收追加到 docs/acceptance/ui-industrial-upgrade/ROUND2.md。
 
 
-## 业务人员 / 部门 / 岗位嵌入组件（2026-10-10）
+## 业务引用目录组件
 
-业务模块需要人员、部门、岗位搜索或选择时，优先复用 mes-base-ui 的
-`src/components/business/directory/PersonnelSelect.vue`、`DepartmentSelect.vue`、`PostSelect.vue`。
-接口统一为 `/api/business/directory/{personnel|departments|posts}` 与 `/{id}`，仅提供 GET 列表和单个查询；禁止在这组能力中增加新增、修改、删除或角色分配。
-复用中心库 sys_user/sys_dept/sys_post 的平台 Mapper，使用 masterTransactionManager 只读事务；不新增表、不复制目录到业务库。
-HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:read 权限，不能让组件调用平台管理 API 或要求 system 权限。
-中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等 SysUser 敏感字段。
-组件 ID 使用字符串，切厂/撤权清理已选项与候选数据、拒绝过期响应。平台管理页面保持原有管理能力。
-契约与使用方式见 mes-base 的 docs/development/business-directory.md。
+业务人员选择复用`src/components/business/directory/PersonnelSelect.vue`，执行列表工艺筛选复用`BusinessDirectorySelect.vue`的routings资源。部门、岗位选择器和目录operations资源没有正式消费者，已清理，不为可能的需求恢复空壳。系统部门、岗位维护及工艺编辑自己的工序候选接口保持独立。
+
+当前目录HTTP入口仅为`/api/business/directory/personnel[/{id}]`、`routings[/{id}]`及`report-operators`，按对应业务权限授权。补报人员检索只使用目录report-operators，不恢复重复的生产报工入口。内部userLabels、routingLabels、operationLabels和materialEntities继续复用统一详情缓存，不因HTTP包装清理而删除，不新增竞争缓存。
+
+目录负责只读引用查询，DetailEntityCache及BusinessCacheProcessor负责通用缓存机制。人员来自中心sys_user，禁止泄漏密码、联系方式、角色及权限；历史身份校验实时查询，不以缓存决定生产准入。ID保持字符串，切厂/撤权清理状态并拒绝迟到响应。契约和职责见mes-base的`docs/development/business-directory.md`。
+
 
 ## 工厂上下文恢复（2026-10-12 用户确认）
 

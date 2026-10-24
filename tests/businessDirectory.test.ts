@@ -4,8 +4,6 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent } from 'vue'
 import type { Component } from 'vue'
 import PersonnelSelect from '../src/components/business/directory/PersonnelSelect.vue'
-import DepartmentSelect from '../src/components/business/directory/DepartmentSelect.vue'
-import PostSelect from '../src/components/business/directory/PostSelect.vue'
 import BusinessDirectorySelect from '../src/components/business/directory/BusinessDirectorySelect.vue'
 import { directoryPermissions, getDirectory, listDirectory } from '../src/api/business/directory'
 import type { DirectoryOption } from '../src/api/business/directory'
@@ -40,7 +38,7 @@ beforeEach(() => {
 })
 afterEach(() => wrappers.splice(0).forEach(wrapper => wrapper.unmount()))
 describe('read-only business directory components', () => {
-  it.each([[PersonnelSelect, 'personnel'], [DepartmentSelect, 'departments'], [PostSelect, 'posts']] as const)(
+  it.each([[PersonnelSelect, 'personnel']] as const)(
     'uses the correct list endpoint and preserves string IDs', async(component, resource) => {
       const { wrapper } = setup(component)
       await flushPromises()
@@ -50,7 +48,7 @@ describe('read-only business directory components', () => {
       expect(wrapper.emitted('change')?.at(-1)).toEqual([row])
       expect(wrapper.text()).not.toMatch(/新增|修改|删除/)
     })
-  it.each(['routings', 'operations'] as const)('uses the shared directory for %s and shows exact version metadata', async resource => {
+  it.each(['routings'] as const)('uses the shared directory for %s and shows exact version metadata', async resource => {
     vi.mocked(listDirectory).mockResolvedValue({ items: [{ ...row, name: '精加工', code: 'ROUTE', version: 2 }], total: 1, offset: 0, limit: 20 })
     const component = defineComponent({ components: { BusinessDirectorySelect }, template: `<BusinessDirectorySelect resource="${resource}" />` })
     const { wrapper } = setup(component)
