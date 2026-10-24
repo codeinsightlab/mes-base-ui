@@ -6,6 +6,8 @@ Base MES 的 Web 管理与现场操作前端，面向中小型离散制造企业
 
 配套后端：[mes-base](https://github.com/codeinsightlab/mes-base)。本项目需要后端、数据库和工厂配置共同运行。
 
+代码托管：[GitHub](https://github.com/codeinsightlab/mes-base-ui) · [Gitee](https://gitee.com/zlxStudyHome/mes-base-ui)
+
 ## 主要功能
 
 | 场景 | 当前界面能力 |
@@ -101,6 +103,7 @@ npm run build
 
 - [后端项目与产品介绍](https://github.com/codeinsightlab/mes-base)
 - [前端开发与部署说明](docs/development.md)
+- [GitHub / Gitee 双托管](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/dual-hosting.md)
 - [产品当前规划](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/next-stage-plan.md)
 - [生产投产与 BOM 规则](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/production-input.md)
 - [LOCAL / ERP 业务边界](https://github.com/codeinsightlab/mes-base/blob/main/docs/architecture/local-erp-business-boundary.md)
@@ -109,4 +112,4 @@ npm run build
 
 ## 来源与第三方声明
 
-部分系统管理能力演进自 RuoYi、ktg-mes-ui 等来源项目，来源清单及第三方许可见[后端声明目录](https://github.com/codeinsightlab/mes-base/tree/main/docs/legal)。不在本页为整个项目新增许可证或变更原组件的授权。
+项目原创贡献采用 [Apache License 2.0](LICENSE)。部分系统管理能力演进自 RuoYi、ktg-mes-ui 等来源项目，相关组件保留原有 MIT 许可，完整声明见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) 和 [NOTICE](NOTICE)。来源清单见[后端声明目录](https://github.com/codeinsightlab/mes-base/tree/main/docs/legal)，第三方依赖遵守各自许可证。
