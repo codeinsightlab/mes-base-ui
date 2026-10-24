@@ -4,7 +4,7 @@ Base MES 的 Web 管理与现场操作前端，面向中小型离散制造企业
 
 围绕工单、生产批次和工序，把材料领用、报工、不良申报、入库与追溯放到同一个工作界面，让管理人员看清进度，让现场人员方便地记录生产事实。
 
-配套后端：[mes-base](https://github.com/codeinsightlab/mes-base)。本项目需要后端、数据库和工厂配置共同运行。
+配套后端：mes-base（[GitHub](https://github.com/codeinsightlab/mes-base) / [Gitee](https://gitee.com/codeinsightlab/mes-base)）。本项目需要后端、数据库和工厂配置共同运行。
 
 代码托管：[GitHub](https://github.com/codeinsightlab/mes-base-ui) · [Gitee](https://gitee.com/codeinsightlab/mes-base-ui)
 
@@ -41,7 +41,7 @@ Base MES 的 Web 管理与现场操作前端，面向中小型离散制造企业
 - 当前工厂不可用时进入重新选厂流程，不自动换到其他工厂，也不自动重放之前失败的业务提交。
 - 只有一个工厂时沿用相同界面与模型；私有文件及业务资源仍由后端校验访问范围。
 
-本前端共用一套界面，后端通过独立业务库隔离数据。按年度配置不等于自动年度结转：期初、资料、未完工单与在制品承接需要按正式规则准备；不会自动切年、封账或跨空间合并。完整说明见[后端数据空间设计](https://github.com/codeinsightlab/mes-base#数据隔离不只用于多工厂)。
+本前端共用一套界面，后端通过独立业务库隔离数据。按年度配置不等于自动年度结转：期初、资料、未完工单与在制品承接需要按正式规则准备；不会自动切年、封账或跨空间合并。完整说明见后端数据空间设计（[GitHub](https://github.com/codeinsightlab/mes-base#数据隔离不只用于多工厂) / [Gitee](https://gitee.com/codeinsightlab/mes-base#user-content-数据隔离不只用于多工厂)）。
 
 ## 当前阶段
 
@@ -55,7 +55,7 @@ Base MES 的 Web 管理与现场操作前端，面向中小型离散制造企业
 
 系统管理能力迁移自 RuoYi 体系，部分页面和交互经 ktg-mes-ui 来源项目迁入，并适配 Vue 3、TypeScript 和 Element Plus；本项目在此基础上建设生产、质量、仓储及数据空间工作区。
 
-配套后端的代码生成器已经重构为独立模块，以显式配置和真实表结构生成基础后端、Vue 3 CRUD 页面及菜单等产物。前端复用统一表格、主子单据和业务选择器；生成能力不代替复杂业务设计，也不代表现有全部页面都由生成器生成。详见[后端生成器说明](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/codegen.md)。
+配套后端的代码生成器已经重构为独立模块，以显式配置和真实表结构生成基础后端、Vue 3 CRUD 页面及菜单等产物。前端复用统一表格、主子单据和业务选择器；生成能力不代替复杂业务设计，也不代表现有全部页面都由生成器生成。详见后端生成器说明（[GitHub](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/codegen.md) / [Gitee](https://gitee.com/codeinsightlab/mes-base/blob/main/docs/development/codegen.md)）。
 
 ## 技术栈
 
@@ -121,15 +121,15 @@ npm run build
 
 ## 文档与相关项目
 
-- [后端项目与产品介绍](https://github.com/codeinsightlab/mes-base)
+- 后端项目与产品介绍（[GitHub](https://github.com/codeinsightlab/mes-base) / [Gitee](https://gitee.com/codeinsightlab/mes-base)）
 - [前端开发与部署说明](docs/development.md)
-- [GitHub / Gitee 双托管](https://github.com/codeinsightlab/mes-base/blob/main/CONTRIBUTING.md)
-- [产品当前规划](https://github.com/codeinsightlab/mes-base/blob/main/docs/roadmap.md)
-- [生产投产与 BOM 规则](https://github.com/codeinsightlab/mes-base/blob/main/docs/usage/production.md)
-- [LOCAL / ERP 业务边界](https://github.com/codeinsightlab/mes-base/blob/main/docs/architecture/local-erp-business-boundary.md)
+- GitHub / Gitee 双托管（[GitHub](https://github.com/codeinsightlab/mes-base/blob/main/CONTRIBUTING.md) / [Gitee](https://gitee.com/codeinsightlab/mes-base/blob/main/CONTRIBUTING.md)）
+- 产品当前规划（[GitHub](https://github.com/codeinsightlab/mes-base/blob/main/docs/roadmap.md) / [Gitee](https://gitee.com/codeinsightlab/mes-base/blob/main/docs/roadmap.md)）
+- 生产投产与 BOM 规则（[GitHub](https://github.com/codeinsightlab/mes-base/blob/main/docs/usage/production.md) / [Gitee](https://gitee.com/codeinsightlab/mes-base/blob/main/docs/usage/production.md)）
+- LOCAL / ERP 业务边界（[GitHub](https://github.com/codeinsightlab/mes-base/blob/main/docs/architecture/local-erp-business-boundary.md) / [Gitee](https://gitee.com/codeinsightlab/mes-base/blob/main/docs/architecture/local-erp-business-boundary.md)）
 
 公共文档维护当前用法和契约；个人环境、排障和一次性验收证据保存在被Git忽略的本地目录。
 
 ## 来源与第三方声明
 
-项目原创贡献采用 [Apache License 2.0](LICENSE)。部分系统管理能力演进自 RuoYi、ktg-mes-ui 等来源项目，相关组件保留原有 MIT 许可，完整声明见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) 和 [NOTICE](NOTICE)。来源清单见[后端声明目录](https://github.com/codeinsightlab/mes-base/tree/main/docs/legal)，第三方依赖遵守各自许可证。
+项目原创贡献采用 [Apache License 2.0](LICENSE)。部分系统管理能力演进自 RuoYi、ktg-mes-ui 等来源项目，相关组件保留原有 MIT 许可，完整声明见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) 和 [NOTICE](NOTICE)。来源清单见后端声明目录（[GitHub](https://github.com/codeinsightlab/mes-base/tree/main/docs/legal) / [Gitee](https://gitee.com/codeinsightlab/mes-base/tree/main/docs/legal)），第三方依赖遵守各自许可证。
