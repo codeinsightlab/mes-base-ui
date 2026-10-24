@@ -17,7 +17,7 @@ import SyncButton from '@/components/business/SyncButton.vue'
 import { api, sync, type ReferenceOption, type RoutingDetail, type RoutingVo } from '@/api/production/routing'
 import { contentError } from '@/lib/production/routingGraph'
 import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
-import type { RoutingNode } from '@/api/production/routing'
+import type { RoutingNode, RoutingProduct } from '@/api/production/routing'
 import { parseTime } from '@/utils/ruoyi'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
@@ -44,6 +44,11 @@ let sequence = 0, listSequence = 0, operationSequence = 0, materialSequence = 0
 const alive = (attempt: number, revision: number) => attempt === sequence && revision === auth.revision
 const labels = { DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '停用' } as const
 const tone = (status: RoutingVo['status']) => status === 'PUBLISHED' ? 'success' : status === 'DRAFT' ? 'warning' : 'disabled'
+function productLabel(product: RoutingProduct) {
+  if (!product.currentMaterialCode || !product.currentMaterialName)
+    return `${product.currentMaterialCode ?? '品号待确认'} · ${product.currentMaterialName ?? '名称待确认'}（物料ID ${product.materialId}）`
+  return `${product.currentMaterialCode} · ${product.currentMaterialName}`
+}
 function clear() {
   sequence++; listSequence++; operationSequence++; materialSequence++
   rows.value = []; total.value = 0; detail.value = null; materialIds.value = []
@@ -88,7 +93,7 @@ function accept(value: RoutingDetail) {
   savedContent.value = contentFingerprint()
   metadata.name = value.routing.name; metadata.description = value.routing.description ?? ''
   operationOptions.value = [...new Map(value.nodes.filter(node => node.operationCode).map(node => [node.operationId, { id: node.operationId, code: node.operationCode!, name: node.operationName ?? '' }])).values()]
-  materialOptions.value = value.products.map(product => ({ id: product.materialId, code: product.materialCode, name: product.materialName }))
+  materialOptions.value = value.products.map(product => ({ id: product.materialId, code: product.currentMaterialCode ?? `物料ID ${product.materialId}`, name: product.currentMaterialName ?? '名称待确认' }))
 }
 async function open(id: string) {
   if (!can('query')) return
@@ -260,7 +265,8 @@ onMounted(load)
             <el-select v-if="editable" v-model="materialIds" multiple filterable remote :remote-method="searchMaterials" placeholder="搜索物料 / 产品编码或名称" style="width: 100%" :disabled="busy">
               <el-option v-for="option in materialOptions" :key="option.id" :value="option.id" :label="`${option.code} · ${option.name}`" />
             </el-select>
-            <span v-else>{{ detail.products.map(item => `${item.materialCode} · ${item.materialName}`).join('，') }}</span>
+            <span v-else>{{ detail.products.map(productLabel).join('，') || '尚未关联产品' }}</span>
+            <span class="secondary">显示当前物料的编码和名称。</span>
           </el-form-item>
         </el-form>
         <el-alert v-if="pendingContent || pendingMetadata" title="有未保存修改，请保存后再发布或复制。" type="warning" :closable="false" />

@@ -9,7 +9,11 @@ export interface RoutingNode {
   operationName?: string | null; operationDescription?: string | null; isKey: boolean; description: string | null
 }
 export interface RoutingEdge { id?: string; fromNodeCode: string; toNodeCode: string }
-export interface RoutingProduct { id: string; materialId: string; materialCode: string; materialName: string }
+export interface RoutingProduct {
+  id: string; materialId: string
+  materialCode: string | null; materialName: string | null
+  currentMaterialCode: string | null; currentMaterialName: string | null
+}
 export interface RoutingDetail { routing: RoutingVo; products: RoutingProduct[]; nodes: RoutingNode[]; edges: RoutingEdge[] }
 export interface ReferenceOption { id: string; code: string; name: string }
 export interface RoutingPage { items: RoutingVo[]; total: number; offset: number; limit: number }
