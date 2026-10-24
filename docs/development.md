@@ -64,3 +64,13 @@ npm exec eslint -- src/views/Home.vue --fix
 修改前读取本仓库 [AGENTS.md](../AGENTS.md) 及其引用规范。前端复用公共请求、权限、工厂上下文和主子单据组件；业务规则及最终授权由后端负责。提交只包含本次任务的差异，检查结果区分静态、Mock、构建与真实业务验收。
 
 页面开发遵守[统一设计规范](UI_DESIGN_SYSTEM.md)，复用主题、布局和公共组件。
+
+## 质量详情读取契约
+
+质量详情复用公共 `request`、权限及工厂上下文；基本信息、当前汇总、处理记录和申报版本各自维护加载、失败与重试状态。局部失败保留其他成功区域，不以空列表或数量0表示失败。无法可靠解释的派生数量允许为null，界面显示待确认并禁用依赖该数量的新处理。
+
+- `GET /api/quality/defects/{id}/treatment` 返回当前汇总，不携带处理历史；核实和入仓成功响应同样返回汇总。
+- `GET /api/quality/defects/{id}/treatment/events` 接受 `offset`（默认0）和 `limit`（默认20、最大100），返回 `items/total/offset/limit`，按记录时间及ID倒序稳定分页。
+- `POST /api/quality/defects/{id}/treatment/requests/check` 只读核对原请求。请求为 `{kind: 'assess', assessment: 原核实命令}` 或 `{kind: 'dispose', disposition: 原入仓命令}`；后端校验原UUID、申报、操作者、动作及完整内容。此入口要求处理权限，不授予新处理能力。
+
+原未决请求独立于汇总恢复；核对未找到或失败时继续保留原身份和内容，不扫描事件第一页判断请求结果。切厂、身份变化、撤权、离页及各区域后发请求必须使迟到响应失效；成功业务响应与后续刷新失败分别展示。真实API、MySQL和浏览器验证需分别取证，单元测试不替代运行验收。
