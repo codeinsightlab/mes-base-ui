@@ -21,10 +21,10 @@ function setup() {
   return { auth, wrapper: mount(Routing, { attachTo: document.body, global: { plugins: [pinia, ElementPlus] }}) }
 }
 describe('routing detail interactions', () => {
-  it('shows current linked product identity when published snapshots are absent and never interpolates null', async() => {
+  it('shows current linked product identity and keeps missing references readable', async() => {
     api.detail.mockResolvedValue({ ...detail(), routing: { ...row, status: 'PUBLISHED' }, products: [
-      { id: '1', materialId: '19', materialCode: null, materialName: null, currentMaterialCode: 'P19', currentMaterialName: '当前关联产品' },
-      { id: '2', materialId: '999', materialCode: 'OLD', materialName: '旧快照名称', currentMaterialCode: null, currentMaterialName: null }
+      { id: '1', materialId: '19', currentMaterialCode: 'P19', currentMaterialName: '当前关联产品' },
+      { id: '2', materialId: '999', currentMaterialCode: null, currentMaterialName: null }
     ] })
     const { wrapper } = setup(); await flushPromises()
     await wrapper.findAll('button').find(b => b.text() === '详情 / 工序')!.trigger('click'); await flushPromises()
@@ -32,7 +32,6 @@ describe('routing detail interactions', () => {
     expect(text).toContain('P19 · 当前关联产品')
     expect(text).toContain('品号待确认 · 名称待确认（物料ID 999）')
     expect(text).not.toContain('null')
-    expect(text).not.toContain('旧快照名称')
     wrapper.unmount()
   })
   it('formats mixed timestamp precision and opens topology on demand without closing its parent', async() => {

@@ -11,7 +11,6 @@ export interface RoutingNode {
 export interface RoutingEdge { id?: string; fromNodeCode: string; toNodeCode: string }
 export interface RoutingProduct {
   id: string; materialId: string
-  materialCode: string | null; materialName: string | null
   currentMaterialCode: string | null; currentMaterialName: string | null
 }
 export interface RoutingDetail { routing: RoutingVo; products: RoutingProduct[]; nodes: RoutingNode[]; edges: RoutingEdge[] }
