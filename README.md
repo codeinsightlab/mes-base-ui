@@ -1,90 +1,112 @@
-# MES Base UI
+# Base MES UI
 
-当前前端由 Source 系统页面的 Vue3/Element Plus PORT 与既有 Base 自写框架组成。用户、组织岗位、角色菜单等页面迁入了旧模板和操作逻辑；App/Shell、侧栏、路由、Pinia
-会话、登录外观及请求适配仍有 Base 重写实现，尚未完整迁入 Source Layout/Navbar/TagsView/Settings。不能将页面迁入等同于整个前端按原架构迁移完成。当前
-Phase1 在真实环境验收，未迁正式 MES Domain。
+Base MES 的 Web 管理与现场操作前端，面向中小型离散制造企业。
 
-本轮 `http://127.0.0.1:15174` 代理本轮后端18081和远程测试 MySQL 的独立 Schema；admin 已建立，凭证不入文档。原15173/18080服务保留。
+围绕工单、生产批次和工序，把材料领用、报工、不良申报、入库与追溯放到同一个工作界面，让管理人员看清进度，让现场人员方便地记录生产事实。
 
-使用 .nvmrc 已安装 Node22，不改全局默认 Node：
+配套后端：[mes-base](https://github.com/codeinsightlab/mes-base)。本项目需要后端、数据库和工厂配置共同运行。
 
-```sh
-nvm use 22
-npm run test
-npm run build
-MES_API_TARGET=http://127.0.0.1:18081 npm run dev -- --host 127.0.0.1 --port 15174 --strictPort
+## 主要功能
+
+| 场景 | 当前界面能力 |
+| --- | --- |
+| 业务工作台 | 工单与执行状态、近期报工和不良信息、业务入口 |
+| 基础资料 | 物料、分类、单位、版本化 BOM、工序、工艺路线、工作站和设备台账 |
+| 生产管理 | 工单、Execution、实际路径、BOM 单材料投产、同批追加、工序报工及记录查询 |
+| 质量处理 | 独立不良申报、核实、不良品/报废品入仓和来源查询 |
+| 仓储管理 | 仓库、库位、库存及流水、正式单据维护与审核、生产入库 |
+| 平台管理 | 用户、角色、菜单、工厂、数据源、系统配置、日志与监控 |
+
+## 界面与交互特点
+
+- **管理与现场操作共用业务模型**：管理页面提供查询和单据维护，现场入口围绕扫码定位与业务提交组织操作。
+- **工厂上下文明确**：切换工厂后清理旧数据与相关浮层，权限变化和迟到响应按上下文处理。
+- **统一主子单据**：主单信息在上，明细在下；复用单据组件和业务选择器。
+- **事实与派生结果分区呈现**：局部数量或关联查询失败时，保留已成功读取且有权查看的事实，并提供错误提示与重试。
+- **统一工作区体验**：共享表格、状态、字段和弹出层组件，支持缓存页面的离开审查与未保存编辑提示。
+
+页面菜单与按钮用于引导操作，最终权限、数量、来源和库存规则由后端校验。
+
+## 当前阶段
+
+项目处于开发与交付准备阶段。配套后端的 LOCAL 单材料生产主链已有真实测试环境验收，涵盖 BOM 领料、同批追加、报工、不良入仓、生产分批入库及审核后收尾。
+
+当前重点是统一领料与生产入库的便捷入口、普通单据的草稿/审核交互，以及现场稳定性。工作站现场采集、标签打印、退料调拨与完整管理统计仍需完善。
+
+多阶 BOM 可以维护，生产投产目前只支持一条直接材料组件。页面存在某种单据类型，不等于其来源和审核已经接通；ERP 正式库存业务、完整委外及多材料生产尚未交付。系统监控和业务工作台也不等于设备采集或完整生产分析平台。
+
+## 技术栈
+
+Vue 3 · TypeScript · Vite · Element Plus · Pinia · Vue Router · Vitest · ESLint
+
+```text
+src/
+  api/          后端接口适配
+  components/   公共组件、业务选择器与主子单据组件
+  composables/  页面状态及共享交互逻辑
+  lib/          请求、权限和基础能力
+  stores/       会话与应用状态
+  views/        平台管理、生产、质量、仓储等页面
+tests/          组件与交互测试
+deploy/         Nginx 部署配置模板
 ```
 
-启动前核对端口归属；依赖已安装时无需反复 npm ci。Vite 路由修改/依赖优化可能整页重载，Token 仅在内存，重载后重新登录。
+## 快速开始
 
-## 开发 / 生产 API 配置
-
-后端地址的唯一配置键是 `MES_API_TARGET`，固定放在对应环境文件中；启动 / 构建时自动选择环境，不用每次手改地址。浏览器在所有环境始终请求同源 `/api`，不再使用 `/dev-api` / `/prod-api`。[Vite 环境文件说明](https://vite.dev/guide/env-and-mode.html)
-
-| 场景 | 配置文件 | 默认后端地址 | 命令 |
-| --- | --- | --- | --- |
-| 开发 | `.env.development` | `http://127.0.0.1:8081` | `npm run dev` / `npm run build:dev` |
-| 生产 | `.env.production` | `http://127.0.0.1:8080` | `npm run build` / `npm run build:prod` |
-| 单元测试 | `.env.test` | TEST ONLY / Mock，不调用该地址 | `npm run test` |
-
-```sh
-# 开发：读取 .env.development，无需每次在命令前写后端地址
-npm run dev
-
-# 生产：读取 .env.production，输出 dist/ 和 target/deploy/nginx.conf
-npm run build:prod
-```
-
-例如 `.env.development` 中填写 `MES_API_TARGET=http://127.0.0.1:8081`，`.env.production` 中填写生产后端 origin；地址不包含 `/api`、用户名密码、查询参数或 fragment。开发目标仍只允许显式 `127.0.0.1` HTTP 后端；生产可填写后端主机的 HTTP/HTTPS origin。同机部署时 `127.0.0.1` 指 Nginx 所在机器；分机 / 容器部署时填 Nginx 能访问的后端地址。
-
-本机临时覆盖可放入 `.env.development.local` 或 `.env.production.local`（Git 忽略），启动进程已有的环境变量优先。旧 `MES_DEV_API_TARGET` 已由统一的 `MES_API_TARGET` 替代。环境文件修改后重启开发服务或重新构建；日常不需要在启动命令里填写地址。
-
-开发时 Vite 将 `/api`、`/open-api`、`/health` 转发到开发地址；构建时读取相应环境地址，根据 [`deploy/nginx.conf.template`](deploy/nginx.conf.template) 自动生成 `target/deploy/nginx.conf`。后端地址仅进入服务器转发配置，不写入浏览器 JS。普通请求、私有文件、消息 SSE、Swagger 以及外部 Open API 的路径、认证和 Factory 行为保持原样。
-
-发布时部署 `dist/` 静态内容，并将本次生成的 `target/deploy/nginx.conf` 安装到服务器 Nginx 配置目录，检查配置后重载。该文件是供 Nginx 的 `http` 块加载的站点配置；网站域名、静态目录和 HTTPS 在模板中按部署环境配置。API 地址只改环境文件，不手改生成的配置。两份产物需要配套发布，否则服务器仍可能转发到上一次的后端地址。改变后端地址后浏览器 JS 可以复用，但需要更新服务器转发配置。
-
-构建只生成产物，不自动上传、重载 Nginx 或启动服务；本次未部署线上。Nginx 的真实连通性与部署行为需在目标服务器验收。
-
-## ESLint 检查与自动修复
-
-使用项目本地 ESLint flat config，配合 Vue3、TypeScript 和 ESLint Stylistic 插件。沿用 ktg-mes-ui 的主要格式风格：两空格缩进、单引号、无分号、无尾逗号、函数括号前不加空格、LF 换行；不强制按 100 列重排。Vue 属性单行最多 10 个，多行每行 1 个。EditorConfig 统一编辑器缩进和换行。
+需要 Node.js 22.18 或更高版本，并准备可访问的 Base MES 后端。
 
 ```sh
 nvm use
-npm run lint         # 检查格式及基础代码问题，不修改文件
-npm run lint:fix     # 自动修复所有可修复问题，请先核对工作区改动
-npm run lint -- --max-warnings 0 # 严格检查，错误或警告都会导致失败
-npm exec eslint -- src/views/Home.vue --fix # 仅修复指定文件
+npm ci
+npm run dev
 ```
 
-VS Code 安装推荐的 ESLint 扩展后，手动保存 Vue、TypeScript、JavaScript 文件会执行 ESLint 自动修复；格式化文档也使用 ESLint。Volar 保留 Vue 语言服务，不再作为格式化入口。IDEA/WebStorm 在 ESLint 设置中使用本项目的 `node_modules/eslint` 和 `eslint.config.mjs`，启用保存时执行 `eslint --fix`；需使用支持当前 ESLint flat config 的 IDE 版本。本次未验证编辑器实际操作。
+`nvm use` 使用仓库的 `.nvmrc`，请确保对应 Node 版本满足 `package.json` 的要求。依赖安装完成后，日常开发无需重复 `npm ci`。
 
-仅使用 ESLint 进行代码检查和自动修复，不使用 Prettier 或独立格式化流程。Vue、TypeScript、Stylistic 是 ESLint 插件，统一在 `eslint.config.mjs` 配置。ESLint 检查 JS/TS/Vue 和脚本配置，忽略依赖、构建产物和 IDEA 本地文件；不沿用旧项目会屏蔽全部 JS/Vue 的忽略模式。CSS、JSON、Markdown 和 SVG 不在本次 ESLint 范围内。启用 JS/TS/Vue 推荐基础检查；为兼容现有迁入代码，保留显式 `any`、既有 `v-html` 和单词组件名。`lint:fix` 只修复规则提供自动修复的问题，剩余错误仍需手工处理，命令会返回非零状态。
+开发环境默认通过 `.env.development` 的 `MES_API_TARGET` 连接 `http://127.0.0.1:8081`。后端端口不同时，在被 Git 忽略的 `.env.development.local` 中覆盖：
 
-2026-10-06 全项目清理：补齐组件 props/emits，Cron 使用 Vue3 props 且 computed 不修改状态；列显隐通过 `update:columns` 更新父页面，个人资料使用本地草稿并在保存成功后刷新父页面。清理无用导入、调试语句及编码规则页没有入口和接口实现的缓存刷新残留方法。严格 ESLint 检查为 0 错误、0 警告，45 项测试及生产构建通过；`tests/eslintRegression.test.ts` 使用 Mock 验证上述组件行为，不代表真实后端或浏览器验收。构建仍有原有深度 CSS 选择器弃用及大分块提示。
+```dotenv
+MES_API_TARGET=http://127.0.0.1:18081
+```
 
-现有功能页面包括用户/组织岗位/角色菜单/字典参数/公告消息/自动编码、日志在线用户/Quartz/Server/Cache/Druid、系统接口及个人资料/文件/消息。具体来源及迁移缺口见相邻
-Base 的迁移报告“前端迁移来源复核”章节；功能列表不代表每项前端实现均直接来自 Source。Source data/rows/total 经
-src/utils/request.ts 按真实成功契约读取；HTTP 错误保留 requestId，无多结构猜测。
+浏览器请求同源 `/api`，由 Vite 代理到后端；开发模式要求显式的 `127.0.0.1` HTTP 地址和端口。地址不含 `/api` 路径或凭证。修改配置后重新启动开发服务。
 
-动态菜单仅注册已编译 views catalog；PLATFORM/FACTORY 权限独立。切厂清旧权限、数据、弹窗和过期响应。按钮和菜单不承担最终授权。公告图片、头像、个人文件走认证私有资源
-policy，文件下载使用 FileSaver；API 字节验证与浏览器下载产物分别记录。
+登录账号、角色、工厂及业务数据源由后端初始化和管理，本项目不提供独立演示账号。
 
-/tool/swagger 从授权接口读取 SDK 生成的真实 OpenAPI，关闭外部 validator、持久化认证及跨源请求，鉴权来自当前内存会话。注册由
-Source 参数开关控制且默认关闭；密码规则来自后端 profile。浏览器输入/修改新凭证需用户接手。
+## 检查与构建
 
-迁移阶段不调用 Codegen；后续新增开发才使用相邻 Base CRUD
-Skill。详见 [交接入口](../mes-base/docs/development/next-stage-plan.md)、[功能矩阵](../mes-base/docs/development/MES_MIGRATION_MATRIX.md)、[实际验收](../mes-base/docs/reviews/2026-10-06-phase1-verification.json)
-。本轮未提交、推送或部署。
+```sh
+npm run lint
+npm run test
+npm run build
+```
 
-## OpenAPI 基础设施（2026-10-10）
+生产构建读取 `.env.production`，本机覆盖使用 `.env.production.local`。构建输出：
 
-OpenAPI 应用管理页面与 API 已恢复，提供客户端创建、启停、一次性 Secret 展示/重置和接口分组授权。后台用户权限仍由平台管理接口校验，外部 Token 不用于后台登录。需启用后端 OpenAPI 配置并应用 V22 恢复菜单，再由管理员分配菜单权限；不自动恢复 V16 已删除的角色授权。
+- `dist/`：浏览器静态资源。
+- `target/deploy/nginx.conf`：根据 API 目标生成的 Nginx 站点配置。
 
-## 2026-10-06 业务后置
+两份产物配套部署；网站域名、静态目录及 HTTPS 按目标环境配置。构建不会自动上传文件或重载 Nginx。更多环境设置、代理和格式规范见[开发与部署说明](docs/development.md)。
 
-生产监控、人员分析的页面和 API 已移出当前源码与构建。备份位于相邻后端仓库 `mes-base/migration-backups/2026-10-06-deferred-production-analytics`，后续接入须重新审查。后端 V15 清理对应菜单/角色菜单关联；已有数据库需按迁移流程执行 V15，本次未连接或修改数据库。系统监控与基础工作区继续保留。
+## 后续方向
 
-### 2026-10-10 OpenAPI 退役验收
+1. 完善统一业务出入库和现场操作体验，补齐请求恢复及异常处理。
+2. 补齐退料、调拨、工作站、标签打印与管理统计。
+3. 完成首厂现场验收，再逐步扩展 ERP、委外及多材料业务界面。
+4. 按实际需求发展设备、辅助排程和只读生产 AI。
 
-只删除旧应用管理页、API 客户端与侧栏图标映射，保留系统 Swagger 和代理配置。`npm run test` 84 项通过，最终 `npm run build` 通过；先前并行 CRUD 测试类型错误不属于本任务修改，后续工作区已解决。没有浏览器或真实数据库迁移验收；旧菜单须由后端 V16 清理。
+路线图以配套后端的正式能力为前提。专门返工、独立放行和定时完结已退出当前方案，不作为后续必建页面。
+
+## 文档与相关项目
+
+- [后端项目与产品介绍](https://github.com/codeinsightlab/mes-base)
+- [前端开发与部署说明](docs/development.md)
+- [产品当前规划](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/next-stage-plan.md)
+- [生产投产与 BOM 规则](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/production-input.md)
+- [LOCAL / ERP 业务边界](https://github.com/codeinsightlab/mes-base/blob/main/docs/architecture/local-erp-business-boundary.md)
+
+历史迁移和界面验收记录保留在 `docs/` 及后端专题文档中，不作为本页的项目介绍。
+
+## 来源与第三方声明
+
+部分系统管理能力演进自 RuoYi、ktg-mes-ui 等来源项目，来源清单及第三方许可见[后端声明目录](https://github.com/codeinsightlab/mes-base/tree/main/docs/legal)。不在本页为整个项目新增许可证或变更原组件的授权。
