@@ -120,7 +120,7 @@ describe('persisted login restoration', () => {
   it('clears a server-revoked session on 401', async() => {
     saveSession({ token: 'TEST', factoryId: '' })
     const auth = store()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 401 })))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('{}', { status: 401 }))))
     await expect(auth.restoreSession()).rejects.toMatchObject({ status: 401 })
     expect(auth.loggedIn).toBe(false)
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()

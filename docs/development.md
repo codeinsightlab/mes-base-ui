@@ -62,3 +62,13 @@ npm exec eslint -- src/views/Home.vue --fix
 ## 协作入口
 
 修改前读取本仓库 [AGENTS.md](../AGENTS.md) 及其引用规范。前端复用公共请求、权限、工厂上下文和主子单据组件；业务规则及最终授权由后端负责。提交只包含本次任务的差异，检查结果区分静态、Mock、构建与真实业务验收。
+
+## 2026-10-24 — B2 普通请求完整响应超时
+
+源码事实：`src/lib/request.ts` 的普通 `request` / `requestBlob` 现在从发送到完整响应体读取完成共用一个截止时间（默认15秒，既有1–120秒范围不变）。成功 JSON/text、下载 blob 与非2xx错误JSON均受保护；体读取超时、取消及连接中断返回 `NETWORK_ERROR` / status=0，并保留已取得的 `X-Request-Id`，不将其误判为确定的4xx业务拒绝，也不自动重试写请求。完整但无效的成功JSON仍为 `INVALID_RESPONSE`；完整非JSON错误页仍按HTTP失败返回。所有等待分支清理计时器与自身abort监听。
+
+每阶段继续检查 token、Factory及revision；旧请求的迟到体与401/专用422不能影响新上下文。`requestStream` 成功取得头部后结束普通超时，保持长期读取与调用者signal取消；其非2xx错误体仍执行完整响应截止时间。此前[会话恢复验收](acceptance/session-restore/README.md)记载的成功SSE响应头超时及调用者取消契约继续成立。
+
+测试事实（Node 22.23.1、Vitest/jsdom、受控fetch/Response/ReadableStream与假时钟）：新增 `tests/requestTimeout.test.ts` 27项，覆盖头快体慢、部分JSON停滞、错误JSON、blob、发送与读体共用时限、及时完成/204/空体、主动取消/完成竞态、网络与格式错误、计时器/监听清理、切厂/撤权/新登录迟到响应和长期SSE。关联request与sessionRestore定向共75项通过；最终全量89个文件583项通过；定向ESLint及生产构建通过（构建仍有既有deep选择器弃用及大chunk提示）。首次全量为582/583：会话恢复的401 Mock将同一Response交给两个并行请求，第二次读体被正确识别为传输失败；仅改为每次创建独立Response，保留所有业务断言，之后全量通过。
+
+未验证：真实浏览器慢网络、真实后端/代理与部署环境；上述测试和构建不代替这些证据。本次不涉及数据库、业务页面、pending恢复、服务启停、推送或部署。回滚应只撤销本次四个文件的提交差异，不覆盖共享工作区其他改动。
