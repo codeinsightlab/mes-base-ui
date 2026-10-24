@@ -48,10 +48,10 @@ it('production receipt convenience preserves the caller UUID and decimal strings
  await stockDocuments.receiveProduction('9007199254740998',command)
  expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/production/executions/9007199254740998/inbound',{method:'POST',body:command,scope:'factory'})
 })
-it('material issue approval is unavailable without all formal production and document permissions',async()=>{
+it('material issue approval requires production authorization for the saved draft',async()=>{
  const {s,auth}=setup();await wrapper!.setProps({row:{id:'1',revision:'0',status:'DRAFT',documentType:'MATERIAL_ISSUE',postRequestId:'11111111-2222-4333-8444-555555555555'}})
  await s.approve();expect(mocks.request).not.toHaveBeenCalled()
- auth.factoryPermissions.push('business:mes:material:issue:update','business:wm:stock:document:create','business:wm:stock:document:update');await flushPromises()
+ auth.factoryPermissions.push('business:mes:material:issue:update');await flushPromises()
  mocks.request.mockResolvedValue({document:{id:'1'},lines:[]});await s.approve();expect(mocks.request).toHaveBeenCalledOnce()
  expect(mocks.confirm.mock.calls.at(-1)![0]).toContain('减少所选库存')
  expect(mocks.request.mock.calls[0]![1].body.requestId).toBe('11111111-2222-4333-8444-555555555555')
@@ -74,4 +74,15 @@ it('shows an unreadable material issue basis as a local error while preserving t
  await wrapper!.setProps({row:header});await flushPromises();expect(wrapper!.text()).toContain('冻结领料依据无法解析');expect(wrapper!.text()).toContain('QA-RAW')
  expect(s.materialIssueBasis).toBeNull();expect(s.canApprove).toBe(false)
  mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
+})
+
+it('approves an existing material issue draft with post and issue authority without draft creation or editing authority',async()=>{
+ const {s,auth}=setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
+ await wrapper!.setProps({row:{id:'17',revision:'4',status:'DRAFT',documentType:'MATERIAL_ISSUE',postRequestId:'11111111-2222-4333-8444-555555555555'}})
+ await s.approve();expect(mocks.request).not.toHaveBeenCalled()
+ auth.factoryPermissions.push('business:wm:stock:document:post');await flushPromises()
+ expect(auth.hasPermission('business:wm:stock:document:create','factory')).toBe(false)
+ expect(auth.hasPermission('business:wm:stock:document:update','factory')).toBe(false)
+ expect(s.canApprove).toBe(true);mocks.request.mockResolvedValue({document:{id:'17'},lines:[]});await s.approve()
+ expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/stock-documents/17/actions/approve',{method:'POST',scope:'factory',body:{requestId:'11111111-2222-4333-8444-555555555555',expectedRevision:'4'}})
 })

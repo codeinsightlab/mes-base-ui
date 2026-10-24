@@ -15,7 +15,7 @@ const emit=defineEmits<{pending:[string|null]}>()
 const auth=useAuth(),basis=ref<CancellationBasis|null>(null),production=ref<ProductionBasis|null>(null),error=ref(''),cancelBusy=ref(false)
 const intent=useClosureCommand<ApprovalIntent>(()=>`stock-document-post:${auth.username}:${auth.factoryId}:${props.row.id}`)
 const materialIssueBasis=computed(()=>props.row.materialIssueBasis as MaterialIssueBasis|null|undefined)
-const canIssueApprove=computed(()=>props.row.documentType!=='MATERIAL_ISSUE'||!props.row.materialIssueBasisError&&auth.hasPermission('business:mes:material:issue:update','factory')&&['create','update'].every(action=>auth.hasPermission(p+':'+action,'factory')))
+const canIssueApprove=computed(()=>props.row.documentType!=='MATERIAL_ISSUE'||!props.row.materialIssueBasisError&&auth.hasPermission('business:mes:material:issue:update','factory'))
 const canApprove=computed(()=>canIssueApprove.value&&!!props.row.id&&auth.hasPermission(p+':post','factory')&&(!!intent.pending.value||props.row.status==='DRAFT'&&auth.runtimeMode==='LOCAL'))
 watch(()=>intent.pending.value, value=>emit('pending',value?String(props.row.id):null),{immediate:true})
 let generation=0
