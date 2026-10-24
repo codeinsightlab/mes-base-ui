@@ -32,6 +32,7 @@ export const useAuth = defineStore('auth', {
       token: saved?.token ?? '',
       avatar: '',
       username: '',
+      userId: '',
       factoryId: '',
       runtimeMode: null as 'LOCAL' | 'ERP' | null,
       savedFactoryId: saved?.factoryId ?? '',
@@ -59,6 +60,7 @@ export const useAuth = defineStore('auth', {
       this.token = ''
       this.avatar = ''
       this.username = ''
+      this.userId = ''
       this.runtimeMode = null
       this.factoryId = ''
       this.savedFactoryId = ''
@@ -124,6 +126,7 @@ export const useAuth = defineStore('auth', {
       }
     },
     async login(username: string, password: string, code?: string, uuid?: string) {
+      this.userId = ''
       const session = await request<{
         accessToken: string
       }>('/api/session', {
@@ -157,7 +160,7 @@ export const useAuth = defineStore('auth', {
     async loadNavigation() {
       const revision = this.revision
       const [info, response] = await Promise.all([request<{
-        user: { userName: string; avatar: string };
+        user: { userId: string; userName: string; avatar: string };
         permissions: string[];
         passwordPolicy: PasswordPolicy;
         workspaces: WorkspaceAccess
@@ -167,6 +170,7 @@ export const useAuth = defineStore('auth', {
       if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
       this.workspaceAccess = info.workspaces
       this.passwordPolicy = info.passwordPolicy
+      this.userId = typeof info.user.userId === 'string' ? info.user.userId : ''
       this.username = info.user.userName
       this.platformPermissions = info.permissions
       this.avatar = info.user.avatar

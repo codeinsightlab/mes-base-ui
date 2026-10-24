@@ -5,7 +5,7 @@ import { configureRequests } from '../src/lib/request'
 import { SESSION_KEY, readSession, saveSession } from '../src/lib/sessionStorage'
 
 const expiresAt = () => new Date(Date.now() + 3600000).toISOString()
-const info = { user: { userName: 'server-user', avatar: '' }, permissions: ['system:user:list'], workspaces: { platform: true, platformBusiness: false, factoryIds: ['A'] }, passwordPolicy: { minLength: 5, maxLength: 128, maxBytes: 72 }}
+const info = { user: { userId: '7', userName: 'server-user', avatar: '' }, permissions: ['system:user:list'], workspaces: { platform: true, platformBusiness: false, factoryIds: ['A'] }, passwordPolicy: { minLength: 5, maxLength: 128, maxBytes: 72 }}
 function store() {
   setActivePinia(createPinia())
   const auth = useAuth()
@@ -30,6 +30,7 @@ describe('persisted login restoration', () => {
     expect(fetcher).toHaveBeenCalledTimes(5)
     expect(auth.sessionReady).toBe(true)
     expect(auth.username).toBe('server-user')
+    expect(auth.userId).toBe('7')
     expect(auth.platformPermissions).toEqual(info.permissions)
     expect(auth.factoryId).toBe('A')
     expect(auth.factoryPermissions).toEqual(['TEST_ONLY:factory:read'])
@@ -123,6 +124,7 @@ describe('persisted login restoration', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('{}', { status: 401 }))))
     await expect(auth.restoreSession()).rejects.toMatchObject({ status: 401 })
     expect(auth.loggedIn).toBe(false)
+    expect(auth.userId).toBe('')
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
   it('retains the credential during network failure and can retry', async() => {
@@ -195,4 +197,23 @@ describe('persisted login restoration', () => {
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
     expect(auth.platformPermissions).toEqual([])
   })
+})
+
+it('keeps verified userId only in memory and clears it on logout/clear', async() => {
+  const auth = store(); auth.token = 'TEST'; responses(); await auth.loadNavigation()
+  expect(auth.userId).toBe('7'); auth.persistSession()
+  expect(JSON.parse(localStorage.getItem(SESSION_KEY)!)).toEqual({ token: 'TEST', factoryId: '' })
+  auth.clear(); expect(auth.userId).toBe('')
+})
+
+it('clears the previous verified userId before the new login request settles', async() => {
+  const auth = store(); auth.token = 'OLD'; auth.userId = '7'; auth.sessionReady = true; auth.factoryId = 'A'
+  let reject!: (error: Error) => void
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((_resolve, rejecter) => { reject = rejecter })))
+  const login = auth.login('new-user', 'TEST ONLY password')
+  expect(auth.userId).toBe('')
+  await Promise.resolve(); await Promise.resolve()
+  reject(new Error('TEST ONLY interrupted login'))
+  await expect(login).rejects.toMatchObject({ code: 'NETWORK_ERROR' })
+  expect(auth.userId).toBe('')
 })
