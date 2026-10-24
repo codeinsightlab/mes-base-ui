@@ -22,7 +22,7 @@ export interface Header extends Row {
 }
 export interface Line extends Row {id:string;documentId:string;lineNo:number;stockId:string;materialId:string;warehouseId:string;unitId:string;batchNo:string|null;binCode:string|null;quantity:string;remark:string|null;stockActionId:string|null}
 export interface MaterialIssueBasis {requestId:string;code:string;workorderId:string;outputQty:string;routingId:string;routingNodeIds:string[]}
-export interface Detail { materialIssueBasis?:MaterialIssueBasis|null; document:Header; lines:Line[]; qualitySource?:{sourceDeclarationId:string;sourceTreatmentId:string;sourceQualityExecutionId:string}|null }
+export interface Detail { materialIssueBasisError?:string|null; materialIssueBasis?:MaterialIssueBasis|null; document:Header; lines:Line[]; qualitySource?:{sourceDeclarationId:string;sourceTreatmentId:string;sourceQualityExecutionId:string}|null }
 export interface ProductionReceiptCommand { requestId:string; stockId:string; quantity:string; reason:string }
 export interface ApprovalIntent {requestId:string;expectedRevision:string}
 export interface ProductionBasis {executionId:string;productId:string;effective:string;received:string;remaining:string;canReceive:boolean;blockedReason:string|null}
@@ -46,7 +46,7 @@ export const stockDocuments={
 export function stockDocumentApis(changed:()=>Promise<void>){
  let header:Header|null=null
  const parents=new Map<string,string>()
- const store=(d:Detail)=>{header={...d.document,...d.qualitySource,materialIssueBasis:d.materialIssueBasis??null};d.lines.forEach(l=>parents.set(l.id,l.documentId));return d}
+ const store=(d:Detail)=>{header={...d.document,...d.qualitySource,materialIssueBasis:d.materialIssueBasis??null,materialIssueBasisError:d.materialIssueBasisError??null};d.lines.forEach(l=>parents.set(l.id,l.documentId));return d}
  const headerApi:CrudApi={
   list:stockDocuments.list,
   detail:async id=>{store(await stockDocuments.detail(id));return header!},

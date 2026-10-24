@@ -15,7 +15,7 @@ const emit=defineEmits<{pending:[string|null]}>()
 const auth=useAuth(),basis=ref<CancellationBasis|null>(null),production=ref<ProductionBasis|null>(null),error=ref(''),cancelBusy=ref(false)
 const intent=useClosureCommand<ApprovalIntent>(()=>`stock-document-post:${auth.username}:${auth.factoryId}:${props.row.id}`)
 const materialIssueBasis=computed(()=>props.row.materialIssueBasis as MaterialIssueBasis|null|undefined)
-const canIssueApprove=computed(()=>props.row.documentType!=='MATERIAL_ISSUE'||auth.hasPermission('business:mes:material:issue:update','factory')&&['create','update'].every(action=>auth.hasPermission(p+':'+action,'factory')))
+const canIssueApprove=computed(()=>props.row.documentType!=='MATERIAL_ISSUE'||!props.row.materialIssueBasisError&&auth.hasPermission('business:mes:material:issue:update','factory')&&['create','update'].every(action=>auth.hasPermission(p+':'+action,'factory')))
 const canApprove=computed(()=>canIssueApprove.value&&!!props.row.id&&auth.hasPermission(p+':post','factory')&&(!!intent.pending.value||props.row.status==='DRAFT'&&auth.runtimeMode==='LOCAL'))
 watch(()=>intent.pending.value, value=>emit('pending',value?String(props.row.id):null),{immediate:true})
 let generation=0
@@ -53,6 +53,7 @@ onBeforeUnmount(clear)
  <div class="stock-document-actions">
   <p v-if="stockDocumentPurpose(row.documentType)">业务来源：{{stockDocumentPurpose(row.documentType)?.origin}}；关联依据：{{stockDocumentPurpose(row.documentType)?.basis}}<span v-if="!stockDocumentPurpose(row.documentType)?.approvalAvailable">。来源业务尚未接通，禁止审核。</span></p>
  <router-link v-if="row.sourceMaterialIssueId" :to="{path:'/issue/mesMaterialIssue',query:{issueId:String(row.sourceMaterialIssueId)}}">查看正式领料事实 {{row.sourceMaterialIssueId}}</router-link>
+ <el-alert v-if="row.materialIssueBasisError" :title="String(row.materialIssueBasisError)" type="error" :closable="false" />
  <details v-if="materialIssueBasis"><summary>冻结领料依据</summary><p>本次产出投入：<QuantityText :value="materialIssueBasis.outputQty" />（产出基本单位）；工单：{{materialIssueBasis.workorderId}}</p><p>扫码原文：{{materialIssueBasis.code}}</p><p>工艺版本ID：{{materialIssueBasis.routingId}}；实际路径节点：{{materialIssueBasis.routingNodeIds.join(' → ')}}</p><p>原请求UUID：{{materialIssueBasis.requestId}}</p></details>
  <details v-if="row.sourceDeclarationId"><summary>质量来源</summary><p>不良记录：{{row.sourceDeclarationId}}</p><p>处置流水：{{row.sourceTreatmentId}}</p></details>
  <el-tag v-if="row.status" :type="row.status==='POSTED'?'success':row.status==='CANCELLED'?'info':'warning'">{{row.status==='POSTED'?'已审核':row.status==='CANCELLED'?'已作废':'草稿'}}</el-tag>

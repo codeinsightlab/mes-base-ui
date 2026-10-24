@@ -64,3 +64,14 @@ it('keeps the safe material issue basis visible to the draft approver without ex
  expect(wrapper!.text()).toContain('10');expect(wrapper!.text()).toContain('11 → 12');expect(wrapper!.text()).toContain('WO:M#0001')
  expect(s.materialIssueBasis.code).toBe('WO:M#0001 ')
 })
+
+it('shows an unreadable material issue basis as a local error while preserving the raw document and lines',async()=>{
+ const raw={document:{id:'1',documentNo:'QA-RAW',documentType:'MATERIAL_ISSUE',reason:'原始依据',status:'DRAFT',revision:'0',postRequestId:'11111111-2222-4333-8444-555555555555'},lines:[{id:'8',documentId:'1',materialId:'2',batchNo:'0001 ',quantity:'2.500001'}],materialIssueBasis:null,materialIssueBasisError:'冻结领料依据无法解析，请核对原记录；禁止审核'}
+ const {headerApi,itemApi}=stockDocumentApis(async()=>{});mocks.request.mockResolvedValue(raw)
+ const header=await headerApi.detail!('1'),lines=await itemApi.list({documentId:'1',offset:0,limit:20})
+ expect(header.documentNo).toBe('QA-RAW');expect(header.reason).toBe('原始依据');expect(lines.items).toEqual(raw.lines)
+ const{s,auth}=setup();auth.factoryPermissions.push('business:mes:material:issue:update','business:wm:stock:document:create','business:wm:stock:document:update')
+ await wrapper!.setProps({row:header});await flushPromises();expect(wrapper!.text()).toContain('冻结领料依据无法解析');expect(wrapper!.text()).toContain('QA-RAW')
+ expect(s.materialIssueBasis).toBeNull();expect(s.canApprove).toBe(false)
+ mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
+})
