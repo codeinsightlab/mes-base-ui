@@ -123,12 +123,12 @@ npm run build
 
 - [后端项目与产品介绍](https://github.com/codeinsightlab/mes-base)
 - [前端开发与部署说明](docs/development.md)
-- [GitHub / Gitee 双托管](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/dual-hosting.md)
-- [产品当前规划](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/next-stage-plan.md)
-- [生产投产与 BOM 规则](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/production-input.md)
+- [GitHub / Gitee 双托管](https://github.com/codeinsightlab/mes-base/blob/main/CONTRIBUTING.md)
+- [产品当前规划](https://github.com/codeinsightlab/mes-base/blob/main/docs/roadmap.md)
+- [生产投产与 BOM 规则](https://github.com/codeinsightlab/mes-base/blob/main/docs/usage/production.md)
 - [LOCAL / ERP 业务边界](https://github.com/codeinsightlab/mes-base/blob/main/docs/architecture/local-erp-business-boundary.md)
 
-历史迁移和界面验收记录保留在 `docs/` 及后端专题文档中，不作为本页的项目介绍。
+公共文档维护当前用法和契约；个人环境、排障和一次性验收证据保存在被Git忽略的本地目录。
 
 ## 来源与第三方声明
 

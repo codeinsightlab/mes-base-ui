@@ -3,9 +3,14 @@ dist/
 target/
 .env
 *.local
-docs
+/docs/*
+!/docs/development.md
+!/docs/UI_DESIGN_SYSTEM.md
 .vscode
 .idea
 deploy/*
 !deploy/nginx.conf.template
 .DS_Store
+
+# Private QA/environment records; public docs/development.md contains reusable guidance only.
+.local/
