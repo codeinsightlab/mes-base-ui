@@ -51,6 +51,12 @@ Base MES 的 Web 管理与现场操作前端，面向中小型离散制造企业
 
 多阶 BOM 可以维护，生产投产目前只支持一条直接材料组件。页面存在某种单据类型，不等于其来源和审核已经接通；ERP 正式库存业务、完整委外及多材料生产尚未交付。系统监控和业务工作台也不等于设备采集或完整生产分析平台。
 
+## 底座来源与生成能力
+
+系统管理能力迁移自 RuoYi 体系，部分页面和交互经 ktg-mes-ui 来源项目迁入，并适配 Vue 3、TypeScript 和 Element Plus；本项目在此基础上建设生产、质量、仓储及数据空间工作区。
+
+配套后端的代码生成器已经重构为独立模块，以显式配置和真实表结构生成基础后端、Vue 3 CRUD 页面及菜单等产物。前端复用统一表格、主子单据和业务选择器；生成能力不代替复杂业务设计，也不代表现有全部页面都由生成器生成。详见[后端生成器说明](https://github.com/codeinsightlab/mes-base/blob/main/docs/development/codegen.md)。
+
 ## 技术栈
 
 Vue 3 · TypeScript · Vite · Element Plus · Pinia · Vue Router · Vitest · ESLint
