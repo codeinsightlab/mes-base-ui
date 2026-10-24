@@ -2,13 +2,13 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="通知公告" description="公告内容与发布状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="公告标题" prop="noticeTitle">
         <el-input
           v-model="queryParams.noticeTitle"
           placeholder="请输入公告标题"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="操作人员" prop="createBy">
@@ -16,7 +16,7 @@
           v-model="queryParams.createBy"
           placeholder="请输入操作人员"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="类型" prop="noticeType">
@@ -30,10 +30,10 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -174,11 +174,13 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listNotice, getNotice, delNotice, addNotice, updateNotice } from '@/api/system/notice'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'Notice',
   dicts: ['sys_notice_status', 'sys_notice_type'],
   data() {

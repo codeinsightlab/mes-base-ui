@@ -7,13 +7,13 @@
     top="5vh"
     append-to-body
   >
-    <el-form ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
+    <QueryForm @submit="handleQuery" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="用户名称" prop="userName">
         <el-input
           v-model="queryParams.userName"
           placeholder="请输入用户名称"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="用户昵称" prop="nickName">
@@ -21,37 +21,32 @@
           v-model="queryParams.nickName"
           placeholder="请输入用户昵称"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="部门" prop="deptId">
-        <!-- <el-input
-          v-model="queryParams.deptId"
-          placeholder="请输入部门名称"
-          clearable
-          @keyup.enter="handleQuery"
-        /> -->
+
         <el-cascader
           v-model="queryParams.deptId"
           :options="deptOptions"
           :props="{ expandTrigger: 'hover', label: 'label', value: 'id' }"
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item>
-        <el-button
+        <el-button native-type="submit"
           type="primary"
           icon="Search"
           size="small"
-          @click="handleQuery"
+
         >搜索</el-button>
-        <el-button
+        <el-button native-type="button"
           icon="Refresh"
           size="small"
           @click="resetQuery"
         >重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
     <el-row>
       <el-table
         ref="table"
@@ -118,10 +113,12 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { unallocatedUserList, authUserSelectAll } from '@/api/system/role'
 import { treeselect } from '@/api/system/dept'
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   props: {
     // 角色编号
     roleId: {

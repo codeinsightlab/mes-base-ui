@@ -10,13 +10,13 @@
       class="mb8"
       description="应用仍需有效凭证和接口授权。数据范围规则由业务系统配置，可按实际需要启用。"
     />
-    <el-form ref="queryForm" class="filter-panel" :model="queryParams" :inline="true" size="small">
-      <el-form-item label="appKey" prop="appKey"><el-input v-model="queryParams.appKey" clearable @keyup.enter="handleQuery" /></el-form-item>
+    <QueryForm @submit="handleQuery" ref="queryForm" class="filter-panel" :model="queryParams" :inline="true" size="small">
+      <el-form-item label="appKey" prop="appKey"><el-input v-model="queryParams.appKey" clearable  /></el-form-item>
       <el-form-item label="状态" prop="status">
         <el-select v-model="queryParams.status" clearable><el-option label="禁用" :value="0" /><el-option label="启用" :value="1" /></el-select>
       </el-form-item>
-      <el-form-item><el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button><el-button @click="resetQuery">重置</el-button></el-form-item>
-    </el-form>
+      <el-form-item><el-button native-type="submit" type="primary" icon="Search" >搜索</el-button><el-button native-type="button" @click="resetQuery">重置</el-button></el-form-item>
+    </QueryForm>
     <div class="table-toolbar"><el-button v-hasPermi="['system:openApiClient:add']" type="primary" size="small" icon="Plus" @click="createOpen = true">新建应用</el-button><a class="openapi-docs-link" href="/openapi-docs/#start" target="_blank" rel="noopener noreferrer">API 接入文档</a></div>
     <el-table v-loading="loading" :data="clients">
       <el-table-column label="应用名称" prop="clientName" min-width="140" />
@@ -153,10 +153,12 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { listClients, getClient, createClient, changeStatus, resetSecret, getApiCatalog, getClientApis, replaceClientApis, getDataScope } from '@/api/system/openApiClient'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'OpenApiClient',
   beforeRouteLeave(to, from, next) { this.disposeSecrets(); next() },
   data() {

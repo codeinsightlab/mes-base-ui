@@ -1613,10 +1613,6 @@ a,button{
 
 /* Role-aware workspaces and node-local datasource monitor, using the shared theme. */
 .workspace-refresh{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--ui-space-4)}
-.sample-data-label{display:inline-flex;align-items:center;gap:var(--ui-space-1);padding:var(--ui-space-1) var(--ui-space-2);border:1px solid var(--ui-border);border-radius:var(--ui-radius-sm);color:var(--ui-text-secondary);background:var(--ui-surface-soft);font-size:var(--ui-text-xs);font-weight:600;white-space:nowrap}
-.sample-caption{font-size:var(--ui-text-xs);color:var(--ui-text-secondary);font-weight:400;white-space:nowrap}
-.sample-disclosure{display:flex;align-items:center;flex-wrap:wrap;gap:var(--ui-space-3);padding:var(--ui-space-3) 0;margin-bottom:var(--ui-space-4);color:var(--ui-text-secondary);font-size:var(--ui-text-sm)}
-.sample-disclosure>.section-note{margin-left:auto}
 .business-metrics{margin-bottom:var(--ui-space-6)}
 .business-console-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--ui-space-6);align-items:start}
 .business-primary-console,.business-task-console{min-width:0;background:var(--ui-surface);border-top:2px solid var(--ui-border)}
@@ -1625,13 +1621,11 @@ a,button{
 .business-primary-console .el-progress{margin-top:var(--ui-space-2)}
 .business-task-console{padding:var(--ui-space-4)}
 .business-task-console .section-heading{margin-bottom:var(--ui-space-3)}
+.business-task-console h3{font-size:var(--ui-text-sm);margin:var(--ui-space-4) 0 var(--ui-space-2)}
+.business-task-console a{font-size:var(--ui-text-sm)}
 .business-task-list{list-style:none;padding:0;margin:var(--ui-space-3) 0 0}
+.business-task-list li{padding:var(--ui-space-2) 0}
 .business-task-list li+li{border-top:1px solid var(--ui-border-soft)}
-.business-task-list button{display:block;width:100%;text-align:left;border:0;background:transparent;font:inherit;padding:var(--ui-space-3) 0;color:var(--ui-text);cursor:pointer}
-.business-task-list button:hover{background:var(--ui-surface-soft)}
-.business-task-list button:focus-visible{outline:2px solid var(--ui-accent);outline-offset:2px}
-.business-task-list button>div{display:flex;align-items:center;justify-content:space-between;gap:var(--ui-space-2);margin-bottom:var(--ui-space-1)}
-.business-task-list strong{font-size:var(--ui-text-sm)}
 .business-task-list p{margin:var(--ui-space-1) 0 0;font-size:var(--ui-text-xs);color:var(--ui-text-secondary)}
 .druid-monitor-layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:var(--ui-space-6);align-items:start}
 .druid-source-directory{padding:var(--ui-space-4);background:var(--ui-surface);border:1px solid var(--ui-border);min-width:0}

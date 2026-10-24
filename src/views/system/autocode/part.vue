@@ -2,13 +2,13 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="编码规则组成" description="规则组成、顺序与格式" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="组成编码" prop="partCode">
         <el-input
           v-model="queryParams.partCode"
           placeholder="请输入组成编码"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="组成名称" prop="partName">
@@ -16,14 +16,14 @@
           v-model="queryParams.partName"
           placeholder="请输入组成名称"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -223,11 +223,13 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listPart, getPart, delPart, addPart, updatePart } from '@/api/system/autocode/part'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'Part',
   dicts: ['sys_autocode_cyclemethod', 'sys_autocode_parttype'],
   data() {

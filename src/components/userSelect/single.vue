@@ -27,7 +27,7 @@
       </el-col>
       <!--用户数据-->
       <el-col :span="20" :xs="24">
-        <el-form
+        <QueryForm @submit="handleQuery"
           v-show="showSearch"
           ref="queryForm"
           :model="queryParams"
@@ -41,7 +41,7 @@
               placeholder="请输入用户名称"
               clearable
               style="width: 240px"
-              @keyup.enter="handleQuery"
+
             />
           </el-form-item>
           <el-form-item label="手机号码" prop="phonenumber">
@@ -50,14 +50,14 @@
               placeholder="请输入手机号码"
               clearable
               style="width: 240px"
-              @keyup.enter="handleQuery"
+
             />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-            <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+            <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+            <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-form>
+        </QueryForm>
         <el-table v-loading="loading" :data="userList" @current-change="handleCurrent" @row-dblclick="handleRowDbClick">
           <el-table-column width="55" align="center">
             <template #default="scope">
@@ -136,12 +136,14 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { listUser } from '@/api/system/user'
 
 import { treeselect } from '@/api/system/dept'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'UserSingleSelect',
   emits: ['onSelected'],
   dicts: ['sys_normal_disable', 'sys_user_sex'],

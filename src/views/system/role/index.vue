@@ -2,14 +2,14 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="角色管理" description="角色、菜单权限与授权范围" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="角色名称" prop="roleName">
         <el-input
           v-model="queryParams.roleName"
           placeholder="请输入角色名称"
           clearable
           style="width: 240px"
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="权限字符" prop="roleKey">
@@ -18,7 +18,7 @@
           placeholder="请输入权限字符"
           clearable
           style="width: 240px"
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -48,10 +48,10 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -274,6 +274,8 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { useAuth } from '@/stores/auth'
 import { listRole, getRole, delRole, addRole, updateRole, dataScope, changeRoleStatus } from '@/api/system/role'
@@ -281,7 +283,7 @@ import { treeselect as menuTreeselect, roleMenuTreeselect } from '@/api/system/m
 import { treeselect as deptTreeselect, roleDeptTreeselect } from '@/api/system/dept'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'Role',
   dicts: ['sys_normal_disable'],
   data() {

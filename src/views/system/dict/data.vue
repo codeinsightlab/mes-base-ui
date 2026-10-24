@@ -2,7 +2,7 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="字典数据" description="字典选项、排序与展示样式" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="字典名称" prop="dictType">
         <el-select v-model="queryParams.dictType">
           <el-option
@@ -18,7 +18,7 @@
           v-model="queryParams.dictLabel"
           placeholder="请输入字典标签"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -32,10 +32,10 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -194,12 +194,14 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listData, getData, delData, addData, updateData } from '@/api/system/dict/data'
 import { listType, getType } from '@/api/system/dict/type'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'DictData',
   dicts: ['sys_normal_disable'],
   data() {

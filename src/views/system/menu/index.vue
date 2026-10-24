@@ -2,13 +2,13 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="菜单管理" description="目录、页面入口与按钮权限" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true">
       <el-form-item label="菜单名称" prop="menuName">
         <el-input
           v-model="queryParams.menuName"
           placeholder="请输入菜单名称"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -22,10 +22,10 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -272,6 +272,8 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listMenu, getMenu, delMenu, addMenu, updateMenu } from '@/api/system/menu'
 import Treeselect from '@/components/Treeselect/index.vue'
@@ -281,7 +283,7 @@ import IconSelect from '@/components/IconSelect/index.vue'
 export default {
   name: 'SystemMenu',
   dicts: ['sys_show_hide', 'sys_normal_disable'],
-  components: { PageDialog, Treeselect, IconSelect },
+  components: { PageDialog, QueryForm, Treeselect, IconSelect },
   data() {
     return {
       queryError: '',

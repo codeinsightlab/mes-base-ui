@@ -2,13 +2,13 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="岗位管理" description="岗位配置与状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="岗位编码" prop="postCode">
         <el-input
           v-model="queryParams.postCode"
           placeholder="请输入岗位编码"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="岗位名称" prop="postName">
@@ -16,7 +16,7 @@
           v-model="queryParams.postName"
           placeholder="请输入岗位名称"
           clearable
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -30,10 +30,10 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -161,11 +161,13 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listPost, getPost, delPost, addPost, updatePost } from '@/api/system/post'
 
 export default {
-  components: { PageDialog },
+  components: { PageDialog, QueryForm },
   name: 'Post',
   dicts: ['sys_normal_disable'],
   data() {

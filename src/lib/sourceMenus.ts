@@ -17,7 +17,8 @@ export function menuQuery(value?:string):LocationQueryRaw {
     const result:LocationQueryRaw = {}
     for (const [key, item] of Object.entries(parsed)) {
       if (!/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(key) || ['constructor', 'prototype', '__proto__'].includes(key)) continue
-      if (item === null || typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean')result[key] = item === null ? null : String(item)
+      if (item === null) result[key] = null
+      else if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') result[key] = String(item)
     } return result
   } catch { return {} }
 }

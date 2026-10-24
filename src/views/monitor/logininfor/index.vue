@@ -2,14 +2,14 @@
   <div class="app-container">
     <PageHeader section="MES BASE / MONITOR" title="登录日志" description="登录记录与账号访问情况" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <el-form v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="登录地址" prop="ipaddr">
         <el-input
           v-model="queryParams.ipaddr"
           placeholder="请输入登录地址"
           clearable
           style="width: 240px;"
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="用户名称" prop="userName">
@@ -18,7 +18,7 @@
           placeholder="请输入用户名称"
           clearable
           style="width: 240px;"
-          @keyup.enter="handleQuery"
+
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
@@ -48,10 +48,10 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-        <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+        <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+        <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
       </el-form-item>
-    </el-form>
+    </QueryForm>
 
     <el-row :gutter="10" class="table-toolbar mb8">
       <el-col :span="3">
@@ -121,10 +121,13 @@
 </template>
 
 <script>
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { list, delLogininfor, cleanLogininfor } from '@/api/monitor/logininfor'
 
 export default {
+  components: { QueryForm },
   name: 'Logininfor',
   dicts: ['sys_common_status'],
   data() {

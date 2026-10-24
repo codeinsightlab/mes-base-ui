@@ -28,7 +28,7 @@ function setup(actions = ['list', 'query']) {
     ...actions.map(a => 'business:mes:material:issue:' + a),
     ...actions.map(a => 'business:mes:material:issue:item:' + a)
   ]
-  const router = createRouter({history:createMemoryHistory(),routes:[{path:'/',component:{template:'<div />'}}]})
+  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' }}] })
   const wrapper = mount(Header, { global: { plugins: [pinia, ElementPlus, router], stubs: { MaterialSelect: true, WarehouseSelect: true }}})
   return { wrapper, auth, router }
 }
@@ -39,24 +39,24 @@ async function open(wrapper: ReturnType<typeof setup>['wrapper']) {
 }
 describe('master detail material issue document', () => {
   it('returns to the issue list when re-entering the cached inventory verification entry', async() => {
-    const pinia=createPinia(),auth=useAuth(pinia)
-    auth.factoryId='A';auth.factoryPermissions=['business:mes:material:issue:list','business:mes:material:issue:query','business:mes:material:issue:item:list']
-    const router=createRouter({history:createMemoryHistory(),routes:[{path:'/issue/mesMaterialIssue',component:{template:'<div />'}}]})
-    await router.push({path:'/issue/mesMaterialIssue',query:{view:'list'}})
-    const shown=ref(true)
-    const wrapper=mount(defineComponent({setup:()=>()=>h(KeepAlive,null,{default:()=>shown.value?h(Header):null})}),{global:{plugins:[pinia,ElementPlus,router],stubs:{MaterialSelect:true,WarehouseSelect:true}}})
+    const pinia = createPinia(), auth = useAuth(pinia)
+    auth.factoryId = 'A';auth.factoryPermissions = ['business:mes:material:issue:list', 'business:mes:material:issue:query', 'business:mes:material:issue:item:list']
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/issue/mesMaterialIssue', component: { template: '<div />' }}] })
+    await router.push({ path: '/issue/mesMaterialIssue', query: { view: 'list' }})
+    const shown = ref(true)
+    const wrapper = mount(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(Header) : null }) }), { global: { plugins: [pinia, ElementPlus, router], stubs: { MaterialSelect: true, WarehouseSelect: true }}})
     await open(wrapper)
     expect(wrapper.text()).toContain('主单信息')
-    shown.value=false;await flushPromises();shown.value=true;await flushPromises()
+    shown.value = false;await flushPromises();shown.value = true;await flushPromises()
     expect(wrapper.text()).not.toContain('主单信息')
-    expect(wrapper.findAll('button').some(b=>b.text()==='打开单据')).toBe(true)
+    expect(wrapper.findAll('button').some(b => b.text() === '打开单据')).toBe(true)
     expect(header.update).not.toHaveBeenCalled();expect(header.remove).not.toHaveBeenCalled()
     wrapper.unmount()
   })
-  it('opens the exact linked issue and keeps factory changes from reopening the old ID',async()=>{
-    const {wrapper,router,auth}=setup(); await router.push({path:'/',query:{issueId:parent}});await flushPromises();
-    expect(header.detail).toHaveBeenCalledWith(parent);expect(wrapper.text()).toContain('主单信息');
-    const count=header.detail.mock.calls.length;auth.factoryId='B';auth.revision++;await flushPromises();
+  it('opens the exact linked issue and keeps factory changes from reopening the old ID', async() => {
+    const { wrapper, router, auth } = setup(); await router.push({ path: '/', query: { issueId: parent }});await flushPromises()
+    expect(header.detail).toHaveBeenCalledWith(parent);expect(wrapper.text()).toContain('主单信息')
+    const count = header.detail.mock.calls.length;auth.factoryId = 'B';auth.revision++;await flushPromises()
     expect(header.detail).toHaveBeenCalledTimes(count);expect(wrapper.text()).not.toContain('主单信息');wrapper.unmount()
   })
   it('opens a single document and reads only its lines, preserving ID and decimal strings', async() => {

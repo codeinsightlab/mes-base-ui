@@ -29,7 +29,7 @@
       </el-col>
       <!--用户数据-->
       <el-col :span="19" :xs="24">
-        <el-form
+        <QueryForm @submit="handleQuery"
           v-show="showSearch"
           ref="queryForm"
           class="filter-panel"
@@ -44,7 +44,7 @@
               placeholder="请输入用户名称"
               clearable
               style="width: 240px"
-              @keyup.enter="handleQuery"
+
             />
           </el-form-item>
           <el-form-item label="用户昵称" prop="nickName">
@@ -53,7 +53,7 @@
               placeholder="请输入用户昵称"
               clearable
               style="width: 240px"
-              @keyup.enter="handleQuery"
+
             />
           </el-form-item>
           <el-form-item label="手机号码" prop="phonenumber">
@@ -62,7 +62,7 @@
               placeholder="请输入手机号码"
               clearable
               style="width: 240px"
-              @keyup.enter="handleQuery"
+
             />
           </el-form-item>
           <el-form-item label="状态" prop="status">
@@ -80,10 +80,10 @@
             />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" icon="Search" size="small" @click="handleQuery">搜索</el-button>
-            <el-button icon="Refresh" size="small" @click="resetQuery">重置</el-button>
+            <el-button native-type="submit" type="primary" icon="Search" size="small" >搜索</el-button>
+            <el-button native-type="button" icon="Refresh" size="small" @click="resetQuery">重置</el-button>
           </el-form-item>
-        </el-form>
+        </QueryForm>
 
         <el-row :gutter="10" class="table-toolbar mb8">
           <el-col :span="3">
@@ -397,6 +397,8 @@
 <script>
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QueryForm from '@/components/QueryForm.vue'
+
 import { sourceList } from '@/utils/sourceList'
 import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus } from '@/api/system/user'
 import request from '@/utils/request'
@@ -410,7 +412,7 @@ import DictSelect from '@/components/DictSelect.vue'
 export default {
   name: 'User',
   dicts: ['sys_normal_disable', 'sys_user_sex'],
-  components: { PageDialog, Treeselect, DictSelect },
+  components: { PageDialog, QueryForm, Treeselect, DictSelect },
   data() {
     const policy = useAuth().passwordPolicy
     return {
