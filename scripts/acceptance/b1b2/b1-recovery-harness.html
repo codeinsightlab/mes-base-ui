@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>B1 受控故障验收</title>
+<style>body{font:14px sans-serif}iframe{width:100%;height:850px;border:2px solid #999}button{margin:3px}pre{max-height:280px;overflow:auto;background:#eee}</style>
+<h1>B1 受控故障验收（测试脚本，不修改生产源码）</h1>
+<p>内嵌原正式页面；正式请求仍由原 Fetch 发送到既有 API。仅当前测试标签页注入；从不手填恢复记录、读取或输出 Token。</p>
+<div id="controls"></div><pre id="evidence"></pre><iframe title="正式现场报工页面" id="app" src="/production/productionReporting"></iframe>
+<script>
+const frame=document.querySelector('#app'),out=document.querySelector('#evidence');let mode='normal',storageFault='',contextFail=false,entries=[],generation=0;
+function show(){out.textContent=JSON.stringify({mode,storageFault,contextFail,generation,postCount:entries.filter(e=>e.kind==='report-post').length,entries},null,2)}
+function button(label,fn){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{fn();show()};document.querySelector('#controls').append(b)}
+for(const m of ['normal','lose-body','403','404','409'])button('响应模式 '+m,()=>mode=m);
+for(const m of ['','setItem','getItem','removeItem'])button('存储故障 '+(m||'关闭'),()=>storageFault=m);
+button('数量上下文故障开关',()=>contextFail=!contextFail);
+button('刷新原页面',()=>frame.contentWindow.location.reload());
+button('离开报工',()=>frame.src='/');button('返回报工',()=>frame.src='/production/productionReporting');
+button('触发表单原生提交',()=>frame.contentDocument.querySelector('form.report-form')?.requestSubmit());
+button('只读恢复证据',()=>{try{const value=frame.contentWindow.sessionStorage.getItem('mes.reporting.pending.v1:'+encodeURIComponent(JSON.stringify(['100','TEST_DEV_PERF_20261019'])));entries.push({kind:'recovery-read-only',value:value?JSON.parse(value):null})}catch(e){entries.push({kind:'recovery-read-error',message:e.message})}});
+frame.addEventListener('load',()=>{
+ generation++;const w=frame.contentWindow,fetch=w.fetch.bind(w);const p=w.Storage.prototype;const original={};
+ for(const method of ['getItem','setItem','removeItem']){
+  original[method]=p[method];p[method]=function(key,...args){if(this===w.sessionStorage&&String(key).startsWith('mes.reporting.pending.v1:')&&storageFault===method)throw new w.DOMException('B1_QA_INJECTED_'+method,'QuotaExceededError');return original[method].call(this,key,...args)};
+ }
+ w.fetch=async function(input,options){
+  const path=String(input);
+  if(contextFail&&path.startsWith('/api/production/reporting/context'))return new w.Response(JSON.stringify({errorCode:'B1_QA_CONTEXT_UNAVAILABLE'}),{status:503,headers:{'Content-Type':'application/json'}});
+  if(path==='/api/production/reporting'&&options?.method==='POST'){
+   const e={kind:'report-post',generation,mode,command:JSON.parse(options.body),at:new Date().toISOString()};entries.push(e);show();
+   if(['403','404','409'].includes(mode)){e.injected=true;e.status=Number(mode);show();return new w.Response(JSON.stringify({errorCode:'B1_QA_INJECTED',requestId:'b1-qa-fault'}),{status:Number(mode),headers:{'Content-Type':'application/json'}})}
+   const response=await fetch(input,options);e.actualStatus=response.status;e.actualResult=await response.clone().json();show();
+   if(mode==='lose-body')return new w.Response(new w.ReadableStream({start(c){c.enqueue(new w.TextEncoder().encode('{'));options.signal.addEventListener('abort',()=>{try{c.error(new w.DOMException('B1_QA_LOST_RESPONSE','AbortError'))}catch{}},{once:true})}}),{status:response.status,headers:response.headers});
+   return response;
+  }
+  return fetch(input,options);
+ };
+ show();
+});show();
+</script>
