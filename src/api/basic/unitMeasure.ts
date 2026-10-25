@@ -8,6 +8,8 @@ export interface UnitMeasureVo {
   name: string;
   symbol: string | null;
   status: string;
+  mustBeWholeNumber: number;
+  quantityPrecision: number;
 }
 
 export interface Page {
@@ -17,8 +19,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status'>
-export type UpdateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status'>
+export type CreateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status' | 'mustBeWholeNumber' | 'quantityPrecision'>
+export type UpdateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status' | 'mustBeWholeNumber' | 'quantityPrecision'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/basic/unit-measure', { method: 'DELETE', body: ids, scope: 'factory' })
