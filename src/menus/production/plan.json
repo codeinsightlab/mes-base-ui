@@ -1,0 +1,11 @@
+{
+  "id": "production:plan",
+  "name": "生产计划",
+  "path": "/production/plan",
+  "component": "production/plan/index",
+  "permission": "business:mes:production:plan:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "Calendar",
+  "children": []
+}
