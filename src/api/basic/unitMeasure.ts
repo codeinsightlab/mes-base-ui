@@ -1,4 +1,5 @@
 import { request } from '@/lib/request'
+import { invalidateQuantityRules } from '@/lib/production/quantityRuleInvalidation'
 
 export interface UnitMeasureVo {
   [key: string]: unknown;
@@ -38,7 +39,7 @@ export const api = {
   update: (id: string, body: unknown) =>
     request<UnitMeasureVo>('/api/basic/unit-measure/' + encodeURIComponent(id), {
       method: 'PUT', body, scope: 'factory'
-    }),
+    }).then(row => { invalidateQuantityRules(); return row }),
 
   remove: (id: string) => removeIds([id]),
 

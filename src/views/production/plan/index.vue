@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import { productionPlanApi } from '@/api/production/plan'
 import { displayQuantity } from '@/lib/production/quantity'
 import type { Field, Row } from '@/lib/crud'
+import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 
 const statusOptions = [{ label: '草稿', value: 'DRAFT', tone: 'info' as const }]
 const statusLabel = (value: unknown) => statusOptions.find(option => option.value === value)?.label
@@ -18,19 +20,22 @@ const headerFields: Field[] = [
 ]
 const itemFields: Field[] = [
   { key: 'materialId', label: '产品', kind: 'text', required: true },
-  { key: 'plannedQty', label: '计划数量', kind: 'decimal', fractionDigits: 2, format: quantityLabel, required: true },
+  { key: 'plannedQty', label: '计划数量', kind: 'decimal', format: quantityLabel, required: true },
   { key: 'plannedStartAt', label: '计划开始', kind: 'datetime' },
   { key: 'plannedEndAt', label: '计划完成', kind: 'datetime' },
   { key: 'priority', label: '优先级', kind: 'number' },
   { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 }
 ]
 
+const quantityValidity = new WeakMap<object, boolean>()
+function setQuantityValidity(row: object, valid: boolean) { quantityValidity.set(row, valid) }
 function validate(items: Row[]) {
   for (const [index, item] of items.entries()) {
-    const quantity = String(item.plannedQty ?? '')
-    if (!/^\d{1,14}(?:\.\d{1,2})?$/.test(quantity) || Number(quantity) <= 0) {
-      return `第${index + 1}行计划数量必须大于0且最多保留两位小数`
+    const quantity = normalizedQuantityInput(String(item.plannedQty ?? ''))
+    if (quantityValidity.get(item) !== true || !positiveQuantity(quantity)) {
+      return `第${index + 1}行计划数量无效，请确认物料单位规则并输入正数量`
     }
+    item.plannedQty = quantity
     if (item.plannedStartAt && item.plannedEndAt && String(item.plannedEndAt) < String(item.plannedStartAt)) {
       return `第${index + 1}行计划完成时间不得早于开始时间`
     }
@@ -63,7 +68,7 @@ function validate(items: Row[]) {
           :disabled="!writable"
           @click="items.push({ materialId: null, plannedQty: '', plannedStartAt: null, plannedEndAt: null, priority: 0, remark: '' })"
         >添加计划行</el-button>
-        <span class="document-toolbar-hint">数量最多两位小数，整数不显示小数位</span>
+        <span class="document-toolbar-hint">数量精度按所选物料的基本单位规则执行</span>
       </div>
       <el-table :data="items" border stripe>
         <el-table-column type="index" label="#" width="64" />
@@ -72,7 +77,7 @@ function validate(items: Row[]) {
         </el-table-column>
         <el-table-column label="计划数量" width="150" align="right">
           <template #default="{ row }">
-            <el-input v-model="row.plannedQty as any" inputmode="decimal" maxlength="17" :disabled="!writable" placeholder="最多两位小数" />
+            <QuantityInput required positive v-model="row.plannedQty as any" :material-id="row.materialId as string | null" :disabled="!writable" @validity="setQuantityValidity(row, $event)" />
           </template>
         </el-table-column>
         <el-table-column label="计划开始" min-width="190">

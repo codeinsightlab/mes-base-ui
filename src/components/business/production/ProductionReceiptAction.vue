@@ -4,6 +4,8 @@ import PageDialog from '@/components/page/PageDialog.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { stockDocuments, stockDocumentPermission as p, type ProductionBasis, type ProductionReceiptCommand } from '@/api/wm/stockDocuments'
 import type { WmInventoryVo } from '@/api/wm/wmInventory'
 import { useAuth } from '@/stores/auth'
@@ -15,12 +17,12 @@ const auth = useAuth(), messageBox = usePageMessageBox()
 const allowed = computed(() => auth.runtimeMode === 'LOCAL' && auth.hasPermission(p + ':create', 'factory') && auth.hasPermission(p + ':post', 'factory'))
 const visible = ref(false), basis = ref<ProductionBasis | null>(null), loading = ref(false), error = ref('')
 const warehouseId = ref<string | null>(null), stockId = ref<string | null>(null), stock = ref<WmInventoryVo | null>(null)
-const unitId = ref(''), quantity = ref(''), reason = ref('')
+const unitId = ref(''), quantity = ref(''), quantityValid = ref(false), reason = ref('')
 const intent = useClosureCommand<ProductionReceiptCommand>(() => `production-receipt:${auth.username}:${auth.factoryId}:${props.executionId}`)
 let generation = 0
 function clear() {
   generation++; visible.value = false; basis.value = null; loading.value = false; error.value = ''
-  warehouseId.value = null; stockId.value = null; stock.value = null; unitId.value = ''; quantity.value = ''; reason.value = ''; intent.clear()
+  warehouseId.value = null; stockId.value = null; stock.value = null; unitId.value = ''; quantity.value = ''; quantityValid.value = false; reason.value = ''; intent.clear()
 }
 watch(() => [props.executionId, auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), auth.runtimeMode], clear, { flush: 'sync' })
 watch(warehouseId, () => { stockId.value = null; stock.value = null; unitId.value = '' }, { flush: 'sync' })
@@ -34,11 +36,11 @@ function open() { if (!allowed.value) return; clear(); intent.restore(); visible
 function selectStock(value: WmInventoryVo, unit: string) { stock.value = value; unitId.value = unit }
 async function submit() {
   if (!allowed.value || intent.busy.value) return
-  if (!intent.pending.value && (!basis.value?.canReceive || !stock.value || !quantity.value || !reason.value.trim())) {
+  if (!intent.pending.value && (!basis.value?.canReceive || !stock.value || !quantityValid.value || !positiveQuantity(normalizedQuantityInput(quantity.value)) || !reason.value.trim())) {
     error.value = '请核对可入库数量，选择确切库存来源并填写数量和原因'; return
   }
   const g = generation
-  await intent.run(() => ({ requestId: crypto.randomUUID(), stockId: stockId.value!, quantity: quantity.value, reason: reason.value }),
+  await intent.run(() => ({ requestId: crypto.randomUUID(), stockId: stockId.value!, quantity: normalizedQuantityInput(quantity.value), reason: reason.value }),
     command => stockDocuments.receiveProduction(props.executionId, command), async() => {
       if (g !== generation) return
       quantity.value = ''; reason.value = ''; await load(); if (g + 1 === generation) emit('changed')
@@ -66,7 +68,7 @@ async function close(done?: () => void) {
         <el-form-item label="LOCAL入库仓库"><WarehouseSelect v-model="warehouseId" source="LOCAL" /></el-form-item>
         <el-form-item label="产品批次及库位"><StockSourceSelect v-model="stockId" :material-id="basis.productId" :warehouse-id="warehouseId" receipt @selected="selectStock" /></el-form-item>
         <p v-if="stock">批次原文：{{ stock.batchNo }} · 库位：{{ stock.binCode || '无库位' }} · 基本单位：{{ unitId }}</p>
-        <el-form-item label="本次入库数量"><el-input v-model="quantity" inputmode="decimal" /></el-form-item>
+        <el-form-item label="本次入库数量"><QuantityInput v-model="quantity" :material-id="basis.productId" required positive :disabled="intent.busy.value || !!intent.pending.value" @validity="quantityValid = $event" /></el-form-item>
         <el-form-item label="入库原因 / 实物依据"><el-input v-model="reason" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
     </div>
