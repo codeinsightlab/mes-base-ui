@@ -5,7 +5,7 @@ import { loadQuantityRule, normalizedQuantityInput, positiveQuantity, quantityIn
 import { quantityRuleRevision } from '@/lib/production/quantityRuleInvalidation'
 
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ modelValue: string | number | null; materialId?: string | null; disabled?: boolean; positive?: boolean; required?: boolean; unchangedValue?: string | null }>()
+const props = defineProps<{ modelValue: string | number | null; materialId?: string | null; disabled?: boolean; positive?: boolean; required?: boolean; unchangedValue?: string | null; remainderValue?: string | null; historicalReduction?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string]; validity: [valid: boolean] }>()
 const auth = useAuth()
 const rule = ref<QuantityRule | null>(null)
@@ -20,6 +20,9 @@ const inputError = computed(() => {
   if (props.positive && !positiveQuantity(normalizedQuantityInput(value))) return '请输入正数量'
   // An unchanged stored fact may retain its precision when only metadata is edited.
   if (props.unchangedValue != null && normalizedQuantityInput(value) === normalizedQuantityInput(props.unchangedValue)) return null
+  // Only the caller's trusted outstanding fact can be exhausted after a rule change.
+  if (props.remainderValue != null && normalizedQuantityInput(value) === normalizedQuantityInput(props.remainderValue)) return quantityInputError(value, { mustBeWholeNumber: false, quantityPrecision: 6 })
+  if (props.historicalReduction && value.startsWith('-')) return quantityInputError(value, { mustBeWholeNumber: false, quantityPrecision: 6 })
   return quantityInputError(value, rule.value)
 })
 const inputDisabled = computed(() => props.disabled || !props.materialId || !allowed.value || loading.value || !rule.value)
@@ -41,7 +44,7 @@ async function refreshRule() {
   const factoryId = auth.factoryId
   const revision = auth.revision
   try {
-    const loaded = await loadQuantityRule(props.materialId, factoryId!, revision)
+    const loaded = await loadQuantityRule(props.materialId, factoryId!, revision, () => factoryId === auth.factoryId && revision === auth.revision && allowed.value)
     if (ticket !== generation || factoryId !== auth.factoryId || revision !== auth.revision) return
     rule.value = loaded
     expiry = setTimeout(() => { void refreshRule() }, QUANTITY_RULE_TTL_MS)

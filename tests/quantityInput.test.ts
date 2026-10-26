@@ -119,3 +119,17 @@ it('allows an unchanged precise stored value but applies current rules to edits'
   await w.setProps({ modelValue: '1.2346' }); expect(valid(w)).toBe(false)
   await w.setProps({ modelValue: '1.2345', unchangedValue: null }); expect(valid(w)).toBe(false)
 })
+
+it('does not query a unit in a different factory after the material read resolves', async() => {
+  let finish!: (value: unknown) => void
+  calls.material.mockImplementationOnce(() => new Promise(resolve => { finish=resolve }))
+  let current = true
+  const original = loadQuantityRule('A','F1',1,()=>current)
+  const rejected = expect(original).rejects.toThrow('工厂上下文已变化')
+  current=false;finish({unitId:'same-id'})
+  await rejected
+  expect(calls.unit).not.toHaveBeenCalled()
+  calls.material.mockResolvedValue({unitId:'same-id'})
+  await loadQuantityRule('A','F1',1)
+  expect(calls.unit).toHaveBeenCalledTimes(1)
+})

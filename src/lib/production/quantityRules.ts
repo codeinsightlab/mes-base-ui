@@ -12,7 +12,7 @@ export const QUANTITY_RULE_TTL_MS = 60_000
 const ruleCache = new Map<string, { expiresAt: number; request: Promise<QuantityRule> }>()
 let cacheRevision = -1
 
-export function loadQuantityRule(materialId: string, factoryId: string, revision: number): Promise<QuantityRule> {
+export function loadQuantityRule(materialId: string, factoryId: string, revision: number, isCurrent: () => boolean = () => true): Promise<QuantityRule> {
   if (cacheRevision !== quantityRuleRevision.value) {
     ruleCache.clear()
     cacheRevision = quantityRuleRevision.value
@@ -24,8 +24,10 @@ export function loadQuantityRule(materialId: string, factoryId: string, revision
   if (existing) return existing.request
   const request = (async () => {
     const material = await materialApi.detail(materialId)
+    if (!isCurrent()) throw new Error('工厂上下文已变化，请重新读取单位规则')
     if (typeof material.unitId !== 'string' || !material.unitId) throw new Error('物料未配置有效的计量单位')
     const unit = await unitMeasureApi.detail(material.unitId)
+    if (!isCurrent()) throw new Error('工厂上下文已变化，请重新读取单位规则')
     const precision = unit.quantityPrecision
     const whole = unit.mustBeWholeNumber
     if (!Number.isInteger(precision) || precision < 0 || precision > 6 || (whole !== 0 && whole !== 1)) {
