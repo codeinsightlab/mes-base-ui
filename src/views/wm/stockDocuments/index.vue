@@ -2,6 +2,8 @@
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { loadQuantityRule, quantityInputError, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { displayQuantity } from '@/lib/production/quantity'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
@@ -15,18 +17,38 @@ import { stockDocumentApis, stockDocumentPermission as p, stockDocumentTypes } f
 import { useAuth } from '@/stores/auth'
 import { request } from '@/lib/request'
 import type { StockAction } from '@/api/wm/localStock'
-import type { Field, Row } from '@/lib/crud'
+import type { CrudApi, Field, Row } from '@/lib/crud'
 const route = useRoute()
 const pendingDocument = ref<string | null>(null)
 const auth = useAuth(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
 const productionInputPath = computed(() => menuPathForComponent(auth.factoryMenus, 'production/productionInput/index'))
-const { headerApi, itemApi, clear } = stockDocumentApis(async() => { await document.value?.refresh() })
+const { headerApi, itemApi: baseItemApi, clear } = stockDocumentApis(async() => { await document.value?.refresh() })
+const originalLines = new Map<string, Row>()
+const remember = (row:Row) => { originalLines.set(String(row.id), { ...row });return row }
+async function checkedLine(raw:unknown, id?:string) {
+  const row = raw as Row, previous = id ? originalLines.get(id) : null
+  const value = normalizedQuantityInput(String(row.quantity ?? ''))
+  if (previous && previous.materialId===row.materialId && previous.stockId===row.stockId && previous.unitId===row.unitId && normalizedQuantityInput(String(previous.quantity))===value) return row
+  const factory = auth.factoryId, revision = auth.revision
+  if (!factory || !auth.hasPermission('business:material:query','factory') || !auth.hasPermission('business:unit:measure:query','factory')) throw Error('没有读取物料单位规则的权限')
+  const rule = await loadQuantityRule(String(row.materialId), factory, revision, () => factory===auth.factoryId && revision===auth.revision)
+  if (factory!==auth.factoryId || revision!==auth.revision) throw Error('工厂上下文已变化，请重新打开明细')
+  const error = quantityInputError(value, rule)
+  if (error || !positiveQuantity(value)) throw Error(error || '收发数量必须大于零')
+  return { ...row, quantity: value }
+}
+const itemApi:CrudApi = { ...baseItemApi,
+  list: async q => { const page = await baseItemApi.list(q);page.items.forEach(remember);return page },
+  detail: async id => remember(await baseItemApi.detail!(id)),
+  create: async raw => baseItemApi.create(await checkedLine(raw)),
+  update: async(id,raw) => baseItemApi.update(id, await checkedLine(raw,id))
+}
 const action = ref<StockAction | null>(null), actionVisible = ref(false), actionError = ref('')
 function openLinkedDocument() { const id = route.query.documentId;if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({ id }) }
 onMounted(openLinkedDocument)
 watch(() => route.query.documentId, openLinkedDocument)
 let generation = 0
-function reset() { pendingDocument.value = null;generation++;action.value = null;actionVisible.value = false;actionError.value = '';clear() }
+function reset() { originalLines.clear();pendingDocument.value = null;generation++;action.value = null;actionVisible.value = false;actionError.value = '';clear() }
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], reset)
 onBeforeUnmount(reset)
 async function showAction(id:unknown) {
@@ -55,7 +77,7 @@ const itemFields:Field[] = [
   { key: 'stockId', label: '确切库存来源', kind: 'text', required: true },
   { key: 'batchNo', label: '批次', kind: 'text' }, { key: 'binCode', label: '库位', kind: 'text' },
   { key: 'unitId', label: '基本单位ID', kind: 'text', required: true },
-  { key: 'quantity', label: '本次收发数量', kind: 'decimal', required: true, fractionDigits: 2, format: value => displayQuantity(value as string) },
+  { key: 'quantity', label: '本次收发数量', kind: 'decimal', required: true, format: value => displayQuantity(value as string) },
   { key: 'remark', label: '明细 / 实物清点依据', kind: 'textarea', maxLength: 500 },
   { key: 'stockActionId', label: '库存动作', kind: 'text', readonly: true, columnMinWidth: 260 }
 ]
@@ -87,6 +109,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
       <template #field-materialId="{draft,disabled}"><MaterialSelect v-model="(draft.materialId as string|null)" :disabled="disabled" @update:model-value="resetIdentity(draft)" /></template>
       <template #field-warehouseId="{draft,disabled}"><WarehouseSelect v-model="(draft.warehouseId as string|null)" source="LOCAL" :disabled="disabled" @update:model-value="resetIdentity(draft)" /></template>
       <template #field-stockId="{draft,disabled}"><StockSourceSelect v-model="(draft.stockId as string|null)" :material-id="(draft.materialId as string|null)" :warehouse-id="(draft.warehouseId as string|null)" :disabled="disabled" receipt @selected="(s,unit)=>{draft.materialId=s.materialId;draft.warehouseId=s.warehouseId;draft.batchNo=s.batchNo;draft.binCode=s.binCode;draft.unitId=unit}" /></template>
+      <template #field-quantity="{draft,disabled}"><QuantityInput v-model="draft.quantity as string" :material-id="draft.materialId as string" required positive :disabled="disabled" :unchanged-value="originalLines.get(String(draft.id))?.materialId===draft.materialId ? originalLines.get(String(draft.id))?.quantity as string : null" /></template>
       <template #field-batchNo="{draft}"><el-input :model-value="draft.batchNo" disabled placeholder="来自库存来源" /></template>
       <template #field-binCode="{draft}"><el-input :model-value="draft.binCode" disabled placeholder="来自库存来源" /></template>
       <template #field-unitId="{draft}"><el-input :model-value="draft.unitId" disabled placeholder="物料基本单位" /></template>
@@ -94,7 +117,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
     </MasterDetailDocument>
     <PageDialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
       <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" />
-      <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{ action.id }}</el-descriptions-item><el-descriptions-item label="审核UUID">{{ action.operationId||'—' }}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{ action.documentLineId||'—' }}</el-descriptions-item><el-descriptions-item label="业务来源">{{ action.sourceType }} / {{ action.sourceId }}</el-descriptions-item><el-descriptions-item label="库存来源">{{ action.stockId }}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{ action.batchNo }} / {{ action.binCode }}</el-descriptions-item><el-descriptions-item label="变动量">{{ action.quantityDelta }}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{ action.quantityBefore }} / {{ action.quantityAfter }}</el-descriptions-item><el-descriptions-item label="操作人">{{ action.operatorUserId }}</el-descriptions-item><el-descriptions-item label="原因">{{ action.reason }}</el-descriptions-item></el-descriptions>
+      <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{ action.id }}</el-descriptions-item><el-descriptions-item label="审核UUID">{{ action.operationId||'—' }}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{ action.documentLineId||'—' }}</el-descriptions-item><el-descriptions-item label="业务来源">{{ action.sourceType }} / {{ action.sourceId }}</el-descriptions-item><el-descriptions-item label="库存来源">{{ action.stockId }}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{ action.batchNo }} / {{ action.binCode }}</el-descriptions-item><el-descriptions-item label="变动量">{{ displayQuantity(action.quantityDelta) }}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{ displayQuantity(action.quantityBefore) }} / {{ displayQuantity(action.quantityAfter) }}</el-descriptions-item><el-descriptions-item label="操作人">{{ action.operatorUserId }}</el-descriptions-item><el-descriptions-item label="原因">{{ action.reason }}</el-descriptions-item></el-descriptions>
     </PageDialog>
   </div>
 </template>
