@@ -3,6 +3,8 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -28,6 +30,7 @@ const ledgerNode = computed(() => ledgerNodes.value.find(n => n.routingNodeId ==
 // This manager edits historical facts; writable only describes normal forward reporting.
 const historyWritable = computed(() => quantity.value?.pathStatus === 'LOCKED')
 const can = (action: keyof typeof reportPermissions) => auth.hasPermission(reportPermissions[action], 'factory')
+const quantityValid = ref(false)
 const command = ref<'supplement' | 'adjust' | 'void' | null>(null), original = ref<Ledger | null>(null), saving = ref(false), commandError = ref('')
 const pending = ref<{ requestId: string; uncertain: boolean; mode: 'supplement' | 'adjust' | 'void'; originalId: string | null; executionId: string; nodeId: string; form: typeof form } | null>(null)
 const pendingKey = () => 'mes-admin-report-pending:' + auth.username + ':' + auth.factoryId + ':' + props.executionId
@@ -98,13 +101,14 @@ async function loadUsers(keyword: string, more = false) {
 }
 async function save() {
   const mode = command.value
-  if (!mode || saving.value || !can(mode) || !historyWritable.value || !node.value) return
+  if (!mode || saving.value || !can(mode)) return
+  if (!pending.value) {
+  if (!historyWritable.value || !node.value) return
   if (!form.reason.trim() || form.reason.length > 500) { commandError.value = '请填写操作原因（最多500字）'; return }
-  if (mode !== 'void' && (!/^[+-]?\d{1,14}(\.\d{1,2})?$/.test(form.quantity) || !/[1-9]/.test(form.quantity) || mode === 'supplement' && form.quantity.startsWith('-'))) { commandError.value = '请输入非零数量，最多14位整数和2位小数；补录必须为正数'; return }
+  if (mode !== 'void' && (!quantityValid.value || !/[1-9]/.test(form.quantity))) { commandError.value = '请输入符合单位规则的非零数量；补录必须为正数'; return }
   if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) { commandError.value = '请选择历史操作人员并填写实际生产时间'; return }
   if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) { commandError.value = '工作站编号应为正整数'; return }
-  if (!pending.value) {
-    pending.value = { requestId: crypto.randomUUID(), uncertain: false, mode, originalId: original.value?.id ?? null, executionId: props.executionId, nodeId: node.value.routingNodeId, form: { ...form }}
+    pending.value = { requestId: crypto.randomUUID(), uncertain: false, mode, originalId: original.value?.id ?? null, executionId: props.executionId, nodeId: node.value.routingNodeId, form: { ...form, quantity: normalizedQuantityInput(form.quantity) }}
     sessionStorage.setItem(pendingKey(), JSON.stringify(pending.value))
   }
   const intent = pending.value, body = intent.form, storageKey = pendingKey()
@@ -209,7 +213,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
     <p v-if="original">原始流水：{{ original.id }}，原始报工量：<QuantityText :value="original.quantityDelta" />。调整继承原操作人员及实际生产时间。</p>
     <p v-if="command === 'void'" class="secondary">将追加一笔负向调整，把原始报工当前有效余额调整为零；上下游数量仍须满足约束。</p>
     <el-form class="report-command" label-position="top" :disabled="saving || !!pending" @submit.prevent="save">
-      <el-form-item v-if="command !== 'void'" :label="command === 'supplement' ? '本次加工完成数量' : '数量变化（正数增加，负数减少）'" required><el-input v-model="form.quantity" inputmode="decimal" /></el-form-item>
+      <el-form-item v-if="command !== 'void'" :label="command === 'supplement' ? '本次加工完成数量' : '数量变化（正数增加，负数减少）'" required><QuantityInput v-model="form.quantity" :material-id="quantity?.productId" required :positive="command==='supplement'" :historical-reduction="command==='adjust'" :disabled="saving || !!pending" @validity="quantityValid=$event" /></el-form-item>
       <template v-if="command === 'supplement'">
         <el-form-item label="历史实际操作人员" required><el-select v-model="form.operatorUserId" filterable remote :remote-method="loadUsers" :loading="usersLoading" placeholder="输入昵称检索历史人员" aria-label="历史实际操作人员"><el-option v-for="u in users" :key="u.id" :value="u.id" :label="`${u.name}（${u.id}）`" /><template #footer><el-button v-if="usersMore" text :loading="usersLoading" @click="loadUsers(userKeyword, true)">加载更多人员</el-button><span v-else class="secondary">不按当前工序能力或派工名单限制历史补录</span></template></el-select></el-form-item>
         <el-form-item label="实际生产时间" required><el-date-picker v-model="form.reportTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择实际生产时间" /></el-form-item>
