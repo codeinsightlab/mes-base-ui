@@ -45,6 +45,7 @@ const props = withDefaults(defineProps<{
   permissionScope?: PermissionScope;
   listAction?: string;
   detailAction?: string;
+  revisionField?: string;
   api: CrudApi;
   fields: Field[];
   idKey?: string;
@@ -164,6 +165,7 @@ async function save() {
   saving.value = true
   try {
     const body = { ...commandFromDraft(props.fields, draft, !!editId.value, props.idKey), ...props.fixedValues }
+    if (editId.value && props.revisionField) body[props.revisionField] = draft[props.revisionField]
     if (editId.value) {
       await props.api.update(editId.value, body)
     } else {
@@ -353,7 +355,7 @@ defineExpose({ load })
             <StatusTag
               v-else-if="field.key==='status'"
               :fallback="field.options?.find(o=>o.value===row[field.key])?.tone"
-              :label="field.options?.find(o=>o.value===row[field.key])?.label ?? formatValue(row[field.key],field.kind)"
+              :label="field.options?.find(o=>String(o.value)===String(row[field.key]))?.label ?? field.format?.(row[field.key]) ?? formatValue(row[field.key],field.kind)"
             />
             <span
               v-else

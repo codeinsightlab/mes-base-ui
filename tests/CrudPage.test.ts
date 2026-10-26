@@ -23,6 +23,30 @@ describe('list response contract', () => {
   })
 })
 
+describe('optimistic revision updates', () => {
+  it('includes the configured revision in updates without exposing it as an editable field', async() => {
+    const pinia = createPinia()
+    useAuth(pinia).factoryPermissions = ['test:list', 'test:query', 'test:update']
+    const target = {
+      ...api(),
+      list: vi.fn().mockResolvedValue({ items: [{ id: '42', code: 'REV', name: 'Revision fixture', revision: 3 }], total: 1, offset: 0, limit: 20 }),
+      detail: vi.fn().mockResolvedValue({ id: '42', code: 'REV', name: 'Revision fixture', revision: 3 }),
+      update: vi.fn().mockResolvedValue({})
+    }
+    const wrapper = mount(CrudPage, { props: {
+      title: '修订夹具', permission: 'test', api: target, fields: [...fields],
+      listAction: 'list', detailAction: 'query', revisionField: 'revision'
+    }, global: { plugins: [pinia, ElementPlus] }})
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === '编辑')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('.el-dialog button').find(button => button.text() === '保存')!.trigger('click')
+    await flushPromises()
+    expect(target.update).toHaveBeenCalledWith('42', { code: 'REV', name: 'Revision fixture', revision: 3 })
+    wrapper.unmount()
+  })
+})
+
 describe('one permission per CRUD action', () => {
   function page(grants: string[]) {
     const pinia = createPinia(), auth = useAuth(pinia)

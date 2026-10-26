@@ -7,6 +7,8 @@ import PageDrawer from '@/components/page/PageDrawer.vue'
 import QueryForm from '@/components/QueryForm.vue'
 
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { quantityColumn } from '@/lib/production/quantity'
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { routeLocationKey } from 'vue-router'
@@ -47,7 +49,9 @@ onBeforeUnmount(() => window.removeEventListener('resize', resizeDetails))
 const dialog = ref(false), drawer = ref(false), detail = ref<Detail | null>(null), editId = ref<string | null>(null)
 const productOptions = ref<MaterialVo[]>([]), routeOptions = ref<RoutingOption[]>([])
 const routesLoading = ref(false)
+const originalProductId = ref('')
 const originalPlannedQty = ref('')
+const plannedQuantityValid = ref(false)
 const blank = (): Save => ({ code: '', productId: '', routingId: '', plannedQty: '', plannedStartAt: null, plannedEndAt: null, externalId: null, externalCode: null, remark: null })
 const form = reactive<Save>(blank())
 const histories = ref<Record<string, BatchHistory>>({}), historyLoading = ref<Record<string, boolean>>({})
@@ -91,7 +95,7 @@ async function searchRoutes(search = '', selectOnly = false) {
   } catch(e) { if (attempt === routeAttempt) error.value = e instanceof Error ? e.message : '工艺版本读取失败' } finally { if (attempt === routeAttempt) routesLoading.value = false }
 }
 function productChanged() { form.routingId = ''; resetRouteOptions(); void searchRoutes('', true) }
-function create() { resetRouteOptions(); editId.value = null; Object.assign(form, blank()); error.value = ''; dialog.value = true; void searchProducts('') }
+function create() { resetRouteOptions(); editId.value = null; plannedQuantityValid.value = false; Object.assign(form, blank()); error.value = ''; dialog.value = true; void searchProducts('') }
 async function open(id: string) {
   if (!can('query')) return
   const attempt = ++detailAttempt
@@ -111,18 +115,19 @@ async function edit(id: string) {
   try {
     const d = await api.detail(id)
     if (attempt !== detailAttempt) return
-    originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty) })
+    originalProductId.value = d.workorder.productId; originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; plannedQuantityValid.value = false; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty) })
     productOptions.value = [{ id: d.workorder.productId, code: d.productCode, name: d.productName } as MaterialVo]
     routeOptions.value = [d.routing]; dialog.value = true
   } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function save() {
   if (!can(editId.value ? 'update' : 'create') || busy.value) return
-  if (!form.code.trim() || !form.productId || !form.routingId || (!/^\d{1,14}(\.\d{1,2})?$/.test(form.plannedQty) && !(editId.value && form.plannedQty === originalPlannedQty.value)) || !/[1-9]/.test(form.plannedQty)) { error.value = '请填写工单号、产出物料、已发布默认工艺和正计划数量（最多2位小数）'; return }
+  if (!form.code.trim() || !form.productId || !form.routingId || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) { error.value = '请填写工单号、产出物料、已发布默认工艺和符合单位精度的正计划数量'; return }
   const attempt = detailAttempt
   busy.value = true; error.value = ''
   try {
-    if (editId.value) await api.update(editId.value, form); else await api.create(form)
+    const command = { ...form, plannedQty: normalizedQuantityInput(form.plannedQty) }
+    if (editId.value) await api.update(editId.value, command); else await api.create(command)
     if (attempt !== detailAttempt) return
     dialog.value = false; ElMessage.success('工单已保存，可独立创建生产执行单元'); await load()
   } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '保存失败' } finally { if (attempt === detailAttempt) busy.value = false }
@@ -195,7 +200,7 @@ onMounted(load)
       <el-form label-width="110px">
         <el-form-item label="工单号" required><el-input v-model="form.code" maxlength="64" /></el-form-item>
         <el-form-item label="产出物料" required><el-select v-model="form.productId" filterable remote :remote-method="searchProducts" @change="productChanged"><el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="p.code+' · '+p.name" /></el-select></el-form-item>
-        <el-form-item label="计划数量" required><el-input v-model="form.plannedQty" /></el-form-item>
+        <el-form-item label="计划数量" required><QuantityInput required positive :unchanged-value="editId && form.productId === originalProductId ? originalPlannedQty : null" v-model="form.plannedQty" :material-id="form.productId" :disabled="busy" @validity="plannedQuantityValid = $event" /></el-form-item>
         <el-form-item label="默认工艺" required><el-select v-model="form.routingId" :disabled="!form.productId" :loading="routesLoading" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" no-data-text="该物料暂无匹配的已发布工艺" filterable remote :remote-method="searchRoutes" @visible-change="(v: boolean)=>v && !routesLoading && searchRoutes()"><el-option v-for="r in routeOptions" :key="r.id" :value="r.id" :label="r.code+' / V'+r.version+' · '+r.name" /></el-select></el-form-item>
         <el-form-item label="计划开始"><el-date-picker v-model="form.plannedStartAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
         <el-form-item label="计划结束"><el-date-picker v-model="form.plannedEndAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>

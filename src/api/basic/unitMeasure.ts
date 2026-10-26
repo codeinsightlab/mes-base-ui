@@ -1,4 +1,5 @@
 import { request } from '@/lib/request'
+import { invalidateQuantityRules } from '@/lib/production/quantityRuleInvalidation'
 
 export interface UnitMeasureVo {
   [key: string]: unknown;
@@ -8,6 +9,8 @@ export interface UnitMeasureVo {
   name: string;
   symbol: string | null;
   status: string;
+  mustBeWholeNumber: number;
+  quantityPrecision: number;
 }
 
 export interface Page {
@@ -17,8 +20,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status'>
-export type UpdateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status'>
+export type CreateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status' | 'mustBeWholeNumber' | 'quantityPrecision'>
+export type UpdateCommand = Pick<UnitMeasureVo, 'code' | 'name' | 'symbol' | 'status' | 'mustBeWholeNumber' | 'quantityPrecision'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/basic/unit-measure', { method: 'DELETE', body: ids, scope: 'factory' })
@@ -36,7 +39,7 @@ export const api = {
   update: (id: string, body: unknown) =>
     request<UnitMeasureVo>('/api/basic/unit-measure/' + encodeURIComponent(id), {
       method: 'PUT', body, scope: 'factory'
-    }),
+    }).then(row => { invalidateQuantityRules(); return row }),
 
   remove: (id: string) => removeIds([id]),
 

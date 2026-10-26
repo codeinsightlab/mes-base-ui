@@ -8,6 +8,8 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 
 import { parseTime } from '@/utils/ruoyi'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { quantityInput } from '@/lib/production/quantity'
 import { positiveQuantity, exceedsQuantity, qualityStateLabel, qualityStateTone, qualityReceiptLabel } from '@/lib/quality/presentation'
@@ -29,6 +31,7 @@ const events = ref<Event[]>([]), eventTotal = ref(0), eventPage = ref(1), eventL
 let eventAttempt = 0
 const actionOpen = ref(false), actionKind = ref<'assess' | 'dispose'>('dispose'), formError = ref(''), restoreError = ref(''), recoveryBlocked = ref(false)
 const attribution = ref<Attribution>('INDEPENDENT'), related = ref<string | null>(null), basis = ref('')
+const quantityValid = ref(false)
 const form = reactive({ quantity: '', warehouseId: null as string | null, reason: '' })
 type Pending = { kind: 'assess'; command: AssessmentCommand } | { kind: 'dispose'; command: Disposition } | { kind: 'retired-return'; command: { requestId: string }}
 const pending = ref<Pending | null>(null)
@@ -111,11 +114,11 @@ async function submit() {
       pending.value = { kind: 'assess', command: { requestId: crypto.randomUUID(), expectedRevision: view.value!.revision, reason: form.reason.trim(), assessment: { type: attribution.value, relatedDeclarationId: attribution.value === 'OVERLAP' ? related.value : null, basis: basis.value.trim() }}}
     } else {
       if (!canTreat.value) return
-      if (!/^\d{1,14}(?:\.\d{1,2})?$/.test(form.quantity) || !positiveQuantity(form.quantity)) { formError.value = '数量须大于零，最多两位小数';return }
+      if (!quantityValid.value || !positiveQuantity(normalizedQuantityInput(form.quantity))) { formError.value = '请输入符合单位规则的正数量，或完整处理原待入仓余量';return }
       if (view.value!.pendingDispositionQty == null) { formError.value = '处置数量待确认，暂不能提交处理';return }
       if (exceedsQuantity(form.quantity, view.value!.pendingDispositionQty)) { formError.value = '处理数量不能超过待处理数量';return }
       if (!form.warehouseId) { formError.value = '请选择接收仓库';return }
-      pending.value = { kind: 'dispose', command: { requestId: crypto.randomUUID(), expectedRevision: view.value!.revision, destination: 'WAREHOUSE', quantity: form.quantity, warehouseId: form.warehouseId, reason: form.reason.trim() }}
+      pending.value = { kind: 'dispose', command: { requestId: crypto.randomUUID(), expectedRevision: view.value!.revision, destination: 'WAREHOUSE', quantity: normalizedQuantityInput(form.quantity), warehouseId: form.warehouseId, reason: form.reason.trim() }}
     }
   }
   const storageKey = pendingKey(), scope = generation
@@ -169,7 +172,7 @@ async function submit() {
       <p v-if="pending" role="status">上次请求结果待确认，请使用原请求核对，避免重复处理。</p>
       <el-form label-position="top" :disabled="busy || !!pending" @submit.prevent="submit">
         <template v-if="actionKind==='assess'"><el-form-item label="核实结论"><el-radio-group v-model="attribution"><el-radio value="INDEPENDENT">独立申报</el-radio><el-radio value="OVERLAP">重复申报</el-radio></el-radio-group></el-form-item><el-form-item v-if="attribution==='OVERLAP'" label="关联原申报"><el-select v-model="related"><el-option v-for="row in relatedOptions" :key="row.declarationId" :value="row.declarationId" :label="`${row.defectTypeNameSnapshot || row.defectReason} · ${row.defectQty}`" /></el-select></el-form-item><el-form-item label="核实说明" required><el-input v-model="basis" type="textarea" maxlength="500" /></el-form-item></template>
-        <template v-else><p>待处理数量：<QuantityText :value="view?.pendingDispositionQty" /></p><el-form-item label="处理数量" required><el-input v-model="form.quantity" inputmode="decimal" /></el-form-item><el-form-item label="接收仓库" required><WarehouseSelect v-model="form.warehouseId" :source="current?.source" :disabled="busy || !!pending" /></el-form-item><p class="secondary">创建正式入库单并审核，审核通过后执行入库。入仓后的流转与处置由仓储办理。</p></template>
+        <template v-else><p>待处理数量：<QuantityText :value="view?.pendingDispositionQty" /></p><el-form-item label="处理数量" required><QuantityInput v-model="form.quantity" :material-id="view?.productId" :remainder-value="view?.pendingDispositionQty" required positive :disabled="busy || !!pending" @validity="quantityValid=$event" /></el-form-item><el-form-item label="接收仓库" required><WarehouseSelect v-model="form.warehouseId" :source="current?.source" :disabled="busy || !!pending" /></el-form-item><p class="secondary">创建正式入库单并审核，审核通过后执行入库。入仓后的流转与处置由仓储办理。</p></template>
         <el-form-item label="处理说明" required><el-input v-model="form.reason" type="textarea" maxlength="500" :rows="2" /></el-form-item>
       </el-form>
       <template #footer><el-button :disabled="busy || !!pending" @click="closeAction()">取消</el-button><el-button type="primary" :loading="busy" :disabled="recoveryBlocked||pending?.kind==='retired-return'" @click="submit">{{ pending?'核对上次结果':actionKind==='assess'?'确认核实':'创建并审核入库' }}</el-button></template>

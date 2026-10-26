@@ -3,10 +3,12 @@ import QueryForm from '@/components/QueryForm.vue'
 
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { quantityColumn } from '@/lib/production/quantity'
 import { executionStatusLabel } from '@/lib/production/executionState'
 import DefectDeclarationPanel from '@/components/business/quality/DefectDeclarationPanel.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { useAuth } from '@/stores/auth'
 import { readReportingRecovery, saveReportingRecovery, removeReportingRecovery, isDefiniteReportingRejection } from '@/lib/production/reportingRecovery'
 import PageHeader from '@/components/PageHeader.vue'
@@ -18,6 +20,7 @@ import type { RoutingNode, RoutingEdge } from '@/api/production/routing'
 const auth = useAuth()
 const allowed = computed(() => auth.sessionReady && !!auth.token && !!auth.userId && !!auth.factoryId && !auth.factorySwitching && auth.hasPermission(submitPermission, 'factory'))
 const code = ref(''), context = ref<ReportingContext | null>(null), selectedId = ref(''), quantity = ref('')
+const quantityValid = ref(false)
 const loading = ref(false), busy = ref(false), error = ref(''), result = ref<Ledger | null>(null)
 const pending = ref<ReportCommand | null>(null), showAll = ref(false)
 const recoveryError = ref('')
@@ -34,7 +37,7 @@ const graphEdges = computed<RoutingEdge[]>(() => {
 })
 const statusNames: Record<string, string> = { AVAILABLE: '可报工', QUALITY_PENDING: '受待核实不良影响', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
 function clearView(preserveConfirmed = false) {
-  version++; context.value = null; selectedId.value = ''; quantity.value = ''
+  version++; context.value = null; selectedId.value = ''; quantity.value = ''; quantityValid.value = false
   if (!preserveConfirmed || !pending.value) result.value = null
   error.value = ''; busy.value = loading.value = false; showAll.value = false
 }
@@ -62,8 +65,8 @@ async function submit(recover = false) {
   if (!allowed.value || busy.value || recoveryError.value) return
   if (!!pending.value !== recover) return
   const fresh = !pending.value
-  if (fresh && (!context.value || selected.value?.status !== 'AVAILABLE' || !/^\d{1,14}(\.\d{1,2})?$/.test(quantity.value) || !/[1-9]/.test(quantity.value))) { error.value = '请选择可报工序，输入正数量（最多2位小数）'; return }
-  const command = pending.value ? { ...pending.value } : { executionId: context.value!.identity.executionId, routingNodeId: selectedId.value, reportQty: quantity.value, workstationId: null, requestId: crypto.randomUUID() }
+  if (fresh && (!context.value || selected.value?.status !== 'AVAILABLE' || !quantityValid.value || !positiveQuantity(normalizedQuantityInput(quantity.value)))) { error.value = '请选择可报工序，输入符合物料单位精度的正数量'; return }
+  const command = pending.value ? { ...pending.value } : { executionId: context.value!.identity.executionId, routingNodeId: selectedId.value, reportQty: normalizedQuantityInput(quantity.value), workstationId: null, requestId: crypto.randomUUID() }
   const owner = { userId: auth.userId, factoryId: auth.factoryId }, token = auth.token, revision = auth.revision
   const trusted = () => allowed.value && auth.userId === owner.userId && auth.factoryId === owner.factoryId && auth.token === token && auth.revision === revision
   try { saveReportingRecovery(owner, command) } catch(e) { recoveryError.value = e instanceof Error ? e.message : '无法保存原请求，尚未发送'; return }
@@ -145,7 +148,7 @@ async function submit(recover = false) {
         <el-form class="report-form" label-position="top" @submit.prevent="submit()">
           <el-form-item label="本次报工工序"><el-select v-model="selectedId" :disabled="busy || !!pending" placeholder="选择可报工序"><el-option v-for="n in nodes" :key="n.routingNodeId" :value="n.routingNodeId" :label="n.code + ' · ' + (n.name || '工序名称未记录') + (n.reason ? '（' + n.reason + '）' : '')" :disabled="n.status !== 'AVAILABLE'" /></el-select></el-form-item>
           <p v-if="selected">上游输入 <QuantityText :value="selected.inputQty" /> · 已报 <QuantityText :value="selected.reportedQty" /> · 不良 <QuantityText :value="selected.defectQty" /> · 可流转 <QuantityText :value="selected.effectiveOutputQty" /> · 剩余 <QuantityText :value="selected.availableQty" /></p>
-          <el-form-item label="本次完成数量"><el-input v-model="quantity" inputmode="decimal" :disabled="busy || !!pending" placeholder="输入大于0的完成数量" /></el-form-item>
+          <el-form-item label="本次完成数量"><QuantityInput required positive v-model="quantity" :material-id="context.identity.productId" :disabled="busy || !!pending" @validity="quantityValid = $event" /></el-form-item>
           <el-button type="primary" size="large" :loading="busy" :disabled="!!pending || !!recoveryError || selected?.status !== 'AVAILABLE'" @click="submit()">确认报工</el-button>
         </el-form>
         <el-collapse v-if="context && selected && auth.hasPermission('business:quality:defect:create', 'factory')"><el-collapse-item title="申报本工序不良" name="defect"><DefectDeclarationPanel :execution-id="context.identity.executionId" :node-id="selected.routingNodeId" /></el-collapse-item></el-collapse>

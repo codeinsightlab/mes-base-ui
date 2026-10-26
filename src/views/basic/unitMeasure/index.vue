@@ -54,6 +54,26 @@ const fields: Field[] = [
     required: true,
     searchable: false,
     maxLength: 16
+  },
+  {
+    key: 'mustBeWholeNumber',
+    label: '数量必须为整数',
+    kind: 'select',
+    defaultValue: 0,
+    options: [{ label: '允许小数', value: 0 }, { label: '必须为整数', value: 1 }],
+    readonly: false,
+    required: true,
+    searchable: false
+  },
+  {
+    key: 'quantityPrecision',
+    label: '允许小数位数',
+    kind: 'select',
+    defaultValue: 6,
+    options: Array.from({ length: 7 }, (_, value) => ({ label: String(value), value })),
+    readonly: false,
+    required: true,
+    searchable: false
   }
 ]
 </script>

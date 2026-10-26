@@ -1,0 +1,11 @@
+{
+  "id": "sales:order",
+  "name": "销售订单",
+  "path": "/sales/order",
+  "component": "sales/order/index",
+  "permission": "business:mes:sales:order:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "Document",
+  "children": []
+}

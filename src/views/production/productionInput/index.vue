@@ -6,6 +6,8 @@ import { ApiError } from '@/lib/request'
 
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import { displayQuantity } from '@/lib/production/quantity'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -20,6 +22,8 @@ const canConfirm = computed(() => allowed.value && (auth.runtimeMode === 'ERP' |
 const documentPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
 const draftResult = ref<StockDocumentDetail | null>(null), pendingKind = ref<'draft' | 'confirm'>('confirm')
 const code = ref(''), orderId = ref(''), stockId = ref(''), outputQty = ref(''), nextNode = ref('')
+const quantityValid = ref(false)
+const outputProductId = computed(() => supply.value?.orders.find(o=>o.workorderId===orderId.value)?.productId)
 const supply = ref<Supply | null>(null), preview = ref<Preview | null>(null), calculation = ref<Calculation | null>(null)
 const selected = ref<string[]>([]), pending = ref<Command | null>(null), result = ref<Result | null>(null)
 const error = ref(''), busy = ref(false), pendingSourceMode = ref<string | null>(null)
@@ -68,14 +72,14 @@ async function loadPreview() {
   try { const data = await api.preview(code.value, orderId.value); if (ticket !== previewSequence) return; preview.value = data; selected.value = data.actual ? [...data.actual.selectedNodeIds] : [] } catch(e) { if (ticket === previewSequence) error.value = e instanceof Error ? e.message : '执行工艺读取失败' }
 }
 async function calculate() {
-  if (!orderId.value || !stockId.value || !/^\d{1,14}(\.\d{1,2})?$/.test(outputQty.value) || !/[1-9]/.test(outputQty.value) || busy.value || !allowed.value) return
+  if (!orderId.value || !stockId.value || !quantityValid.value || busy.value || !allowed.value) return
   const ticket = ++calculateSequence; busy.value = true; error.value = ''; calculation.value = null
-  try { const data = await api.calculate({ code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: outputQty.value }); if (ticket === calculateSequence) calculation.value = data } catch(e) { if (ticket === calculateSequence) error.value = e instanceof Error ? e.message : '用料计算失败' } finally { if (ticket === calculateSequence) busy.value = false }
+  try { const data = await api.calculate({ code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: normalizedQuantityInput(outputQty.value) }); if (ticket === calculateSequence) calculation.value = data } catch(e) { if (ticket === calculateSequence) error.value = e instanceof Error ? e.message : '用料计算失败' } finally { if (ticket === calculateSequence) busy.value = false }
 }
 async function submit(kind: 'draft' | 'confirm' = pending.value ? pendingKind.value : 'confirm') {
-  if (!(kind === 'draft' ? canDraft.value : canConfirm.value) || busy.value || (!pending.value && (!calculation.value || !preview.value || !pathComplete.value))) return
+  if (!(kind === 'draft' ? canDraft.value : canConfirm.value) || busy.value || (!pending.value && (!quantityValid.value || !calculation.value || !preview.value || !pathComplete.value))) return
   if (pending.value && kind !== pendingKind.value) return
-  if (!pending.value) { pendingKind.value = kind; pendingSourceMode.value = calculation.value!.sourceMode; pending.value = { requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: outputQty.value, routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey } }
+  if (!pending.value) { pendingKind.value = kind; pendingSourceMode.value = calculation.value!.sourceMode; pending.value = { requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: normalizedQuantityInput(outputQty.value), routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey } }
   const storageKey = recoveryKey(); sessionStorage.setItem(storageKey, JSON.stringify({ command: pending.value, sourceMode: pendingSourceMode.value, kind: pendingKind.value }))
   const ticket = generation; busy.value = true; error.value = ''
   try {
@@ -113,8 +117,8 @@ function again() { if (result.value?.status !== 'CONFIRMED' && !draftResult.valu
           <el-form-item label="生产工单"><el-select v-model="orderId" :disabled="busy || !!pending" placeholder="选择工单、产出产品与工作中心"><el-option v-for="o in supply.orders" :key="o.workorderId" :value="o.workorderId" :label="`${o.workorderCode} · ${o.productCode} ${o.productName} · ${o.workCenter} · 计划 ${displayQuantity(o.plannedQty)} ${o.outputUnitCode} · ${o.status}`" /></el-select></el-form-item>
           <p class="secondary">已加载 {{ supply.orders.length }} / {{ supply.total ?? supply.orders.length }} 张匹配工单 <el-button v-if="supply.orders.length < supply.total" link :loading="busy" :disabled="!!pending" @click="moreOrders">加载更多匹配工单</el-button></p>
           <el-form-item label="材料库存来源"><el-select v-model="stockId" :disabled="!orderId || busy || !!pending" placeholder="明确选择仓库、批次及库位"><el-option v-for="s in stockOptions" :key="s.reference" :value="s.reference" :label="`${s.materialCode} / ${s.lotCode} · ${s.warehouseCode}${s.binCode ? ' / '+s.binCode : ''} · 可用 ${displayQuantity(s.availableQty)} ${s.unitCode}`" /></el-select></el-form-item>
-          <el-form-item :label="'本次预计成品产出数量' + (supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode ? '（' + supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode + '）' : '')"><el-input v-model="outputQty" inputmode="decimal" :disabled="busy || !!pending" placeholder="正数，最多2位小数" /></el-form-item>
-          <el-button :disabled="!stockId || !outputQty || !!pending" :loading="busy" @click="calculate">计算本次材料领用量</el-button>
+          <el-form-item :label="'本次预计成品产出数量' + (supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode ? '（' + supply.orders.find(o => o.workorderId === orderId)?.outputUnitCode + '）' : '')"><QuantityInput v-model="outputQty" :material-id="outputProductId" required positive :disabled="busy || !!pending" @validity="quantityValid=$event" /></el-form-item>
+          <el-button :disabled="!stockId || !quantityValid || !!pending" :loading="busy" @click="calculate">计算本次材料领用量</el-button>
           <el-descriptions v-if="calculation" :column="1" border><el-descriptions-item label="预计产出"><QuantityText :value="calculation.outputQty" /> {{ calculation.order.outputUnitCode }}</el-descriptions-item><el-descriptions-item label="材料领用"><QuantityText :value="calculation.issueQty" /> {{ calculation.stock.unitCode }}</el-descriptions-item><el-descriptions-item label="库存读取时间">{{ calculation.stock.observedAt }}</el-descriptions-item></el-descriptions>
           <template v-if="preview">
             <el-alert v-if="terminal" title="此生产身份状态不允许继续投产" type="warning" :closable="false" /><el-alert v-else-if="preview.actual?.executionStatus === 'FULLY_RECEIVED'" title="本执行已完全入库。计划余额内的合法追加将复用本执行并恢复未完成，既有报工、入库和结束记录保留。" type="info" :closable="false" />

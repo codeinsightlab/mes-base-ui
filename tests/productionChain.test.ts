@@ -11,7 +11,8 @@ const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), 
 const executions = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }))
 vi.mock('../src/api/production/workorder', () => ({ api: wo }))
 vi.mock('../src/api/production/mesProductionExecution', () => ({ api: executions }))
-vi.mock('../src/api/basic/material', () => ({ api: { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'P1', name: '产品一' }] }) }}))
+vi.mock('../src/api/basic/material', () => ({ api: { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'P1', name: '产品一' }] }), detail: vi.fn().mockResolvedValue({ unitId: '4' }) }}))
+vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn().mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 2 }) }}))
 const allocation = { workorderId: '1', plannedQty: '1000.000000', allocatedTargetQty: '1300.000000', remainingTargetQty: '-300.000000', excessTargetQty: '300.000000', executionCount: 2 }
 const order = { id: '1', code: 'WO1', productId: '1', routingId: '1', plannedQty: '1000', status: 'DRAFT', revision: 0 }
 const detail = () => ({ workorder: order, productCode: 'P1', productName: '产品一', routing: { id: '1', code: 'R1', version: 1 }, allocation, batches: [{ id: '7', batchNo: 'LEGACY_ONLY', plannedQty: '1000', routeStatus: 'LOCKED' }] })
@@ -26,7 +27,7 @@ beforeEach(() => {
 })
 function setup(permissions: string[]) {
   const pinia = createPinia(), auth = useAuth(pinia)
-  auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = permissions
+  auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = [...permissions, 'business:material:query', 'business:unit:measure:query']
   return { auth, global: { plugins: [pinia, ElementPlus] }}
 }
 describe('single active execution chain', () => {
@@ -88,9 +89,9 @@ describe('single active execution chain', () => {
     const state = w.vm as unknown as { form: Record<string, unknown>; save: () => Promise<void> }
     expect(state.form).not.toHaveProperty('batches')
     expect(document.body.textContent).not.toContain('添加批次')
-    Object.assign(state.form, { code: 'WO_NEW', productId: '1', routingId: '1', plannedQty: '1000.01' })
-    state.form.plannedQty = '1000.001'; await state.save(); expect(wo.create).not.toHaveBeenCalled()
-    state.form.plannedQty = '1000.01'
+    Object.assign(state.form, { code: 'WO_NEW', productId: '1', routingId: '1', plannedQty: '1000.01' }); await flushPromises()
+    state.form.plannedQty = '1000.001'; await flushPromises(); await state.save(); expect(wo.create).not.toHaveBeenCalled()
+    state.form.plannedQty = '1000.01'; await flushPromises()
     wo.create.mockResolvedValue(detail()); await state.save(); await flushPromises()
     expect(wo.create).toHaveBeenCalled()
     expect(wo.create.mock.calls[0]![0]).not.toHaveProperty('batches')

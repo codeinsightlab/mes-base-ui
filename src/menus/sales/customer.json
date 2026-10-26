@@ -1,0 +1,11 @@
+{
+  "id": "sales:customer",
+  "name": "客户管理",
+  "path": "/sales/customer",
+  "component": "sales/customer/index",
+  "permission": "business:mes:customer:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "User",
+  "children": []
+}

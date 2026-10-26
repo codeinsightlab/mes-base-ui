@@ -1,4 +1,5 @@
 import { request } from '@/lib/request'
+import { invalidateQuantityRules } from '@/lib/production/quantityRuleInvalidation'
 
 export interface MaterialVo {
   [key: string]: unknown;
@@ -40,7 +41,7 @@ export const api = {
   update: (id: string, body: unknown) =>
     request<MaterialVo>('/api/basic/material/' + encodeURIComponent(id), {
       method: 'PUT', body, scope: 'factory'
-    }),
+    }).then(row => { invalidateQuantityRules(); return row }),
 
   remove: (id: string) => removeIds([id]),
 
@@ -48,4 +49,4 @@ export const api = {
 }
 
 export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
-export const sync = () => request<SyncResult>('/api/basic/material/actions/sync', { method: 'POST', scope: 'factory' })
+export const sync = () => request<SyncResult>('/api/basic/material/actions/sync', { method: 'POST', scope: 'factory' }).then(result => { invalidateQuantityRules(); return result })

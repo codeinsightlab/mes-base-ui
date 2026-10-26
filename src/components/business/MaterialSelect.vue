@@ -69,7 +69,7 @@ onBeforeUnmount(clear)
 </script>
 
 <template>
-  <div>
+  <div class="material-select">
     <el-select
       :model-value="modelValue"
       clearable
@@ -87,3 +87,8 @@ onBeforeUnmount(clear)
     <el-button :disabled="disabled" v-if="error" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
   </div>
 </template>
+
+<style scoped>
+.material-select { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.material-select :deep(.el-select) { flex: 1; min-width: 0; }
+</style>
