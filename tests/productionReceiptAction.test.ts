@@ -7,14 +7,15 @@ import { invalidateQuantityRules } from '../src/lib/production/quantityRuleInval
 import ReceiptAction from '../src/components/business/production/ProductionReceiptAction.vue'
 import QuantityInput from '../src/components/business/material/QuantityInput.vue'
 import { ApiError } from '../src/lib/request'
+const quantityReads = vi.hoisted(() => ({ unit: vi.fn() }))
 const calls = vi.hoisted(() => ({ basis: vi.fn(), receive: vi.fn(), confirm: vi.fn() }))
 vi.mock('../src/api/wm/stockDocuments', () => ({ stockDocumentPermission: 'business:wm:stock:document', stockDocuments: { productionBasis: calls.basis, receiveProduction: calls.receive }}))
 vi.mock('element-plus', async original => ({ ...await original<object>(), ElMessageBox: { confirm: calls.confirm }}))
 vi.mock('../src/api/basic/material', () => ({ api: { detail: vi.fn().mockResolvedValue({ unitId: '77' }) }}))
-vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn().mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 }) }}))
+vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: quantityReads.unit }}))
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
-  sessionStorage.clear(); vi.clearAllMocks(); invalidateQuantityRules()
+  sessionStorage.clear(); vi.clearAllMocks(); invalidateQuantityRules();quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 })
   calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '100', received: '90', remaining: '10', canReceive: true, blockedReason: null })
   calls.receive.mockResolvedValue({ document: { id: '901', status: 'POSTED' }, lines: [] })
   calls.confirm.mockResolvedValue('confirm')
@@ -79,4 +80,39 @@ it('normalizes only a new receipt command without losing significant decimals', 
   await wrapper.findComponent(QuantityInput).get('input').setValue('1.234500000')
   await flushPromises(); await s.submit()
   expect(calls.receive.mock.calls[0]![1].quantity).toBe('1.2345')
+})
+
+it.each([
+  { whole: 1, precision: 0 },
+  { whole: 0, precision: 2 }
+])('settles only the exact trusted old receipt remainder with rule $whole/$precision', async({ whole, precision }) => {
+  quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: whole, quantityPrecision: precision })
+  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '1.234567', received: '0', remaining: '1.234567', canReceive: true, blockedReason: null })
+  const { s } = await setup();fill(s);s.quantity = '0.234567'
+  await flushPromises();await s.submit()
+  expect(calls.receive).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
+  s.quantity = '1.234567';await flushPromises();await s.submit()
+  expect(calls.receive.mock.calls[0]![1].quantity).toBe('1.234567')
+})
+
+it('keeps compliant partial receipt quantities valid after tightening and rejects an obsolete remainder after refresh', async() => {
+  quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 0 })
+  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '2.234567', received: '0', remaining: '2.234567', canReceive: true, blockedReason: null })
+  const { s } = await setup();fill(s);s.quantity = '1'
+  await flushPromises();await s.submit()
+  expect(calls.receive.mock.calls[0]![1].quantity).toBe('1')
+  calls.receive.mockClear();s.quantity = '2.234567';s.reason = '重新核对余量'
+  calls.basis.mockResolvedValueOnce({ executionId: '9007199254740999', productId: '88', effective: '2.234567', received: '1', remaining: '1.234567', canReceive: true, blockedReason: null })
+  await s.load();await flushPromises();await s.submit()
+  expect(calls.receive).not.toHaveBeenCalled()
+})
+
+it('does not mistake another execution remainder for settlement when the execution changes', async() => {
+  quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 0 })
+  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '1.234567', received: '0', remaining: '1.234567', canReceive: true, blockedReason: null })
+  const { s } = await setup();fill(s);s.quantity = '1.234567';await flushPromises()
+  expect(s.quantityValid).toBe(true)
+  await wrapper.setProps({ executionId: '123' });await flushPromises()
+  expect(s.basis).toBeNull();expect(s.quantityValid).toBe(false)
+  await s.submit();expect(calls.receive).not.toHaveBeenCalled()
 })

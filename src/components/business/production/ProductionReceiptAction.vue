@@ -68,7 +68,7 @@ async function close(done?: () => void) {
         <el-form-item label="LOCAL入库仓库"><WarehouseSelect v-model="warehouseId" source="LOCAL" /></el-form-item>
         <el-form-item label="产品批次及库位"><StockSourceSelect v-model="stockId" :material-id="basis.productId" :warehouse-id="warehouseId" receipt @selected="selectStock" /></el-form-item>
         <p v-if="stock">批次原文：{{ stock.batchNo }} · 库位：{{ stock.binCode || '无库位' }} · 基本单位：{{ unitId }}</p>
-        <el-form-item label="本次入库数量"><QuantityInput v-model="quantity" :material-id="basis.productId" required positive :disabled="intent.busy.value || !!intent.pending.value" @validity="quantityValid = $event" /></el-form-item>
+        <el-form-item label="本次入库数量"><QuantityInput v-model="quantity" :material-id="basis.productId" :remainder-value="basis.remaining" required positive :disabled="intent.busy.value || !!intent.pending.value" @validity="quantityValid = $event" /></el-form-item>
         <el-form-item label="入库原因 / 实物依据"><el-input v-model="reason" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
     </div>
