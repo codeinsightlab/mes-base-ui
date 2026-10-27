@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import MaterialPicker from './MaterialPicker.vue'
 import BomVersionSelect from './BomVersionSelect.vue'
-import { bomApi, bomItemApi, structure, transition, type BomGraph } from '@/api/basic/materialBom'
+import { bomApi, bomItemApi, setDefaultBom, structure, transition, type BomGraph } from '@/api/basic/materialBom'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
 import { quantityInputError, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
@@ -15,7 +15,7 @@ const ElMessageBox = usePageMessageBox()
 
 function coefficient(raw:unknown) {
   const value = normalizedQuantityInput(String(raw ?? ''))
-  const error = quantityInputError(value, {mustBeWholeNumber:false,quantityPrecision:6})
+  const error = quantityInputError(value, { mustBeWholeNumber: false, quantityPrecision: 6 })
   if (error || !positiveQuantity(value)) throw Error(error || 'BOM数量必须大于零')
   return value
 }
@@ -52,7 +52,8 @@ const itemApi:CrudApi = { ...bomItemApi,
 const headerFields:Field[] = [
   { key: 'code', label: 'BOM编码', kind: 'text', required: true, maxLength: 64, searchable: true },
   { key: 'version', label: '版本', kind: 'text', required: true, maxLength: 32, searchable: true },
-  { key: 'baseQty', label: '基准产出数量（物料基本单位）', kind: 'decimal', required: true, format: v=>displayQuantity(v as string) },
+  { key: 'defaultVersion', label: '产品默认版本', kind: 'text', readonly: true, format: value => value ? '默认' : '—' },
+  { key: 'baseQty', label: '基准产出数量（物料基本单位）', kind: 'decimal', required: true, format: v => displayQuantity(v as string) },
   { key: 'status', label: '状态', kind: 'select', readonly: true, options: [{ value: 'DRAFT', label: '草稿' }, { value: 'PUBLISHED', label: '已发布' }, { value: 'DISABLED', label: '停用' }] },
   { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 }
 ]
@@ -61,7 +62,7 @@ const itemFields:Field[] = [
   { key: 'materialId', label: '组件物料', kind: 'text', required: true, columnMinWidth: 220, format: value => materialLabels.value[String(value)] ?? String(value) },
   { key: 'specification', label: '规格型号', kind: 'text', readonly: true, columnMinWidth: 150 },
   { key: 'unitName', label: '基本单位', kind: 'text', readonly: true, columnMinWidth: 110 },
-  { key: 'quantity', label: '标准用量（组件基本单位）', kind: 'decimal', required: true, format: v=>displayQuantity(v as string) },
+  { key: 'quantity', label: '标准用量（组件基本单位）', kind: 'decimal', required: true, format: v => displayQuantity(v as string) },
   { key: 'childBomId', label: '子BOM版本', kind: 'text' },
   { key: 'sort', label: '显示顺序', kind: 'number', required: true, defaultValue: 0 }
 ]
@@ -76,6 +77,19 @@ async function act(row:Row, action:'publish' | 'disable', refresh:() => Promise<
     await transition(String(row.id), action, String(row.revision))
     if (current === generation) { await refresh(); ElMessage.success(action === 'publish' ? 'BOM已发布' : 'BOM已停用') }
   } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '操作失败') } finally { if (current === generation) acting.value = false }
+}
+async function makeDefault(row:Row, refresh:() => Promise<void>) {
+  const current = generation
+  if (acting.value || row.status !== 'PUBLISHED' || row.defaultVersion === true || !canUpdate.value) return
+  try {
+    await ElMessageBox.confirm('设为默认只影响之后首次维护的工单用料；已有工单版本和冻结依据不会改变。确认设为默认？', '产品默认BOM版本', { type: 'info' })
+    if (current !== generation || !canUpdate.value) return
+    acting.value = true
+    await refresh()
+    if (current !== generation) return
+    await setDefaultBom(String(row.id), String(row.revision))
+    if (current === generation) { await refresh(); ElMessage.success('产品默认BOM版本已更新') }
+  } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '设置默认版本失败') } finally { if (current === generation) acting.value = false }
 }
 async function loadGraph(id = graphId.value) {
   if (!id) return
@@ -110,6 +124,8 @@ onBeforeUnmount(clear)
       <el-button v-if="row.id" :disabled="dirty || acting" @click="refresh">刷新版本</el-button>
       <el-button v-if="row.id" :disabled="dirty" @click="loadGraph(String(row.id))">多阶结构与需求</el-button>
       <el-button v-if="row.id && row.status==='DRAFT' && canUpdate" :disabled="dirty || acting" type="primary" plain @click="act(row,'publish',refresh)">发布</el-button>
+      <el-button v-if="row.id && row.status==='PUBLISHED' && row.defaultVersion!==true && canUpdate" :disabled="dirty || acting" @click="makeDefault(row,refresh)">设为默认</el-button>
+      <el-tag v-if="row.id && row.defaultVersion===true" type="success">产品默认版本</el-tag>
       <el-button v-if="row.id && row.status==='PUBLISHED' && canUpdate" :disabled="acting" @click="act(row,'disable',refresh)">停用</el-button>
     </template>
     <template #field-baseQty="{draft,disabled}"><el-input v-model="draft.baseQty" inputmode="decimal" :disabled="disabled" @blur="draft.baseQty=normalizedQuantityInput(String(draft.baseQty))" /><span class="secondary">BOM基准数量，最多六位有效小数</span></template>
