@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="自动编码规则" description="维护规则、预览并正式取号" />
-    <el-alert type="info" :closable="false" show-icon class="mb8" title="调用约定：规则编码就是 getDocNo(type) 的 type，无需额外传入前缀、日期或流水。规则组成按前缀、日期、流水配置。此页预览和正式生成用于平台配置检查；Factory业务创建由服务读取当前工厂上下文并独立取号。" />
+    <el-alert type="info" :closable="false" show-icon class="mb8" title="调用约定：规则编码就是 getDocNo(type) 的 type，无需额外传入前缀、日期或流水。全局规则可在此页正式取号；工厂专属规则仅可预览，正式取号由对应工厂的单据创建流程执行。" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="规则名称" prop="ruleName">
@@ -79,10 +79,12 @@
 
     <PageDialog v-model="codeOpen" title="预览或正式取号" width="520px" append-to-body>
       <p>规则：{{ codeRule.ruleName }}（{{ codeRule.ruleCode }}）</p>
+      <p>适用范围：{{ codeRule.factoryId ? factoryLabel(codeRule.factoryId) : '全局' }}</p>
       <p>调用参数：<code>getDocNo("{{ codeRule.ruleCode }}")</code></p>
       <el-input v-model="codeInput" maxlength="64" placeholder="平台通用规则输入字符（仅 INPUTCHAR 组成或按字符循环时需要）" />
       <el-alert v-if="generatedCode" :title="generatedCode" type="success" :closable="false" style="margin-top:16px" />
-      <template #footer><el-button @click="codeOpen=false">关闭</el-button><el-button :loading="codeLoading" @click="testCode(false)">预览（不占用流水号）</el-button><el-button v-hasPermi="['system:autocode:rule:generate']" type="primary" :loading="codeLoading" @click="testCode(true)">正式取号</el-button></template>
+      <el-alert v-if="codeRule.factoryId" title="工厂专属规则不能在平台页面正式取号；请在对应工厂的单据创建流程中验证。" type="info" :closable="false" style="margin-top:16px" />
+      <template #footer><el-button @click="codeOpen=false">关闭</el-button><el-button :loading="codeLoading" @click="testCode(false)">预览（不占用流水号）</el-button><el-button v-if="!codeRule.factoryId" v-hasPermi="['system:autocode:rule:generate']" type="primary" :loading="codeLoading" @click="testCode(true)">正式取号</el-button></template>
     </PageDialog>
     <el-table v-loading="loading" :data="ruleList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
@@ -96,6 +98,9 @@
       <el-table-column label="规则名称" align="center" prop="ruleName" :show-overflow-tooltip="true" />
       <el-table-column label="单据类型" align="center" prop="ruleType">
         <template #default="scope"><dict-tag :options="dict.type.sys_autocode_ruletype" :value="scope.row.ruleType" /></template>
+      </el-table-column>
+      <el-table-column label="适用工厂" align="center" min-width="180">
+        <template #default="scope">{{ scope.row.factoryId ? factoryLabel(scope.row.factoryId) : '全局' }}</template>
       </el-table-column>
       <el-table-column label="最大长度" align="center" prop="maxLength" />
       <el-table-column label="是否补齐" align="center" prop="isPadded" />
@@ -155,6 +160,14 @@
             <el-option v-for="item in dict.type.sys_autocode_ruletype" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
+        <el-form-item label="适用工厂" prop="factoryId">
+          <el-select v-model="form.factoryId" :loading="factoryOptionsLoading" :disabled="factoryOptionsLoading" style="width:100%" placeholder="选择规则范围">
+            <el-option label="全局（适用于所有工厂）" value="" />
+            <el-option v-for="factory in factoryOptions" :key="factory.factoryId" :label="`${factory.factoryName}（${factory.factoryId}）${factory.status === 'ENABLED' ? '' : ' · 已停用'}`" :value="factory.factoryId" :disabled="factory.status !== 'ENABLED'" />
+          </el-select>
+          <p v-if="factoryOptionsError" class="secondary" role="alert">{{ factoryOptionsError }} <el-button link size="small" @click="loadFactoryOptions">重试</el-button></p>
+          <p v-else class="secondary">工厂专属规则只供该工厂使用；留空范围（全局）适用于所有工厂。</p>
+        </el-form-item>
         <el-form-item label="描述" prop="ruleDesc">
           <el-input v-model="form.ruleDesc" placeholder="请输入描述信息" />
         </el-form-item>
@@ -204,6 +217,9 @@ import QueryForm from '@/components/QueryForm.vue'
 
 import { sourceList } from '@/utils/sourceList'
 import { listRule, getRule, delRule, addRule, updateRule, genCode, previewCode } from '@/api/system/autocode/rule'
+import { listFactories } from '@/api/system/datasource'
+
+const GLOBAL_RULE_SCOPE = ''
 
 export default {
   components: { PageDialog, QueryForm },
@@ -211,7 +227,7 @@ export default {
   dicts: ['sys_yes_no', 'sys_autocode_ruletype'],
   data() {
     return {
-      queryError: '',
+      queryError: '', factoryOptions: [], factoryOptionsLoading: false, factoryOptionsError: '', factoryOptionsAttempt: 0,
       // 遮罩层
       loading: true, codeOpen: false, codeRule: {}, codeInput: '', generatedCode: '', codeLoading: false,
       // 选中数组
@@ -258,8 +274,39 @@ export default {
   },
   created() {
     this.getList()
+    this.loadFactoryOptions()
+  },
+  beforeUnmount() {
+    this.factoryOptionsAttempt++
   },
   methods: {
+    factoryLabel(factoryId) {
+      const factory = this.factoryOptions.find(item => String(item.factoryId) === String(factoryId))
+      return factory ? `${factory.factoryName}（${factory.factoryId}）` : `工厂 ${factoryId}`
+    },
+    async loadFactoryOptions() {
+      const attempt = (this.factoryOptionsAttempt || 0) + 1
+      this.factoryOptionsAttempt = attempt
+      this.factoryOptionsLoading = true
+      this.factoryOptionsError = ''
+      try {
+        const rows = []
+        let pageNum = 1
+        let total = 0
+        do {
+          const page = await listFactories({ pageNum, pageSize: 100 })
+          if (attempt !== this.factoryOptionsAttempt) return
+          rows.push(...(page.rows || []))
+          total = Number(page.total || 0)
+          pageNum++
+        } while (rows.length < total)
+        this.factoryOptions = rows
+      } catch(error) {
+        if (attempt === this.factoryOptionsAttempt) this.factoryOptionsError = error instanceof Error ? error.message : '工厂列表读取失败'
+      } finally {
+        if (attempt === this.factoryOptionsAttempt) this.factoryOptionsLoading = false
+      }
+    },
     openCode(row) { this.codeRule = row;this.codeInput = '';this.generatedCode = '';this.codeOpen = true },
     async testCode(persist) { this.codeLoading = true;this.generatedCode = '';try { const r = persist ? await genCode(this.codeRule.ruleCode, this.codeInput || null) : await previewCode(this.codeRule.ruleCode, this.codeInput || null);this.generatedCode = r.data.code } finally { this.codeLoading = false } },
     /** 查询字典类型列表 */
@@ -281,6 +328,7 @@ export default {
         ruleId: undefined,
         ruleCode: undefined,
         ruleType: undefined,
+        factoryId: GLOBAL_RULE_SCOPE,
         ruleName: undefined,
         ruleDesc: undefined,
         maxLength: undefined,
@@ -319,6 +367,7 @@ export default {
       const ruleId = row.ruleId || this.ids
       getRule(ruleId).then(response => {
         this.form = response.data
+        this.form.factoryId = response.data.factoryId || GLOBAL_RULE_SCOPE
         this.open = true
         this.title = '修改编码规则'
       })
@@ -327,14 +376,15 @@ export default {
     submitForm: function() {
       this.$refs['form'].validate(valid => {
         if (valid) {
+          const payload = { ...this.form, factoryId: this.form.factoryId === GLOBAL_RULE_SCOPE ? null : this.form.factoryId }
           if (this.form.ruleId != undefined) {
-            updateRule(this.form).then(response => {
+            updateRule(payload).then(response => {
               this.$modal.msgSuccess('修改成功')
               this.open = false
               this.getList()
             })
           } else {
-            addRule(this.form).then(response => {
+            addRule(payload).then(response => {
               this.$modal.msgSuccess('新增成功')
               this.open = false
               this.getList()
