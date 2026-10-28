@@ -17,7 +17,7 @@ vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn().mockReso
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => { sessionStorage.clear();vi.clearAllMocks();invalidateQuantityRules();vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}});calls.detail.mockResolvedValue({ id: '9007199254740999', quantity: '800.000001', availableQuantity: '700.000001', materialId: '1', warehouseId: '2', warehouseSource: 'LOCAL', batchNo: 'LOT', binCode: 'BIN' });calls.actions.mockResolvedValue({ items: [], total: 0 });calls.execute.mockResolvedValue({ id: 'done' }) })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '';vi.unstubAllGlobals();vi.restoreAllMocks() })
-async function setup(write = true) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:wm:inventory:query', 'business:wm:stock:action:list', ...(write ? ['business:wm:stock:gain'] : [])];const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' }}, { path: '/issue/mesMaterialIssue', component: { template: '<div />' }}] });await router.push('/');wrapper = mount(Panel, { global: { plugins: [pinia, ElementPlus, router] }});const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;s.open('9007199254740999');await flushPromises();return { s, auth, router } }
+async function setup(write = true) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryMenus = [{ id: 'stock', name: '出入库单', path: '/wm/stockDocuments', component: 'wm/stockDocuments/index', kind: 'MENU', permission: 'business:wm:stock:document:list', children: [] }];auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:wm:inventory:query', 'business:wm:stock:action:list', ...(write ? ['business:wm:stock:gain'] : [])];const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' }}, { path: '/wm/stockDocuments', component: { template: '<div />' }}] });await router.push('/');wrapper = mount(Panel, { global: { plugins: [pinia, ElementPlus, router] }});const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;s.open('9007199254740999');await flushPromises();return { s, auth, router } }
 it('sends exact decimal strings and server balance preconditions without client actor or fabricated facts', async() => { const { s } = await setup();Object.assign(s.form, { quantity: '0.000001', reason: 'TEST 盘盈核对' });await flushPromises();await s.submit();const command = calls.execute.mock.calls[0]![1];expect(command).toMatchObject({ stockId: '9007199254740999', quantity: '0.000001', expectedQuantity: '800.000001', expectedAvailable: '700.000001' });expect(command).not.toHaveProperty('operatorUserId');expect(command).not.toHaveProperty('quantityAfter');expect(s.pending).toBeNull() })
 it('freezes the request after uncertainty and restores it on reopen', async() => { const { s } = await setup();Object.assign(s.form, { quantity: '3', reason: 'TEST arrival' });calls.execute.mockRejectedValueOnce(new Error('lost response'));await flushPromises();await s.submit();const first = JSON.parse(JSON.stringify(calls.execute.mock.calls[0]![1]));wrapper.unmount();const { s: again } = await setup();Object.assign(again.form, { quantity: '999', reason: 'changed' });await flushPromises();await again.submit();expect(calls.execute.mock.calls[1]![1]).toEqual(first) })
 it.each(['factory', 'permission'])('rejects late balance and action results after %s changes', async type => { const { s, auth } = await setup();let release!:(v:unknown) => void;calls.detail.mockImplementationOnce(() => new Promise(r => release = r));const waiting = s.load();if (type === 'factory')auth.factoryId = 'B';else auth.factoryPermissions = [];await flushPromises();release({ id: 'old', quantity: '999' });await waiting;expect(s.stock).toBeNull();expect(s.rows).toEqual([]);expect(s.visible).toBe(false) })
@@ -37,7 +37,7 @@ it('closes the stock drawer before navigating to material issues and rejects lat
   const { s, router } = await setup();let release!:(v:unknown) => void
   calls.detail.mockImplementationOnce(() => new Promise(r => release = r));const reading = s.load()
   await s.openIssues();await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/issue/mesMaterialIssue');expect(router.currentRoute.value.query).toEqual({ view: 'list' });expect(s.visible).toBe(false)
+  expect(router.currentRoute.value.path).toBe('/wm/stockDocuments');expect(router.currentRoute.value.query).toEqual({ documentType: 'MATERIAL_ISSUE' });expect(s.visible).toBe(false)
   release({ id: 'late', quantity: '999' });await reading;expect(s.stock).toBeNull()
   expect(calls.execute).not.toHaveBeenCalled()
 })
@@ -53,7 +53,7 @@ it('preserves the frozen uncertain request when leaving for issue verification',
   // Element Plus intersects its confirm/message/prompt overload return types.
   vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce('confirm' as never)
   await s.openIssues();await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/issue/mesMaterialIssue');expect(s.visible).toBe(false)
+  expect(router.currentRoute.value.path).toBe('/wm/stockDocuments');expect(s.visible).toBe(false)
   expect(sessionStorage.getItem(sessionStorage.key(0)!)).toBe(frozen);expect(calls.execute).toHaveBeenCalledTimes(1)
 })
 it('closes a deactivated cached stock drawer and rejects its pending read', async() => {
@@ -87,4 +87,17 @@ it('permits a negative correction while preserving its exact decimal delta', asy
   await wrapper.findComponent(QuantityInput).get('input').setValue('-0.123456000')
   await flushPromises(); await s.submit()
   expect(calls.execute).toHaveBeenCalledWith('correction', expect.objectContaining({ quantity: '-0.123456' }))
+})
+
+it('submits new returns with the unified document identity', async() => {
+  const { s, auth } = await setup(false);auth.factoryPermissions.push('business:wm:stock:return');await flushPromises()
+  s.open('9007199254740999');await flushPromises();s.operation = 'return';Object.assign(s.form, { quantity: '1', reason: 'TEST 退料', documentId: '9007199254740998' });await flushPromises();await s.submit()
+  expect(calls.execute).toHaveBeenCalledWith('return', expect.objectContaining({ documentId: '9007199254740998' }))
+  expect(calls.execute.mock.calls[0]![1]).not.toHaveProperty('issueId')
+})
+it('replays an older uncertain return with the original request and issue identity intact', async() => {
+  const { s, auth } = await setup(false);auth.factoryPermissions.push('business:wm:stock:return');await flushPromises()
+  const command = { requestId: '8e112c7b-f726-46cc-9d31-a6a6b2194902', stockId: '9007199254740999', quantity: '1', expectedQuantity: '800', expectedAvailable: '700', reason: 'TEST old', issueId: '47' }
+  sessionStorage.setItem(`mes-stock-pending:${auth.username}:${auth.factoryId}:9007199254740999`, JSON.stringify({ operation: 'return', command }))
+  s.open('9007199254740999');await flushPromises();await s.submit();expect(calls.execute).toHaveBeenCalledWith('return', command)
 })

@@ -29,7 +29,7 @@
 | 业务目录底层 `BusinessDirectorySelect` | [BusinessDirectorySelect.vue](../src/components/business/directory/BusinessDirectorySelect.vue) | 仅使用已有的受支持目录资源；人员优先使用PersonnelSelect；工艺目录按已有资源语义复用，不另建目录HTTP或名称缓存 | [人员选择](../src/components/business/directory/PersonnelSelect.vue)、[执行列表工艺筛选](../src/components/business/production/ProductionExecutionList.vue) |
 | 工单 `WorkOrderSelect` | [WorkOrderSelect.vue](../src/components/business/production/WorkOrderSelect.vue) | 工单ID、来源/状态上下文、禁用状态；保持可信来源与业务场景准入；不得由名称猜测工单身份 | [库存单据](../src/views/wm/stockDocuments/index.vue) |
 | 执行关联 `ExecutionSelect`（待归并） | [ExecutionSelect.vue](../src/components/business/production/ExecutionSelect.vue) | 执行ID及可选父工单；当前用于记录查询/申报关联。与下一行的检索、候选及返回方式不同，新增消费者前须统一同义规则 | [报工记录](../src/views/production/productionReport/index.vue)、[质量申报](../src/components/business/quality/DefectDeclarationPanel.vue) |
-| 单据执行选择 `ProductionExecutionSelect`（待归并） | [ProductionExecutionSelect.vue](../src/components/business/production/ProductionExecutionSelect.vue) | 执行ID、状态上下文及selected事件；与ExecutionSelect并存不表示允许持续维护两套同义规则；不能混淆ID关联与用户扫码定位 | [领料单](../src/views/issue/mesMaterialIssue/index.vue)、[库存单据](../src/views/wm/stockDocuments/index.vue) |
+| 单据执行选择 `ProductionExecutionSelect`（待归并） | [ProductionExecutionSelect.vue](../src/components/business/production/ProductionExecutionSelect.vue) | 执行ID、状态上下文及selected事件；与ExecutionSelect并存不表示允许持续维护两套同义规则；不能混淆ID关联与用户扫码定位 | [库存单据](../src/views/wm/stockDocuments/index.vue) |
 | 工单可用工艺 `ExecutionRoutingSelect` | [ExecutionRoutingSelect.vue](../src/components/business/production/ExecutionRoutingSelect.vue) | 父工单ID、工艺选择值和禁用状态；候选来自该工单上下文，不等同于通用工艺目录或路径编辑 | [执行列表](../src/components/business/production/ProductionExecutionList.vue) |
 
 ## 扫码与值展示

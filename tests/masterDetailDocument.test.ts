@@ -36,3 +36,10 @@ it('discards a completed save after the factory context has changed', async() =>
   auth.factoryId = 'B';auth.revision++;await flushPromises();finish({ id: parent, reason: 'stale' });await saving
   expect(wrapper.text()).not.toContain('主单信息');expect(wrapper.text()).not.toContain('stale')
 })
+it('keeps aggregate item controls read only when the document freezes its lines', async() => {
+  const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.factoryPermissions = ['list', 'query', 'create', 'update'].map(action => 'qa:' + action)
+  const aggregate = { detail: vi.fn().mockResolvedValue({ header: { id: parent, reason: 'QA' }, items: [{ id: '4', quantity: '1' }] }), create: vi.fn(), update: vi.fn() }
+  wrapper = mount(Document, { props: { title: 'QA', headerApi: header, itemApi: item, aggregateApi: aggregate, headerFields: [{ key: 'reason', label: '依据', kind: 'text' }], itemFields: [{ key: 'quantity', label: '数量', kind: 'text' }], headerPermission: 'qa', itemPermission: 'qa', parentKey: 'documentId', itemsReadonly: () => true }, slots: { items: '<template #items="{writable}"><span data-test="writable">{{ writable }}</span></template>' }, global: { plugins: [pinia, ElementPlus] } })
+  const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;await s.open({ id: parent });await flushPromises()
+  expect(wrapper.get('[data-test="writable"]').text()).toBe('false');expect(wrapper.text()).toContain('保存主单')
+})

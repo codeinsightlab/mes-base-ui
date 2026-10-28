@@ -2,7 +2,7 @@ import { request } from '@/lib/request'
 
 export type StockOperation = 'opening' | 'receipt' | 'gain' | 'loss' | 'correction' | 'return'
 export interface StockCommand {
-  requestId: string; stockId: string; quantity: string; expectedQuantity: string; expectedAvailable: string; reason: string; issueId: string | null
+  requestId: string; stockId: string; quantity: string; expectedQuantity: string; expectedAvailable: string; reason: string; documentId?: string | null
 }
 export interface StockAction {
   id: string; stockId: string; materialId: string; unitId: string; warehouseId: string; batchNo: string | null; binCode: string | null;

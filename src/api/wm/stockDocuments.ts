@@ -20,52 +20,77 @@ export interface Header extends Row {
   id: string; documentNo: string; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED';
   reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionId: string | null; postRequestId: string | null
 }
-export interface Line extends Row { id: string;documentId: string;lineNo: number;stockId: string;materialId: string;warehouseId: string;unitId: string;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
+export interface Line extends Row { id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
 export interface MaterialIssueBasis { requestId: string;code: string;workorderId: string;outputQty: string;routingId: string;routingNodeIds: string[] }
+export interface ProductionInputBasis {
+  requestId: string;inputKind: string;sourceMode: string;executionId: string;workorderId: string;workorderCode: string;
+  outputQty: string;issueQty: string;materialId: string;materialCode: string;warehouseId: string;unitId: string;batchNo: string;
+  bomId: string | null;bomBaseQty: string | null;bomComponentQty: string | null;pathRevision: string | null;
+  routingNodeIds: string[];businessOccurredAt: string | null;confirmedAt: string | null;stockApplied: boolean | null;voidOperationId: string | null;
+  voidResultStatus: string | null;pathError: string | null
+}
 export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
 export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionId: string } | null }
 export interface ProductionReceiptCommand { requestId: string; stockId: string; quantity: string; reason: string }
 export interface ApprovalIntent { requestId: string;expectedRevision: string }
+export interface MaterialIssueVoidResult {
+  documentId: string;documentStatus: string;productionInputStatus: string | null;voidOperationId: string | null;
+  voidResultStatus: string | null;voidRequestedAt: string | null;voidFinishedAt: string | null;message: string | null
+}
 export interface ProductionBasis { executionId: string;productId: string;effective: string;received: string;remaining: string;canReceive: boolean;blockedReason: string | null }
 export interface CancellationBasis { workorderId: string;productId: string;status: string;handedOver: string;accepted: string;manuallyReceived: string;remaining: string }
 const root = '/api/wm/stock-documents'
 const path = (id:string) => root + '/' + encodeURIComponent(id)
 export const stockDocuments = {
   list: (query:Record<string, string | number>) => request<{ items: Header[];total: number;offset: number;limit: number }>(root, { query, scope: 'factory' }),
-  detail: (id:string) => request<Detail>(path(id), { scope: 'factory' }),
-  create: (body:unknown) => request<Detail>(root, { method: 'POST', body, scope: 'factory' }),
+  detail: (id:string, materialIssueOnly = false) => request<Detail>(path(id), materialIssueOnly ? { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' } : { scope: 'factory' }),
+  productionInputBasis: (id:string, materialIssueOnly = false) => request<ProductionInputBasis | null>(path(id) + '/production-input-basis', materialIssueOnly ? { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' } : { scope: 'factory' }),
+  materialIssueLines: (id:string) => request<Line[]>(path(id) + '/lines', { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }),
+  materialIssueLine: (id:string, lineId:string) => request<Line>(path(id) + '/lines/' + encodeURIComponent(lineId), { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }),
+  createAggregate: (body:unknown) => request<Detail>(root + '/aggregate', { method: 'POST', body, scope: 'factory' }),
   numberingRules: (type: 'STOCK_IN' | 'STOCK_OUT') => request<NumberingRuleOption[]>(root + '/numbering-rules', { query: { type }, scope: 'factory' }),
-  edit: (id:string, body:unknown) => request<Detail>(path(id), { method: 'PUT', body, scope: 'factory' }),
+  editAggregate: (id:string, body:unknown) => request<Detail>(path(id) + '/aggregate', { method: 'PUT', body, scope: 'factory' }),
   approve: (id:string, body:ApprovalIntent) => request<Detail>(path(id) + '/actions/approve', { method: 'POST', body, scope: 'factory' }),
   cancel: (id:string, expectedRevision:string) => request<Detail>(path(id) + '/actions/cancel', { method: 'POST', body: { expectedRevision }, scope: 'factory' }),
-  putLine: (id:string, lineId:string | null, body:unknown) => request<Line>(path(id) + '/lines' + (lineId ? '/' + encodeURIComponent(lineId) : ''), { method: lineId ? 'PUT' : 'POST', body, scope: 'factory' }),
-  removeLine: (id:string, lineId:string, expectedRevision:string) => request<void>(path(id) + '/lines/' + encodeURIComponent(lineId), { method: 'DELETE', body: { expectedRevision }, scope: 'factory' }),
+  voidMaterialIssue: (id:string, reconcile = false) => request<MaterialIssueVoidResult>(path(id) + '/actions/' + (reconcile ? 'reconcile-void' : 'void'), { method: 'POST', scope: 'factory' }),
   receiveProduction: (id:string, body:ProductionReceiptCommand) => request<Detail>('/api/production/executions/' + encodeURIComponent(id) + '/inbound', { method: 'POST', body, scope: 'factory' }),
   productionBasis: (id:string) => request<ProductionBasis>(root + '/executions/' + encodeURIComponent(id) + '/basis', { scope: 'factory' }),
   basis: (id:string) => request<CancellationBasis>(root + '/cancelled-workorders/' + encodeURIComponent(id) + '/basis', { scope: 'factory' })
 }
-/** Adapts the existing shared master/detail component to this document's versioned commands. */
-export function stockDocumentApis(changed:() => Promise<void>) {
-  let header:Header | null = null
-  const parents = new Map<string, string>()
-  const store = (d:Detail) => { header = { ...d.document, ...d.qualitySource, materialIssueBasis: d.materialIssueBasis ?? null, materialIssueBasisError: d.materialIssueBasisError ?? null };d.lines.forEach(l => parents.set(l.id, l.documentId));return d }
-  const headerApi:CrudApi = {
-    list: stockDocuments.list,
-    detail: async id => { store(await stockDocuments.detail(id));return header! },
-    create: async raw => { const b = raw as Row;if (typeof b.ruleCode !== 'string' || !b.ruleCode) throw Error('请选择出入库单编码规则');return { ...store(await stockDocuments.create({ ruleCode: b.ruleCode, documentType: b.documentType, reason: b.reason, remark: b.remark, sourceWorkorderId: b.sourceWorkorderId, sourceExecutionId: b.sourceExecutionId })).document, isNew: '' } },
-    update: async(id, raw) => { const b = raw as Row;if (!header || header.id !== id) throw Error('请重新打开单据');return store(await stockDocuments.edit(id, { expectedRevision: header.revision, reason: b.reason, remark: b.remark })).document },
+/** The document and its complete set of lines are saved by one business command. */
+export function stockDocumentApis(access: { issueListOnly: () => boolean; issueQueryOnly: () => boolean } = { issueListOnly: () => false, issueQueryOnly: () => false }) {
+  const unsupported = async (): Promise<never> => { throw Error('请使用整单保存') }
+  const headerApi: CrudApi = {
+    list: query => stockDocuments.list(access.issueListOnly() ? { ...query, documentType: 'MATERIAL_ISSUE' } : query),
+    detail: async id => (await stockDocuments.detail(id, access.issueQueryOnly())).document,
+    create: unsupported, update: unsupported,
     remove: async() => { throw Error('正式仓储单据仅允许作废草稿') }
   }
-  const itemApi:CrudApi = {
-    list: async q => { const id = String(q.documentId);const d = store(await stockDocuments.detail(id));const offset = Number(q.offset ?? 0), limit = Number(q.limit ?? 20);return { items: d.lines.slice(offset, offset + limit), total: d.lines.length, offset, limit } },
-    detail: async id => { const parent = parents.get(id);if (!parent) throw Error('请刷新明细');const d = store(await stockDocuments.detail(parent));const line = d.lines.find(l => l.id === id);if (!line) throw Error('明细已不存在');return line },
-    create: async raw => save(null, raw), update: async(id, raw) => save(id, raw),
-    remove: async id => { const parent = parents.get(id);if (!header || header.id !== parent) throw Error('请刷新主单');await stockDocuments.removeLine(parent!, id, header.revision);await changed() }
+  const itemApi: CrudApi = { list: unsupported, detail: unsupported, create: unsupported, update: unsupported, remove: unsupported }
+  const view = (detail:Detail) => ({
+    header: { ...detail.document, ...detail.qualitySource, isNew: '', materialIssueBasis: detail.materialIssueBasis ?? null,
+      materialIssueBasisError: detail.materialIssueBasisError ?? null },
+    items: detail.lines
+  })
+  const command = (raw:unknown) => {
+    const b = raw as Row
+    if (!Array.isArray(b.items)) throw Error('请填写单据明细')
+    return { header: { documentType: b.documentType, reason: b.reason, remark: b.remark,
+      sourceWorkorderId: b.sourceWorkorderId, sourceExecutionId: b.sourceExecutionId,
+      ruleCode: b.ruleCode, expectedRevision: b.revision }, items: b.items.map((value:unknown) => {
+      const line = value as Row
+      return { id: line.id ?? null, stockId: line.stockId, materialId: line.materialId, warehouseId: line.warehouseId,
+        unitId: line.unitId, batchNo: line.batchNo, binCode: line.binCode, quantity: line.quantity, remark: line.remark }
+    }) }
   }
-  async function save(lineId:string | null, raw:unknown) {
-    const b = raw as Row, id = String(b.documentId ?? (lineId ? parents.get(lineId) : ''));if (!header || header.id !== id) throw Error('请刷新主单')
-    const result = await stockDocuments.putLine(id, lineId, { expectedRevision: header.revision, stockId: b.stockId, materialId: b.materialId, warehouseId: b.warehouseId, unitId: b.unitId, batchNo: b.batchNo, binCode: b.binCode, quantity: b.quantity, remark: b.remark })
-    parents.set(result.id, id);await changed();return result
+  const aggregateApi = {
+    detail: async(id:string) => view(await stockDocuments.detail(id, access.issueQueryOnly())),
+    create: async(raw:unknown) => {
+      const b = raw as Row
+      if (typeof b.ruleCode !== 'string' || !b.ruleCode) throw Error('请选择出入库单编码规则')
+      return view(await stockDocuments.createAggregate(command(raw)))
+    },
+    update: async(id:string, raw:unknown) => view(await stockDocuments.editAggregate(id, command(raw)))
   }
-  return { headerApi, itemApi, clear: () => { header = null;parents.clear() } }
+  return { headerApi, itemApi, aggregateApi }
 }

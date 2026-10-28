@@ -37,6 +37,7 @@ const props = withDefaults(defineProps<{
   editorBusy?: boolean;
   saveLabel?: string;
   fixedValues?: Record<string, string>;
+  initialSearch?: Record<string, string>;
   tableKey?: string;
   tableConfigUrl?: string;
   title: string;
@@ -61,7 +62,7 @@ const resolvedPermissionScope = computed<PermissionScope>(() => props.permission
 const rows = ref<Row[]>([]), total = ref(0), page = ref(1), limit = ref(20), loading = ref(false), saving = ref(false),
   error = ref(''), dialog = ref(false), editId = ref<string | null>(null)
 const showSearch = ref(true)
-const draft = reactive<Row>({}), search = reactive<Record<string, string>>({})
+const draft = reactive<Row>({}), search = reactive<Record<string, string>>({ ...props.initialSearch })
 let generation = 0, contextGeneration = 0
 let savedDraft = ''
 const defaultColumns = computed(() => props.fields.filter(f => !f.hidden && !(f.key in (props.fixedValues ?? {})) && f.kind !== 'password' && f.key !== 'factoryId'))
@@ -250,6 +251,12 @@ function reset() {
   Object.keys(search).forEach(k => delete search[k])
   searchNow()
 }
+
+watch(() => JSON.stringify(props.initialSearch), () => {
+  Object.keys(search).forEach(k => delete search[k])
+  Object.assign(search, props.initialSearch)
+  searchNow()
+})
 
 watch(() => [props.api, JSON.stringify(props.fixedValues), auth.revision], () => {
   generation++

@@ -13,10 +13,13 @@ const ElMessageBox = usePageMessageBox()
 
 const props = withDefaults(defineProps<{
   creatable?: boolean;
+  deletable?: boolean;
   title: string; headerApi: Omit<CrudApi,'create'|'update'> & { create(body:unknown):Promise<Row>; update(id:string,body:unknown):Promise<Row> }; itemApi: CrudApi;
   aggregateApi?: { detail(id:string):Promise<{header:Row;items:Row[]}>; create(body:unknown):Promise<{header:Row;items:Row[]}>; update(id:string,body:unknown):Promise<{header:Row;items:Row[]}> };
   headerFields: Field[]; itemFields: Field[];
   headerPermission: string; itemPermission: string; parentKey: string;
+  headerPermissionOverrides?: Record<string, string>;
+  initialSearch?: Record<string, string>;
   revisionField?: string;
   validateAggregateItems?: (items:Row[]) => string | null;
   headerTableKey?: string; itemTableKey?: string;
@@ -26,14 +29,14 @@ const props = withDefaults(defineProps<{
   itemsReadonlyWhenDirty?: boolean;
   itemVersionField?: string;
   itemBeforeCreate?: () => Promise<Row | null>;
-}>(), { creatable: true })
+}>(), { creatable: true, deletable: true })
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
 const draft = reactive<Row>({})
 const aggregateItems = ref<Row[]>([])
 let generation = 0
 let savedDraft = '{}'
-const can = (action: string) => auth.hasPermission(props.headerPermission + ':' + action, 'factory')
+const can = (action: string) => auth.hasPermission(props.headerPermissionOverrides?.[action] ?? props.headerPermission + ':' + action, 'factory')
 const readonly = computed(() => !!id.value && !!props.headerReadonly?.(draft))
 const writable = computed(() => !readonly.value && (id.value ? can('update') : can('create')))
 const fixedValues = computed(() => id.value ? { [props.parentKey]: id.value } : {})
@@ -186,11 +189,13 @@ onBeforeUnmount(clear)
     :api="headerApi"
     :fields="headerFields"
     :permission="headerPermission"
+    :permission-overrides="headerPermissionOverrides"
     permission-scope="factory"
     list-action="list"
     detail-action="query"
     managed-editing
     :table-key="headerTableKey"
+    :initial-search="initialSearch"
   >
     <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
     <template #actions="{ row }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button></template>
@@ -199,7 +204,7 @@ onBeforeUnmount(clear)
     <PageHeader :title="title" :description="id ? '单据编号 ' + id : '新增单据'">
       <template #status><slot name="header-actions" :row="draft" :refresh="refresh" :dirty="snapshot() !== savedDraft" /></template>
       <el-button :disabled="saving" @click="back">返回列表</el-button>
-      <el-button v-if="id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除主单</el-button>
+      <el-button v-if="deletable && id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除主单</el-button>
       <el-button v-if="writable" type="primary" :loading="saving" :disabled="loading" @click="save">保存主单</el-button>
     </PageHeader>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
@@ -213,7 +218,7 @@ onBeforeUnmount(clear)
       <h2>单据明细</h2>
       <template v-if="atomic">
         <el-alert v-if="!writable" title="当前单据只读。" type="info" :closable="false" />
-        <slot name="items" :items="aggregateItems" :writable="writable && !loading && !saving" :saving="saving" :add="(row: Row) => aggregateItems.push(row)" :remove="(index: number) => aggregateItems.splice(index, 1)" />
+        <slot name="items" :header="draft" :items="aggregateItems" :writable="writable && !itemsReadonly?.(draft) && !loading && !saving" :saving="saving" :add="(row: Row) => aggregateItems.push(row)" :remove="(index: number) => aggregateItems.splice(index, 1)" />
       </template>
       <template v-else>
       <el-alert v-if="!id" title="先保存主单，再新增明细。" type="info" :closable="false" />
