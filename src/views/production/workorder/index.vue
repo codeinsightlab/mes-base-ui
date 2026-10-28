@@ -24,7 +24,7 @@ import WorkOrderCancellation from '@/components/business/production/WorkOrderCan
 import WorkorderMaterialPanel from '@/components/business/production/WorkorderMaterialPanel.vue'
 import WorkOrderExecutions from '@/components/business/production/WorkOrderExecutions.vue'
 import WorkOrderRoutePreview from '@/components/business/production/WorkOrderRoutePreview.vue'
-import { api, type BatchHistory, type Detail, type NumberingRuleOption, type RoutingOption, type Save } from '@/api/production/workorder'
+import { api, type Detail, type NumberingRuleOption, type RoutingOption, type Save } from '@/api/production/workorder'
 import { api as materials, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
@@ -55,16 +55,13 @@ const originalPlannedQty = ref('')
 const plannedQuantityValid = ref(false)
 const blank = (): Save => ({ ruleCode: '', productId: '', routingId: '', plannedQty: '', plannedStartAt: null, plannedEndAt: null, externalId: null, externalCode: null, remark: null })
 const form = reactive<Save>(blank())
-const histories = ref<Record<string, BatchHistory>>({}), historyLoading = ref<Record<string, boolean>>({})
-let historyAttempt = 0
 let listAttempt = 0, detailAttempt = 0, productAttempt = 0, routeAttempt = 0, numberingAttempt = 0
 function clear() {
-  historyAttempt++; histories.value = {}; historyLoading.value = {}
   listAttempt++; detailAttempt++; productAttempt++; routeAttempt++; numberingAttempt++
   rows.value = []; total.value = 0; detail.value = null; productOptions.value = []; routeOptions.value = []; numberingRules.value = []; numberingRulesLoading.value = false
   dialog.value = drawer.value = loading.value = busy.value = false; error.value = ''; page.value = 1; editId.value = null; Object.assign(form, blank())
 }
-watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), auth.hasPermission('batch:query', 'factory'), canExecutions.value], () => { clear(); if (can('list')) void load() }, { flush: 'sync' })
+watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), canExecutions.value], () => { clear(); if (can('list')) void load() }, { flush: 'sync' })
 function refreshAfterIssueVoid(event: Event) {
   if (!(event instanceof CustomEvent) || event.detail?.factoryId !== auth.factoryId) return
   if (can('list')) void load()
@@ -110,7 +107,6 @@ async function create() {
 async function open(id: string) {
   if (!can('query')) return
   const attempt = ++detailAttempt
-  historyAttempt++; histories.value = {}; historyLoading.value = {}
   drawer.value = true; detail.value = null; busy.value = true; error.value = ''
   try { const value = await api.detail(id); if (attempt === detailAttempt) detail.value = value } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '详情读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
@@ -170,13 +166,7 @@ async function remove(row: Detail['workorder']) {
   if (attempt !== detailAttempt || !can('delete')) return
   try { await api.remove(row.id, row.revision); if (attempt === detailAttempt) await load() } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '删除失败' }
 }
-async function loadHistory(id: string) {
-  if (!auth.hasPermission('batch:query', 'factory') || historyLoading.value[id]) return
-  const attempt = historyAttempt
-  historyLoading.value[id] = true
-  try { const value = await api.batchHistory(id); if (attempt === historyAttempt) histories.value[id] = value } catch(e) { if (attempt === historyAttempt) error.value = e instanceof Error ? e.message : '历史路径读取失败' } finally { if (attempt === historyAttempt) historyLoading.value[id] = false }
-}
-function closeHistory() { detailAttempt++; detail.value = null; busy.value = false; historyAttempt++; histories.value = {}; historyLoading.value = {} }
+function closeDetail() { detailAttempt++; detail.value = null; busy.value = false }
 onMounted(load)
 </script>
 <template>
@@ -224,7 +214,7 @@ onMounted(load)
       <p class="secondary">仅草稿工单允许编辑。已下达工单需先退回草稿；存在下游记录时不能退回或删除。计划数量不能低于已分配的执行目标数量。</p>
       <template #footer><el-button @click="dialog=false">取消</el-button><el-button type="primary" :loading="busy" @click="save">保存</el-button></template>
     </PageDialog>
-    <PageDrawer @close="closeHistory" v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close>
+    <PageDrawer @close="closeDetail" v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close>
       <template v-if="detail">
         <WorkOrderCancellation history :order="detail.workorder" @changed="load();open(detail.workorder.id)" />
         <el-descriptions :column="detailColumns" border>
@@ -238,10 +228,6 @@ onMounted(load)
         <WorkOrderRoutePreview :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" :routing-id="detail.workorder.routingId" />
         <WorkOrderExecutions v-if="canExecutions" :key="detail.workorder.id" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" />
         <el-alert v-else title="当前账号没有生产执行列表权限" type="info" :closable="false" />
-        <el-collapse v-if="detail.batches.length"><el-collapse-item title="旧批次与已选路径（历史只读）">
-          <el-alert title="保留旧模型数据；已确认出库或路径锁定不代表执行已开工，历史路径不参与新执行准入。" type="info" :closable="false" />
-          <el-table :data="detail.batches" row-key="id"><el-table-column label="历史批次号" prop="batchNo" min-width="140" /><el-table-column :formatter="quantityColumn" label="历史计划量" prop="plannedQty" min-width="140" /><el-table-column label="旧路径状态" prop="routeStatus" min-width="130" /><el-table-column label="出库锁定时间" prop="lockedAt" min-width="180" /><el-table-column label="历史所选节点" min-width="200"><template #default="{row}"><template v-if="histories[row.id]">{{ histories[row.id]!.path.map(n=>n.routingNodeId).join(' → ') || '无历史所选节点' }}</template><el-button v-else-if="auth.hasPermission('batch:query', 'factory')" link :loading="historyLoading[row.id]" @click="loadHistory(row.id)">读取历史路径</el-button><span v-else>需要历史批次查询权限</span></template></el-table-column></el-table>
-        </el-collapse-item></el-collapse>
       </template><el-empty v-else-if="!busy" description="未读取到工单" />
     </PageDrawer>
   </div>

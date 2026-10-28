@@ -6,23 +6,16 @@ export interface Order {
   createTime: string | null
   externalId: string | null; externalCode: string | null; remark: string | null; revision: number
 }
-export interface Batch {
-  id: string; workorderId: string; batchNo: string; plannedQty: string | number; status: 'PLANNED' | 'ISSUED'
-  routeStatus: 'UNSELECTED' | 'SELECTED' | 'PENDING' | 'UNKNOWN' | 'LOCKED'; lockedAt: string | null
-  revision: number; remark: string | null
-}
-export interface BatchHistory extends Batch { path: { routingNodeId: string; executionOrder: number }[] }
 export interface RoutingOption { id: string; code: string; name: string; version: number; status: string }
 export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
 export interface Allocation { workorderId: string; plannedQty: string; allocatedTargetQty: string; remainingTargetQty: string; excessTargetQty: string; executionCount: number }
-export interface Detail { workorder: Order; productCode: string; productName: string; routing: RoutingOption; batches: Batch[]; allocation: Allocation }
+export interface Detail { workorder: Order; productCode: string; productName: string; routing: RoutingOption; allocation: Allocation }
 export interface Save {
   code?: string; ruleCode?: string; productId: string; routingId: string; plannedQty: string; revision?: number
   plannedStartAt: string | null; plannedEndAt: string | null; externalId: string | null
   externalCode: string | null; remark: string | null
 }
 export function saveBody(input: Save, creating = false): Save {
-  if ('batches' in input) throw new Error('旧分批写入已停用，请创建生产执行单元')
   return {
     ...(input.code ? { code: input.code } : {}), ...(creating && input.ruleCode ? { ruleCode: input.ruleCode } : {}), productId: input.productId, routingId: input.routingId, plannedQty: input.plannedQty,
     plannedStartAt: input.plannedStartAt, plannedEndAt: input.plannedEndAt, externalId: input.externalId,
@@ -52,8 +45,7 @@ export const api = {
   recall: (id: string, revision: number) => request<Detail>(path(id) + '/actions/recall', { method: 'POST', body: { revision }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   cancel: (id:string, body:CancelCommand) => request<Cancellation>(path(id) + '/actions/cancel', { method: 'POST', body, scope: 'factory' }),
   cancellation: (id:string) => request<Cancellation | null>(path(id) + '/cancellation', { scope: 'factory' }),
-  batchHistory: (id: string) => request<BatchHistory>('/api/production/batch/' + encodeURIComponent(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
-  list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; batchCount: number; erpExtraMissing: boolean; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; erpExtraMissing: boolean; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   detail: (id: string) => request<Detail>(path(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   create: (body: Save) => request<Detail>(base, { method: 'POST', body: saveBody(body, true), scope: 'factory', parseResponse: parseWorkOrderResponse }),
   update: (id: string, body: Save) => request<Detail>(path(id), { method: 'PUT', body: saveBody(body), scope: 'factory', parseResponse: parseWorkOrderResponse }),
