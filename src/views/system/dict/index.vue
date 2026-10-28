@@ -113,7 +113,7 @@
       <el-table-column label="字典名称" align="center" prop="dictName" :show-overflow-tooltip="true" />
       <el-table-column label="字典类型" align="center" :show-overflow-tooltip="true">
         <template #default="scope">
-          <router-link :to="'/system/dict-data/index/' + scope.row.dictId" class="link-type">
+          <router-link :to="'/system/dict-data/index/' + scope.row.dictId" class="dict-data-link">
             <CodeText :value="scope.row.dictType" />
           </router-link>
         </template>
@@ -349,3 +349,25 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.dict-data-link {
+  color: var(--el-color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.dict-data-link :deep(.code-text) {
+  color: inherit;
+}
+
+.dict-data-link:hover {
+  color: var(--el-color-primary-dark-2);
+}
+
+.dict-data-link:hover :deep(.code-text) {
+  color: inherit;
+}
+</style>
