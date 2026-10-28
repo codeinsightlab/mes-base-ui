@@ -1,6 +1,7 @@
 <template>
   <div class="app-container">
-    <PageHeader section="MES BASE / SYSTEM" title="自动编码规则" description="通用编号规则、预览与生成" />
+    <PageHeader section="MES BASE / SYSTEM" title="自动编码规则" description="维护规则、预览并正式取号" />
+    <el-alert type="info" :closable="false" show-icon class="mb8" title="调用约定：规则编码就是 getDocNo(type) 的 type，无需额外传入前缀、日期或流水。规则组成按前缀、日期、流水配置。此页预览和正式生成用于平台配置检查；Factory业务创建由服务读取当前工厂上下文并独立取号。" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="规则名称" prop="ruleName">
@@ -76,11 +77,12 @@
       <right-toolbar v-model:show-search="showSearch" @query-table="getList" />
     </el-row>
 
-    <PageDialog v-model="codeOpen" title="验证平台编码规则" width="520px" append-to-body>
+    <PageDialog v-model="codeOpen" title="预览或正式取号" width="520px" append-to-body>
       <p>规则：{{ codeRule.ruleName }}（{{ codeRule.ruleCode }}）</p>
-      <el-input v-model="codeInput" maxlength="64" placeholder="输入字符（仅输入字符组成或按字符循环时需要）" />
+      <p>调用参数：<code>getDocNo("{{ codeRule.ruleCode }}")</code></p>
+      <el-input v-model="codeInput" maxlength="64" placeholder="平台通用规则输入字符（仅 INPUTCHAR 组成或按字符循环时需要）" />
       <el-alert v-if="generatedCode" :title="generatedCode" type="success" :closable="false" style="margin-top:16px" />
-      <template #footer><el-button @click="codeOpen=false">关闭</el-button><el-button :loading="codeLoading" @click="testCode(false)">预览（不占用流水号）</el-button><el-button v-hasPermi="['system:autocode:rule:generate']" type="primary" :loading="codeLoading" @click="testCode(true)">生成并登记</el-button></template>
+      <template #footer><el-button @click="codeOpen=false">关闭</el-button><el-button :loading="codeLoading" @click="testCode(false)">预览（不占用流水号）</el-button><el-button v-hasPermi="['system:autocode:rule:generate']" type="primary" :loading="codeLoading" @click="testCode(true)">正式取号</el-button></template>
     </PageDialog>
     <el-table v-loading="loading" :data="ruleList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
@@ -92,6 +94,9 @@
         </template>
       </el-table-column>
       <el-table-column label="规则名称" align="center" prop="ruleName" :show-overflow-tooltip="true" />
+      <el-table-column label="单据类型" align="center" prop="ruleType">
+        <template #default="scope"><dict-tag :options="dict.type.sys_autocode_ruletype" :value="scope.row.ruleType" /></template>
+      </el-table-column>
       <el-table-column label="最大长度" align="center" prop="maxLength" />
       <el-table-column label="是否补齐" align="center" prop="isPadded" />
       <el-table-column label="是否可用" align="center" prop="enableFlag">
@@ -145,6 +150,11 @@
         <el-form-item label="规则名称" prop="ruleName">
           <el-input v-model="form.ruleName" placeholder="请输入规则名称" />
         </el-form-item>
+        <el-form-item label="单据类型" prop="ruleType">
+          <el-select v-model="form.ruleType" :disabled="form.ruleId != undefined && !!form.ruleType" placeholder="选择固定单据类型">
+            <el-option v-for="item in dict.type.sys_autocode_ruletype" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="描述" prop="ruleDesc">
           <el-input v-model="form.ruleDesc" placeholder="请输入描述信息" />
         </el-form-item>
@@ -193,13 +203,12 @@ import PageDialog from '@/components/page/PageDialog.vue'
 import QueryForm from '@/components/QueryForm.vue'
 
 import { sourceList } from '@/utils/sourceList'
-import request from '@/utils/request'
-import { listRule, getRule, delRule, addRule, updateRule } from '@/api/system/autocode/rule'
+import { listRule, getRule, delRule, addRule, updateRule, genCode, previewCode } from '@/api/system/autocode/rule'
 
 export default {
   components: { PageDialog, QueryForm },
   name: 'AutoCodeRule',
-  dicts: ['sys_yes_no'],
+  dicts: ['sys_yes_no', 'sys_autocode_ruletype'],
   data() {
     return {
       queryError: '',
@@ -240,6 +249,9 @@ export default {
         ],
         ruleName: [
           { required: true, message: '规则名称不能为空', trigger: 'blur' }
+        ],
+        ruleType: [
+          { required: true, message: '单据类型不能为空', trigger: 'change' }
         ]
       }
     }
@@ -249,7 +261,7 @@ export default {
   },
   methods: {
     openCode(row) { this.codeRule = row;this.codeInput = '';this.generatedCode = '';this.codeOpen = true },
-    async testCode(persist) { this.codeLoading = true;try { const r = await request({ url: '/system/autocode/' + (persist ? 'generate' : 'preview'), method: 'post', data: { ruleCode: this.codeRule.ruleCode, inputCharacter: this.codeInput || null }, scope: 'platform' });this.generatedCode = r.data.code } finally { this.codeLoading = false } },
+    async testCode(persist) { this.codeLoading = true;this.generatedCode = '';try { const r = persist ? await genCode(this.codeRule.ruleCode, this.codeInput || null) : await previewCode(this.codeRule.ruleCode, this.codeInput || null);this.generatedCode = r.data.code } finally { this.codeLoading = false } },
     /** 查询字典类型列表 */
     getList() {
       return sourceList(this, () => listRule(this.addDateRange(this.queryParams, this.dateRange)), response => {
@@ -268,6 +280,7 @@ export default {
       this.form = {
         ruleId: undefined,
         ruleCode: undefined,
+        ruleType: undefined,
         ruleName: undefined,
         ruleDesc: undefined,
         maxLength: undefined,

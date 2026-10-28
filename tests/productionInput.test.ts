@@ -8,18 +8,18 @@ import { useAuth } from '../src/stores/auth'
 const rules = vi.hoisted(() => ({ material: vi.fn(), unit: vi.fn() }))
 vi.mock('../src/api/basic/material', () => ({ api: { detail: rules.material } }))
 vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: rules.unit } }))
-const { query, preview, calculate, submit, draft } = vi.hoisted(() => ({ query: vi.fn(), preview: vi.fn(), calculate: vi.fn(), submit: vi.fn(), draft: vi.fn() }))
-vi.mock('../src/api/production/productionInput', () => ({ inputPermission: 'business:mes:material:issue:update', productionInput: { query, preview, calculate, submit, draft }}))
+const { query, preview, calculate, submit, draft, numberingRules } = vi.hoisted(() => ({ query: vi.fn(), preview: vi.fn(), calculate: vi.fn(), submit: vi.fn(), draft: vi.fn(), numberingRules: vi.fn() }))
+vi.mock('../src/api/production/productionInput', () => ({ inputPermission: 'business:mes:material:issue:update', productionInput: { query, preview, calculate, submit, draft, numberingRules }}))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const stock = { reference: '1', materialId: '1', materialCode: 'M1', lotCode: '000L', warehouseId: '1', warehouseCode: 'W1', binCode: 'B1', unitId: '1', unitCode: 'KG', availableQty: '1000.000001', observedAt: '2026-10-16T10:00:00' }
 const order = { productId:'2', workorderId: '1', workorderCode: 'WO1', productCode: 'P1', productName: '控制臂', workCenter: 'CENTER', plannedQty: '1000', outputUnitCode: 'PCS', status: 'RELEASED', allowedWarehouses: ['1'] }
 const definition = { routing: { id: '7', code: 'R1', name: '加工', version: 2 }, products: [], nodes: [{ id: '11', nodeCode: 'A', operationId: '1', operationName: '钻孔', displayOrder: 99, isKey: false, description: null }], edges: [] }
-type State = { code: string; orderId: string; stockId: string; outputQty: string; selected: string[]; query: () => Promise<void>; calculate: () => Promise<void>; submit: () => Promise<void>; supply: unknown; preview: unknown; pending: { requestId: string } | null; result: { executionId: string } | null }
+type State = { code: string; orderId: string; stockId: string; outputQty: string; selected: string[]; selectedRuleCode: string; numberingRules: unknown[]; query: () => Promise<void>; calculate: () => Promise<void>; submit: () => Promise<void>; supply: unknown; preview: unknown; pending: { requestId: string; ruleCode?: string } | null; result: { executionId: string } | null }
 let wrapper:ReturnType<typeof mount>
-beforeEach(() => { sessionStorage.clear(); vi.resetAllMocks();invalidateQuantityRules();rules.material.mockResolvedValue({unitId:'u'});rules.unit.mockResolvedValue({mustBeWholeNumber:0,quantityPrecision:6}); vi.stubGlobal('ResizeObserver', class {observe() {} unobserve() {} disconnect() {}}); query.mockResolvedValue({ sourceMode: 'LOCAL_ONLY', stocks: [stock], orders: [order] }); preview.mockResolvedValue({ definition, actual: null }); calculate.mockResolvedValue({ sourceMode: 'LOCAL_ONLY', order, stock, outputQty: '100', issueQty: '200.000000', calculationKey: 'freeze-1' }); submit.mockResolvedValue({ requestId: 'r', issueId: '2', executionId: '3', code: 'WO1:P1#000L', status: 'CONFIRMED', productionInputQty: '100', availableQty: '100' }) })
+beforeEach(() => { sessionStorage.clear(); vi.resetAllMocks();invalidateQuantityRules();rules.material.mockResolvedValue({unitId:'u'});rules.unit.mockResolvedValue({mustBeWholeNumber:0,quantityPrecision:6}); vi.stubGlobal('ResizeObserver', class {observe() {} unobserve() {} disconnect() {}}); query.mockResolvedValue({ sourceMode: 'LOCAL_ONLY', stocks: [stock], orders: [order] }); numberingRules.mockResolvedValue([{ ruleCode: 'OUT_RULE', ruleName: '领料出库', prefix: 'MI' }]); preview.mockResolvedValue({ definition, actual: null }); calculate.mockResolvedValue({ sourceMode: 'LOCAL_ONLY', order, stock, outputQty: '100', issueQty: '200.000000', calculationKey: 'freeze-1' }); submit.mockResolvedValue({ requestId: 'r', issueId: '2', executionId: '3', code: 'WO1:P1#000L', status: 'CONFIRMED', productionInputQty: '100', availableQty: '100' }) })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '' })
-async function setup() { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = ['business:material:query','business:unit:measure:query','business:mes:material:issue:update', 'business:wm:stock:document:create', 'business:wm:stock:document:update', 'business:wm:stock:document:post'];wrapper = mount(Input, { global: { plugins: [pinia, ElementPlus], stubs: { RoutingGraphPreview: true }}});const s = wrapper.vm as unknown as State;s.code = 'WO1:M1#000L';await s.query();await flushPromises();return { s, auth } }
-it('queries without writes, auto-selects only one order, and keeps separate material and output quantities', async() => { const { s } = await setup();expect(s.orderId).toBe('1');expect(submit).not.toHaveBeenCalled();expect(wrapper.text()).toContain('独立 MES');s.stockId = '1';s.outputQty = '100';await flushPromises();await s.calculate();expect(wrapper.text()).toContain('200');s.selected = ['11'];await s.submit();expect(submit.mock.calls[0]![0]).toMatchObject({ code: 'WO1:M1#000L', outputQty: '100', calculationKey: 'freeze-1', inputKind: 'PRODUCTION_INPUT' });expect(submit.mock.calls[0]![0]).not.toHaveProperty('issueQty');expect(wrapper.text()).toContain('3') })
+async function setup(selectRule = true) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = ['business:material:query','business:unit:measure:query','business:mes:material:issue:update', 'business:wm:stock:document:create', 'business:wm:stock:document:update', 'business:wm:stock:document:post'];wrapper = mount(Input, { global: { plugins: [pinia, ElementPlus], stubs: { RoutingGraphPreview: true }}});const s = wrapper.vm as unknown as State;s.code = 'WO1:M1#000L';await s.query();await flushPromises();if (selectRule) s.selectedRuleCode = 'OUT_RULE';await flushPromises();return { s, auth } }
+it('queries without writes, explicitly chooses the STOCK_OUT rule, and keeps separate quantities', async() => { const { s } = await setup();expect(s.orderId).toBe('1');expect(numberingRules).toHaveBeenCalledOnce();expect(s.selectedRuleCode).toBe('OUT_RULE');expect(submit).not.toHaveBeenCalled();expect(wrapper.text()).toContain('独立 MES');s.stockId = '1';s.outputQty = '100';await flushPromises();await s.calculate();expect(wrapper.text()).toContain('200');s.selected = ['11'];await s.submit();expect(submit.mock.calls[0]![0]).toMatchObject({ code: 'WO1:M1#000L', outputQty: '100', calculationKey: 'freeze-1', inputKind: 'PRODUCTION_INPUT', ruleCode: 'OUT_RULE' });expect(submit.mock.calls[0]![0]).not.toHaveProperty('issueQty');expect(wrapper.text()).toContain('3') })
 it('keeps an unmatched workorder and product empty rather than choosing another order', async() => { query.mockResolvedValue({ sourceMode: 'LOCAL_ONLY', stocks: [], orders: [], total: 0, offset: 0, limit: 20 });const { s } = await setup();expect(s.orderId).toBe('');expect(preview).not.toHaveBeenCalled();expect(query).toHaveBeenCalledWith('WO1:M1#000L') })
 it('keeps the same request after a lost response and prevents double submission', async() => { const { s } = await setup();s.stockId = '1';s.outputQty = '100';await flushPromises();await s.calculate();s.selected = ['11'];submit.mockRejectedValueOnce(new Error('网络断开'));await s.submit();const first = { ...submit.mock.calls[0]![0] };await s.submit();expect(submit.mock.calls[1]![0]).toEqual(first) })
 it.each(['factory', 'permission'])('clears state and rejects late responses on %s change', async(kind) => { const { s, auth } = await setup();let release!:(v:unknown) => void;query.mockImplementationOnce(() => new Promise(r => { release = r }));const task = s.query();if (kind === 'factory')auth.factoryId = 'B';else auth.factoryPermissions = ['business:material:query','business:unit:measure:query',];await flushPromises();release({ sourceMode: 'LOCAL_ONLY', stocks: [stock], orders: [order] });await task;expect(s.supply).toBeNull();expect(s.pending).toBeNull();expect(s.code).toBe('') })
@@ -74,7 +74,7 @@ it('saves a formal material issue draft with one command and does not confirm pr
 })
 it('a draft creator without approval authority can save but cannot run the convenience confirmation', async() => {
   const { s, auth } = await setup();auth.factoryPermissions = auth.factoryPermissions.filter(p => !p.endsWith(':post'));await flushPromises()
-  s.code = 'WO1:M1#000L';await s.query();await flushPromises();s.outputQty = '100';await flushPromises();await s.calculate();s.selected = ['11']
+  s.code = 'WO1:M1#000L';await s.query();await flushPromises();s.selectedRuleCode = 'OUT_RULE';s.outputQty = '100';await flushPromises();await s.calculate();s.selected = ['11']
   await s.submit();expect(submit).not.toHaveBeenCalled()
   draft.mockResolvedValueOnce({ document: { id: '902', documentNo: 'MI-QA-2' }, lines: [] })
   await (s.submit as (kind:string) => Promise<void>)('draft');expect(draft).toHaveBeenCalledOnce()
@@ -85,4 +85,33 @@ it('replays a lost draft response as the same draft request and cannot switch it
   await (s.submit as (kind:string) => Promise<void>)('confirm');expect(submit).not.toHaveBeenCalled()
   draft.mockResolvedValueOnce({ document: { id: '903', documentNo: 'MI-QA-3' }, lines: [] })
   await s.submit();expect(draft.mock.calls[1]![0]).toEqual(first)
+})
+
+it('requires an explicit local STOCK_OUT rule before creating a draft or confirming', async() => {
+  const { s } = await setup(false)
+  expect(s.selectedRuleCode).toBe('')
+  expect(wrapper.text()).toContain('领料出库单编码规则')
+  s.stockId = '1';s.outputQty = '100';await flushPromises();await s.calculate();s.selected = ['11']
+  await (s.submit as (kind:string) => Promise<void>)('draft')
+  expect(draft).not.toHaveBeenCalled()
+  s.selectedRuleCode = 'OUT_RULE';await (s.submit as (kind:string) => Promise<void>)('draft')
+  expect(draft.mock.calls[0]![0].ruleCode).toBe('OUT_RULE')
+})
+
+it('ignores a delayed older rule response without replacing the newer rule list or user choice', async() => {
+  let releaseOld!:(value:unknown) => void
+  numberingRules.mockImplementationOnce(() => new Promise(resolve => { releaseOld = resolve }))
+  const { s } = await setup(false)
+  numberingRules.mockResolvedValueOnce([
+    { ruleCode: 'OUT_RULE', ruleName: '领料出库', prefix: 'MI' },
+    { ruleCode: 'ALT_RULE', ruleName: '备用出库', prefix: 'OT' }
+  ])
+  await s.query();await flushPromises()
+  s.selectedRuleCode = 'ALT_RULE'
+  releaseOld([{ ruleCode: 'OLD_RULE', ruleName: '旧规则', prefix: 'OLD' }]);await flushPromises()
+  expect(s.selectedRuleCode).toBe('ALT_RULE')
+  expect(s.numberingRules).toEqual([
+    { ruleCode: 'OUT_RULE', ruleName: '领料出库', prefix: 'MI' },
+    { ruleCode: 'ALT_RULE', ruleName: '备用出库', prefix: 'OT' }
+  ])
 })

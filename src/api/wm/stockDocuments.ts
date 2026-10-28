@@ -22,6 +22,7 @@ export interface Header extends Row {
 }
 export interface Line extends Row { id: string;documentId: string;lineNo: number;stockId: string;materialId: string;warehouseId: string;unitId: string;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
 export interface MaterialIssueBasis { requestId: string;code: string;workorderId: string;outputQty: string;routingId: string;routingNodeIds: string[] }
+export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
 export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionId: string } | null }
 export interface ProductionReceiptCommand { requestId: string; stockId: string; quantity: string; reason: string }
 export interface ApprovalIntent { requestId: string;expectedRevision: string }
@@ -33,6 +34,7 @@ export const stockDocuments = {
   list: (query:Record<string, string | number>) => request<{ items: Header[];total: number;offset: number;limit: number }>(root, { query, scope: 'factory' }),
   detail: (id:string) => request<Detail>(path(id), { scope: 'factory' }),
   create: (body:unknown) => request<Detail>(root, { method: 'POST', body, scope: 'factory' }),
+  numberingRules: (type: 'STOCK_IN' | 'STOCK_OUT') => request<NumberingRuleOption[]>(root + '/numbering-rules', { query: { type }, scope: 'factory' }),
   edit: (id:string, body:unknown) => request<Detail>(path(id), { method: 'PUT', body, scope: 'factory' }),
   approve: (id:string, body:ApprovalIntent) => request<Detail>(path(id) + '/actions/approve', { method: 'POST', body, scope: 'factory' }),
   cancel: (id:string, expectedRevision:string) => request<Detail>(path(id) + '/actions/cancel', { method: 'POST', body: { expectedRevision }, scope: 'factory' }),
@@ -50,7 +52,7 @@ export function stockDocumentApis(changed:() => Promise<void>) {
   const headerApi:CrudApi = {
     list: stockDocuments.list,
     detail: async id => { store(await stockDocuments.detail(id));return header! },
-    create: async raw => { const b = raw as Row;return store(await stockDocuments.create({ documentType: b.documentType, reason: b.reason, remark: b.remark, sourceWorkorderId: b.sourceWorkorderId, sourceExecutionId: b.sourceExecutionId })).document },
+    create: async raw => { const b = raw as Row;if (typeof b.ruleCode !== 'string' || !b.ruleCode) throw Error('请选择出入库单编码规则');return { ...store(await stockDocuments.create({ ruleCode: b.ruleCode, documentType: b.documentType, reason: b.reason, remark: b.remark, sourceWorkorderId: b.sourceWorkorderId, sourceExecutionId: b.sourceExecutionId })).document, isNew: '' } },
     update: async(id, raw) => { const b = raw as Row;if (!header || header.id !== id) throw Error('请重新打开单据');return store(await stockDocuments.edit(id, { expectedRevision: header.revision, reason: b.reason, remark: b.remark })).document },
     remove: async() => { throw Error('正式仓储单据仅允许作废草稿') }
   }

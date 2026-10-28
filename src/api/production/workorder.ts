@@ -13,17 +13,18 @@ export interface Batch {
 }
 export interface BatchHistory extends Batch { path: { routingNodeId: string; executionOrder: number }[] }
 export interface RoutingOption { id: string; code: string; name: string; version: number; status: string }
+export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
 export interface Allocation { workorderId: string; plannedQty: string; allocatedTargetQty: string; remainingTargetQty: string; excessTargetQty: string; executionCount: number }
 export interface Detail { workorder: Order; productCode: string; productName: string; routing: RoutingOption; batches: Batch[]; allocation: Allocation }
 export interface Save {
-  code: string; productId: string; routingId: string; plannedQty: string; revision?: number
+  code?: string; ruleCode?: string; productId: string; routingId: string; plannedQty: string; revision?: number
   plannedStartAt: string | null; plannedEndAt: string | null; externalId: string | null
   externalCode: string | null; remark: string | null
 }
-export function saveBody(input: Save): Save {
+export function saveBody(input: Save, creating = false): Save {
   if ('batches' in input) throw new Error('旧分批写入已停用，请创建生产执行单元')
   return {
-    code: input.code, productId: input.productId, routingId: input.routingId, plannedQty: input.plannedQty,
+    ...(input.code ? { code: input.code } : {}), ...(creating && input.ruleCode ? { ruleCode: input.ruleCode } : {}), productId: input.productId, routingId: input.routingId, plannedQty: input.plannedQty,
     plannedStartAt: input.plannedStartAt, plannedEndAt: input.plannedEndAt, externalId: input.externalId,
     externalCode: input.externalCode, remark: input.remark, revision: input.revision
   }
@@ -54,11 +55,12 @@ export const api = {
   batchHistory: (id: string) => request<BatchHistory>('/api/production/batch/' + encodeURIComponent(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   list: (query: Record<string, string | number>) => request<{ items: { workorder: Order; batchCount: number; erpExtraMissing: boolean; productCode: string; productName: string; routingCode: string; routingVersion: number; allocation: Allocation }[]; total: number }>(base, { query, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   detail: (id: string) => request<Detail>(path(id), { scope: 'factory', parseResponse: parseWorkOrderResponse }),
-  create: (body: Save) => request<Detail>(base, { method: 'POST', body: saveBody(body), scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  create: (body: Save) => request<Detail>(base, { method: 'POST', body: saveBody(body, true), scope: 'factory', parseResponse: parseWorkOrderResponse }),
   update: (id: string, body: Save) => request<Detail>(path(id), { method: 'PUT', body: saveBody(body), scope: 'factory', parseResponse: parseWorkOrderResponse }),
   release: (id: string, revision: number) => request<Detail>(path(id) + '/actions/release', { method: 'POST', body: { revision }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   remove: (id: string, revision: number) => request<void>(path(id), { method: 'DELETE', body: { revision }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   routings: (productId: string, search = '') => request<RoutingOption[]>(base + '/references/routings', { query: { productId, search }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  numberingRules: () => request<NumberingRuleOption[]>(base + '/numbering-rules', { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   graph: (id: string) => request<RoutingDetail>(path(id) + '/graph', { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   allocation: (id: string) => request<Allocation>(path(id) + '/allocation', { scope: 'factory' })
 }

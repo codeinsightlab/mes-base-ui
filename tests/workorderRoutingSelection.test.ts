@@ -7,14 +7,14 @@ import ElementPlus from 'element-plus'
 import WorkOrders from '../src/views/production/workorder/index.vue'
 import { useAuth } from '../src/stores/auth'
 const confirmed = Object.assign('confirm' as const, { value: '', action: 'confirm' as const })
-const { list, routings, materials, recall } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn(), recall: vi.fn() }))
-vi.mock('../src/api/production/workorder', () => ({ api: { list, routings, recall }}))
+const { list, routings, materials, recall, numberingRules } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn(), recall: vi.fn(), numberingRules: vi.fn() }))
+vi.mock('../src/api/production/workorder', () => ({ api: { list, routings, recall, numberingRules }}))
 vi.mock('../src/api/basic/material', () => ({ api: { list: materials }}))
 type State = { create: () => void; form: { productId: string; routingId: string }; productChanged: () => void; searchRoutes: (s?: string) => Promise<void>; routeOptions: { id: string }[]; routesLoading: boolean; dialog: boolean }
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-  list.mockResolvedValue({ items: [], total: 0 }); materials.mockResolvedValue({ items: [], total: 0 }); routings.mockResolvedValue([])
+  list.mockResolvedValue({ items: [], total: 0 }); materials.mockResolvedValue({ items: [], total: 0 }); routings.mockResolvedValue([]);numberingRules.mockResolvedValue([{ ruleCode: 'WO_RULE', ruleName: '工单', prefix: 'WO' }])
 })
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
 async function setup() {

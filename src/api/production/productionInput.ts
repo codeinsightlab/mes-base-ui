@@ -8,10 +8,12 @@ export interface Order { productId: string; workorderId: string; workorderCode: 
 export interface Supply { sourceMode: 'LOCAL_ONLY' | 'CONNECTED'; stocks: Stock[]; orders: Order[]; total: number; offset: number; limit: number }
 export interface Calculation { sourceMode: string; order: Order; stock: Stock; outputQty: string; issueQty: string; calculationKey: string }
 export interface Preview { definition: RoutingDetail; actual: PathView | null }
-export interface Command { requestId: string; code: string; workorderId: string; stockReference: string; outputQty: string; routingId: string; routingNodeIds: string[]; inputKind: 'PRODUCTION_INPUT'; calculationKey: string }
+export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
+export interface Command { requestId: string; code: string; workorderId: string; stockReference: string; outputQty: string; routingId: string; routingNodeIds: string[]; inputKind: 'PRODUCTION_INPUT'; calculationKey: string; ruleCode?: string }
 export interface Result { requestId: string; issueId: string; executionId: string; code: string | null; status: string; productionInputQty: string; availableQty: string }
 const base = '/api/production/input'
 export const productionInput = {
+  numberingRules: () => request<NumberingRuleOption[]>('/api/wm/stock-documents/numbering-rules', { query: { type: 'STOCK_OUT' }, scope: 'factory' }),
   query: (code: string, offset = 0, limit = 20) => request<Supply>(base, { query: { code, offset, limit }, scope: 'factory' }),
   calculate: (query: { code: string; workorderId: string; stockReference: string; outputQty: string }) => request<Calculation>(base + '/calculate', { query, scope: 'factory' }),
   preview: (code: string, workorderId: string) => request<Preview>(base + '/preview', { query: { code, workorderId }, scope: 'factory' }),

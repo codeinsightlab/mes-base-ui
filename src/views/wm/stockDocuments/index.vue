@@ -13,13 +13,14 @@ import ProductionExecutionSelect from '@/components/business/production/Producti
 import { useRoute } from 'vue-router'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
-import { stockDocumentApis, stockDocumentPermission as p, stockDocumentTypes } from '@/api/wm/stockDocuments'
+import { stockDocumentApis, stockDocumentPermission as p, stockDocumentTypes, stockDocuments, type NumberingRuleOption } from '@/api/wm/stockDocuments'
 import { useAuth } from '@/stores/auth'
 import { request } from '@/lib/request'
 import type { StockAction } from '@/api/wm/localStock'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 const route = useRoute()
 const pendingDocument = ref<string | null>(null)
+const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false), numberingRulesError = ref('')
 const auth = useAuth(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
 const productionInputPath = computed(() => menuPathForComponent(auth.factoryMenus, 'production/productionInput/index'))
 const { headerApi, itemApi: baseItemApi, clear } = stockDocumentApis(async() => { await document.value?.refresh() })
@@ -47,8 +48,8 @@ const action = ref<StockAction | null>(null), actionVisible = ref(false), action
 function openLinkedDocument() { const id = route.query.documentId;if (typeof id === 'string' && /^[1-9]\d*$/.test(id)) void document.value?.open({ id }) }
 onMounted(openLinkedDocument)
 watch(() => route.query.documentId, openLinkedDocument)
-let generation = 0
-function reset() { originalLines.clear();pendingDocument.value = null;generation++;action.value = null;actionVisible.value = false;actionError.value = '';clear() }
+let generation = 0, numberingAttempt = 0
+function reset() { originalLines.clear();pendingDocument.value = null;generation++;numberingAttempt++;numberingRules.value = [];numberingRulesLoading.value = false;numberingRulesError.value = '';action.value = null;actionVisible.value = false;actionError.value = '';clear() }
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], reset)
 onBeforeUnmount(reset)
 async function showAction(id:unknown) {
@@ -57,7 +58,31 @@ async function showAction(id:unknown) {
   try { const result = await request<StockAction>('/api/wm/wm-stock-action/' + encodeURIComponent(String(id)), { scope: 'factory' });if (g === generation)action.value = result } catch(e) { if (g === generation)actionError.value = e instanceof Error ? e.message : '动作读取失败' }
 }
 const manualDocumentTypes = stockDocumentTypes.filter(t => !['DEFECT_RECEIPT', 'SCRAP_RECEIPT', 'MATERIAL_ISSUE'].includes(t.value))
+const ruleCodeVisibility: Field['showWhen'] = Object.freeze({
+  key: 'isNew',
+  value: 'Y'
+})
+function numberingType(documentType: unknown): 'STOCK_IN' | 'STOCK_OUT' | null {
+  if (typeof documentType !== 'string') return null
+  if (documentType.endsWith('_RECEIPT')) return 'STOCK_IN'
+  if (documentType.endsWith('_ISSUE')) return 'STOCK_OUT'
+  return null
+}
+async function loadNumberingRules(documentType: unknown) {
+  const type = numberingType(documentType), attempt = ++numberingAttempt, factory = auth.factoryId, revision = auth.revision
+  numberingRules.value = [];numberingRulesError.value = ''
+  if (!type || !factory || !auth.hasPermission(p + ':create', 'factory')) return
+  numberingRulesLoading.value = true
+  try {
+    const result = await stockDocuments.numberingRules(type)
+    if (attempt !== numberingAttempt || factory !== auth.factoryId || revision !== auth.revision) return
+    numberingRules.value = result
+  } catch(e) { if (attempt === numberingAttempt) numberingRulesError.value = e instanceof Error ? e.message : '编码规则读取失败' } finally { if (attempt === numberingAttempt) numberingRulesLoading.value = false }
+}
+function documentTypeChanged(draft: Row) { draft.sourceExecutionId = null;draft.ruleCode = null;void loadNumberingRules(draft.documentType) }
 const headerFields:Field[] = [
+  { key: 'isNew', label: '新建状态', kind: 'text', readonly: true, hidden: true, defaultValue: 'Y' },
+  { key: 'ruleCode', label: '编码规则', kind: 'select', showWhen: ruleCodeVisibility },
   { key: 'documentNo', label: '单号', kind: 'text', readonly: true, searchable: true, columnMinWidth: 240 },
   { key: 'documentType', label: '单据类型', kind: 'select', required: true, defaultValue: typeof route.query.executionId === 'string' ? 'PRODUCTION_RECEIPT' : 'OTHER_RECEIPT', searchable: true, options: stockDocumentTypes.map(t => ({ value: t.value, label: t.label })) },
   { key: 'status', label: '状态', kind: 'select', readonly: true, searchable: true, options: [{ value: 'DRAFT', label: '草稿', tone: 'warning' }, { value: 'POSTED', label: '已审核', tone: 'success' }, { value: 'CANCELLED', label: '已作废', tone: 'info' }] },
@@ -104,7 +129,8 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
       :item-permission-overrides="{list:p+':query',query:p+':query',create:p+':update',update:p+':update',delete:p+':update'}"
     >
       <template #header-actions="{row,refresh,dirty}"><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
-      <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>{draft.sourceExecutionId=null}"><el-option v-for="type in draft.id?stockDocumentTypes:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value" /></el-select></template>
+      <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>documentTypeChanged(draft)"><el-option v-for="type in draft.id?stockDocumentTypes:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value" /></el-select></template>
+      <template #field-ruleCode="{draft,disabled}"><div><el-alert v-if="numberingRulesError" :title="numberingRulesError" type="error" :closable="false" /><el-select v-model="draft.ruleCode as string" :disabled="disabled||!!draft.id" :loading="numberingRulesLoading" placeholder="请选择与单据类型匹配的编码规则" @visible-change="(visible: boolean)=>visible&&numberingRules.length===0&&!numberingRulesLoading&&loadNumberingRules(draft.documentType)"><el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode}）`" /></el-select><span class="secondary">单号由服务端生成，规则编码类别由单据类型固定。</span></div></template>
       <template #field-sourceExecutionId="{draft,disabled}"><ProductionExecutionSelect v-model="(draft.sourceExecutionId as string|null)" :statuses="['RUNNING']" :disabled="disabled||!!draft.id||draft.documentType!=='PRODUCTION_RECEIPT'" /></template>
       <template #field-materialId="{draft,disabled}"><MaterialSelect v-model="(draft.materialId as string|null)" :disabled="disabled" @update:model-value="resetIdentity(draft)" /></template>
       <template #field-warehouseId="{draft,disabled}"><WarehouseSelect v-model="(draft.warehouseId as string|null)" source="LOCAL" :disabled="disabled" @update:model-value="resetIdentity(draft)" /></template>

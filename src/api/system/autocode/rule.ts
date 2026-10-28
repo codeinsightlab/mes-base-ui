@@ -1,9 +1,20 @@
 import request from '@/utils/request'
 
-export function genCode(ruleCode: any) {
+export type AutoCodeRuleType = 'WORK_ORDER' | 'STOCK_OUT' | 'STOCK_IN'
+export interface AutoCodeRuleOption { ruleCode: string; ruleName: string; prefix: string }
+export interface AutoCodeRule { ruleId: string; ruleCode: string; ruleType: AutoCodeRuleType | null; ruleName: string; enableFlag: 'Y' | 'N'; maxLength: number }
+
+export function previewCode(ruleCode: string, inputCharacter?: string | null) {
+  return request({
+    scope: 'platform', url: '/system/autocode/preview',
+    method: 'post', data: { ruleCode, ...(inputCharacter == null ? {} : { inputCharacter }) }
+  })
+}
+
+export function genCode(ruleCode: string, inputCharacter?: string | null) {
   return request({
     scope: 'platform', url: '/system/autocode/generate',
-    method: 'post', data: { ruleCode }
+    method: 'post', data: { ruleCode, ...(inputCharacter == null ? {} : { inputCharacter }) }
   })
 }
 

@@ -7,7 +7,7 @@ import { useAuth } from '../src/stores/auth'
 import WorkOrder from '../src/views/production/workorder/index.vue'
 import ExecutionList from '../src/components/business/production/ProductionExecutionList.vue'
 import CrudPage from '../src/components/CrudPage.vue'
-const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), release: vi.fn(), remove: vi.fn(), routings: vi.fn(), allocation: vi.fn(), batchHistory: vi.fn(), graph: vi.fn() }))
+const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), release: vi.fn(), remove: vi.fn(), routings: vi.fn(), numberingRules: vi.fn(), allocation: vi.fn(), batchHistory: vi.fn(), graph: vi.fn() }))
 const executions = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }))
 vi.mock('../src/api/production/workorder', () => ({ api: wo }))
 vi.mock('../src/api/production/mesProductionExecution', () => ({ api: executions }))
@@ -23,6 +23,7 @@ beforeEach(() => {
   wo.detail.mockResolvedValue(detail())
   wo.graph.mockResolvedValue({ routing: { id: '1', code: 'R1', version: 1 }, nodes: [], edges: [] })
   wo.routings.mockResolvedValue([{ id: '1', code: 'R1', name: '发布版本', version: 1 }])
+  wo.numberingRules.mockResolvedValue([{ ruleCode: 'WO_RULE', ruleName: '工单编码', prefix: 'WO' }])
   executions.list.mockReset().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 20 })
 })
 function setup(permissions: string[]) {
@@ -89,7 +90,7 @@ describe('single active execution chain', () => {
     const state = w.vm as unknown as { form: Record<string, unknown>; save: () => Promise<void> }
     expect(state.form).not.toHaveProperty('batches')
     expect(document.body.textContent).not.toContain('添加批次')
-    Object.assign(state.form, { code: 'WO_NEW', productId: '1', routingId: '1', plannedQty: '1000.01' }); await flushPromises()
+    Object.assign(state.form, { code: 'WO_NEW', ruleCode: 'WO_RULE', productId: '1', routingId: '1', plannedQty: '1000.01' }); await flushPromises()
     state.form.plannedQty = '1000.001'; await flushPromises(); await state.save(); expect(wo.create).not.toHaveBeenCalled()
     state.form.plannedQty = '1000.01'; await flushPromises()
     wo.create.mockResolvedValue(detail()); await state.save(); await flushPromises()

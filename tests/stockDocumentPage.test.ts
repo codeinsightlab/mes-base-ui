@@ -11,12 +11,12 @@ vi.mock('../src/lib/request', () => ({ request: mocks.request }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: mocks.query }) }))
 const Document = defineComponent({
   props: ['headerApi', 'headerFields'],
-  setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';return { draft } },
-  template: '<section><slot name="field-documentType" :draft="draft" :disabled="false"/><slot name="field-sourceExecutionId" :draft="draft" :disabled="false"/><button @click="headerApi.create(draft)">保存主单</button></section>'
+  setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft } },
+  template: '<section><slot name="field-documentType" :draft="draft" :disabled="false"/><slot name="field-ruleCode" :draft="draft" :disabled="false"/><slot name="field-sourceExecutionId" :draft="draft" :disabled="false"/><button @click="headerApi.create(draft)">保存主单</button></section>'
 })
 const ExecutionSelect = defineComponent({ props: ['modelValue', 'disabled', 'statuses'], emits: ['update:modelValue'], template: '<div />' })
 let wrapper:ReturnType<typeof mount>
-beforeEach(() => { vi.clearAllMocks();mocks.query = {};mocks.request.mockResolvedValue({ document: { id: '1' }, lines: [] });vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}}) })
+beforeEach(() => { vi.clearAllMocks();mocks.query = {};mocks.request.mockImplementation((url:string, options:unknown) => url.includes('/numbering-rules') ? Promise.resolve([]) : Promise.resolve({ document: { id: '1' }, lines: [] }));vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}}) })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '';vi.unstubAllGlobals() })
 async function setup() { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';wrapper = mount(Page, { global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: Document, ProductionExecutionSelect: ExecutionSelect }}});await flushPromises();return wrapper.findComponent(Document) }
 
@@ -27,13 +27,14 @@ it('creates production inbound from the ordinary menu with a selectable executio
   expect(type.findAllComponents({ name: 'ElOption' }).map(option => option.props('value'))).not.toContain('SCRAP_RECEIPT')
   expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(true)
   type.vm.$emit('update:modelValue', 'PRODUCTION_RECEIPT');type.vm.$emit('change', 'PRODUCTION_RECEIPT');await flushPromises()
+  const state = (document.vm.$ as unknown as { setupState: { draft: Record<string, unknown> }}).setupState;state.draft.ruleCode = 'IN_RULE'
   expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(false)
   wrapper.findComponent(ExecutionSelect).vm.$emit('update:modelValue', '9007199254740999');await flushPromises()
   await document.get('button').trigger('click');await flushPromises()
-  expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999' })
-  type.vm.$emit('update:modelValue', 'OTHER_RECEIPT');type.vm.$emit('change', 'OTHER_RECEIPT');await flushPromises()
+  expect(mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body).toMatchObject({ ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999' })
+  type.vm.$emit('update:modelValue', 'OTHER_RECEIPT');type.vm.$emit('change', 'OTHER_RECEIPT');await flushPromises();expect(state.draft.ruleCode).toBeNull();state.draft.ruleCode = 'OTHER_IN_RULE'
   await document.get('button').trigger('click');await flushPromises()
-  expect(mocks.request.mock.calls[1]![1].body).toMatchObject({ documentType: 'OTHER_RECEIPT', sourceExecutionId: null })
+  expect(mocks.request.mock.calls.filter(call => call[1]?.method === 'POST').at(-1)?.[1].body).toMatchObject({ ruleCode: 'OTHER_IN_RULE', documentType: 'OTHER_RECEIPT', sourceExecutionId: null })
 })
 
 it('preserves the deep-linked execution as a visible production type and allows changing it before save', async() => {
@@ -42,5 +43,5 @@ it('preserves the deep-linked execution as a visible production type and allows 
   expect(wrapper.findComponent(ElSelect).props('modelValue')).toBe('PRODUCTION_RECEIPT')
   expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(false)
   await document.get('button').trigger('click');await flushPromises()
-  expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999' })
+  expect(mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body).toMatchObject({ ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999' })
 })

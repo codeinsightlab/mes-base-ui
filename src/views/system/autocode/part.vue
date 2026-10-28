@@ -1,6 +1,7 @@
 <template>
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="编码规则组成" description="规则组成、顺序与格式" />
+    <el-alert type="info" :closable="false" show-icon class="mb8" title="getDocNo(type) 的 type 使用规则编码。目标单号按固定前缀（FIXCHAR）、服务端日期 yyyyMMdd（NOWDATE）和每日流水（SERIALNO）顺序组成；流水起始值为 1、步长为 1、周期为 DAY、最小宽度为 3。" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
     <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
       <el-form-item label="组成编码" prop="partCode">

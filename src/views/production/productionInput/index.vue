@@ -14,7 +14,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/stores/auth'
 import PageHeader from '@/components/PageHeader.vue'
 import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
-import { productionInput as api, inputPermission, type Supply, type Preview, type Calculation, type Command, type Result } from '@/api/production/productionInput'
+import { productionInput as api, inputPermission, type Supply, type Preview, type Calculation, type Command, type Result, type NumberingRuleOption } from '@/api/production/productionInput'
 const auth = useAuth(), router = useRouter()
 const allowed = computed(() => auth.hasPermission(inputPermission, 'factory'))
 const canDraft = computed(() => allowed.value && auth.runtimeMode === 'LOCAL' && ['create', 'update'].every(action => auth.hasPermission('business:wm:stock:document:' + action, 'factory')))
@@ -22,12 +22,15 @@ const canConfirm = computed(() => allowed.value && (auth.runtimeMode === 'ERP' |
 const documentPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
 const draftResult = ref<StockDocumentDetail | null>(null), pendingKind = ref<'draft' | 'confirm'>('confirm')
 const code = ref(''), orderId = ref(''), stockId = ref(''), outputQty = ref(''), nextNode = ref('')
+const numberingRules = ref<NumberingRuleOption[]>([]), selectedRuleCode = ref(''), numberingError = ref(''), numberingLoading = ref(false)
 const quantityValid = ref(false)
-const outputProductId = computed(() => supply.value?.orders.find(o=>o.workorderId===orderId.value)?.productId)
+const outputProductId = computed(() => supply.value?.orders.find(order => order.workorderId === orderId.value)?.productId)
 const supply = ref<Supply | null>(null), preview = ref<Preview | null>(null), calculation = ref<Calculation | null>(null)
 const selected = ref<string[]>([]), pending = ref<Command | null>(null), result = ref<Result | null>(null)
 const error = ref(''), busy = ref(false), pendingSourceMode = ref<string | null>(null)
-let generation = 0, contextSequence = 0, previewSequence = 0, calculateSequence = 0
+let generation = 0, contextSequence = 0, numberingSequence = 0, previewSequence = 0, calculateSequence = 0
+const requiresNumberingRule = computed(() => supply.value?.sourceMode === 'LOCAL_ONLY')
+const numberingReady = computed(() => !requiresNumberingRule.value || !!selectedRuleCode.value)
 const terminal = computed(() => !!preview.value?.actual && !['READY', 'RUNNING', 'FULLY_RECEIVED'].includes(preview.value.actual.executionStatus))
 const stockOptions = computed(() => supply.value?.stocks.filter(s => !orderId.value || supply.value?.orders.find(o => o.workorderId === orderId.value)?.allowedWarehouses.includes(s.warehouseId)) ?? [])
 const pathCandidates = computed(() => {
@@ -39,12 +42,12 @@ const pathComplete = computed(() => {
   const graph = preview.value?.definition, last = graph?.nodes.find(n => n.id === selected.value.at(-1))
   return !!graph && !!last && !graph.edges.some(e => e.fromNodeCode === last.nodeCode) && graph.nodes.filter(n => n.isKey).every(n => selected.value.includes(n.id!))
 })
-function clear() { generation++; contextSequence++; previewSequence++; calculateSequence++; supply.value = null; preview.value = null; calculation.value = null; selected.value = []; pending.value = null; pendingSourceMode.value = null; result.value = null; draftResult.value = null; error.value = ''; busy.value = false; orderId.value = ''; stockId.value = ''; outputQty.value = ''; nextNode.value = '' }
+function clear() { generation++; contextSequence++; numberingSequence++; previewSequence++; calculateSequence++; supply.value = null; numberingRules.value = []; selectedRuleCode.value = ''; numberingError.value = ''; numberingLoading.value = false; preview.value = null; calculation.value = null; selected.value = []; pending.value = null; pendingSourceMode.value = null; result.value = null; draftResult.value = null; error.value = ''; busy.value = false; orderId.value = ''; stockId.value = ''; outputQty.value = ''; nextNode.value = '' }
 const recoveryKey = () => 'mes-production-input-pending:' + auth.username + ':' + auth.factoryId
 function restorePending() {
   if (!allowed.value) return
   const saved = sessionStorage.getItem(recoveryKey()); if (!saved) return
-  try { const savedValue = JSON.parse(saved) as Command | { command: Command; sourceMode: string | null; kind?: 'draft' | 'confirm' }; const request = 'command' in savedValue ? savedValue.command : savedValue; code.value = request.code; pending.value = request; pendingSourceMode.value = 'command' in savedValue ? savedValue.sourceMode : null; pendingKind.value = 'command' in savedValue ? savedValue.kind ?? 'confirm' : 'confirm'; error.value = '存在结果待确认的投产请求，请使用原请求重查，不能发起替代领料。' } catch { error.value = '待确认投产请求无法读取，请联系管理员核实原记录。' }
+  try { const savedValue = JSON.parse(saved) as Command | { command: Command; sourceMode: string | null; kind?: 'draft' | 'confirm' }; const request = 'command' in savedValue ? savedValue.command : savedValue; code.value = request.code; pending.value = request; selectedRuleCode.value = request.ruleCode ?? ''; pendingSourceMode.value = 'command' in savedValue ? savedValue.sourceMode : null; pendingKind.value = 'command' in savedValue ? savedValue.kind ?? 'confirm' : 'confirm'; error.value = '存在结果待确认的投产请求，请使用原请求重查，不能发起替代领料。' } catch { error.value = '待确认投产请求无法读取，请联系管理员核实原记录。' }
 }
 watch(() => [auth.factoryId, auth.revision, allowed.value, auth.factoryPermissions.join('|'), auth.runtimeMode], () => { clear(); code.value = ''; restorePending() }, { flush: 'sync' })
 watch(code, clear, { flush: 'sync' })
@@ -55,8 +58,20 @@ watch(stockOptions, candidates => { if (pending.value) return; if (candidates.le
 onBeforeUnmount(clear)
 async function query() {
   if (!allowed.value || busy.value || pending.value) return
-  const ticket = ++contextSequence; busy.value = true; error.value = ''; supply.value = null; orderId.value = ''; preview.value = null; result.value = null
-  try { const data = await api.query(code.value); if (ticket !== contextSequence) return; supply.value = data; if ((data.total ?? data.orders.length) === 1) orderId.value = data.orders[0]!.workorderId } catch(e) { if (ticket === contextSequence) error.value = e instanceof Error ? e.message : '库存查询失败' } finally { if (ticket === contextSequence) busy.value = false }
+  const ticket = ++contextSequence; numberingSequence++; numberingRules.value = []; selectedRuleCode.value = ''; numberingError.value = ''; numberingLoading.value = false; busy.value = true; error.value = ''; supply.value = null; orderId.value = ''; preview.value = null; result.value = null
+  try { const data = await api.query(code.value); if (ticket !== contextSequence) return; supply.value = data; if ((data.total ?? data.orders.length) === 1) orderId.value = data.orders[0]!.workorderId; if (data.sourceMode === 'LOCAL_ONLY') void loadNumberingRules(ticket) } catch(e) { if (ticket === contextSequence) error.value = e instanceof Error ? e.message : '库存查询失败' } finally { if (ticket === contextSequence) busy.value = false }
+}
+async function loadNumberingRules(queryTicket: number) {
+  const ticket = ++numberingSequence; numberingError.value = ''; numberingLoading.value = true
+  try {
+    const options = await api.numberingRules()
+    if (ticket !== numberingSequence || queryTicket !== contextSequence || supply.value?.sourceMode !== 'LOCAL_ONLY') return
+    numberingRules.value = options
+  } catch(e) {
+    if (ticket === numberingSequence && queryTicket === contextSequence) numberingError.value = e instanceof Error ? e.message : '领料出库单编码规则读取失败'
+  } finally {
+    if (ticket === numberingSequence && queryTicket === contextSequence) numberingLoading.value = false
+  }
 }
 async function moreOrders() {
   if (!supply.value || busy.value || pending.value) return
@@ -77,9 +92,9 @@ async function calculate() {
   try { const data = await api.calculate({ code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: normalizedQuantityInput(outputQty.value) }); if (ticket === calculateSequence) calculation.value = data } catch(e) { if (ticket === calculateSequence) error.value = e instanceof Error ? e.message : '用料计算失败' } finally { if (ticket === calculateSequence) busy.value = false }
 }
 async function submit(kind: 'draft' | 'confirm' = pending.value ? pendingKind.value : 'confirm') {
-  if (!(kind === 'draft' ? canDraft.value : canConfirm.value) || busy.value || (!pending.value && (!quantityValid.value || !calculation.value || !preview.value || !pathComplete.value))) return
+  if (!(kind === 'draft' ? canDraft.value : canConfirm.value) || busy.value || (!pending.value && (!quantityValid.value || !calculation.value || !preview.value || !pathComplete.value || !numberingReady.value))) return
   if (pending.value && kind !== pendingKind.value) return
-  if (!pending.value) { pendingKind.value = kind; pendingSourceMode.value = calculation.value!.sourceMode; pending.value = { requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: normalizedQuantityInput(outputQty.value), routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey } }
+  if (!pending.value) { pendingKind.value = kind; pendingSourceMode.value = calculation.value!.sourceMode; pending.value = { requestId: crypto.randomUUID(), code: code.value, workorderId: orderId.value, stockReference: stockId.value, outputQty: normalizedQuantityInput(outputQty.value), routingId: preview.value!.definition.routing.id, routingNodeIds: [...selected.value], inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.value!.calculationKey, ...(requiresNumberingRule.value ? { ruleCode: selectedRuleCode.value } : {}) } }
   const storageKey = recoveryKey(); sessionStorage.setItem(storageKey, JSON.stringify({ command: pending.value, sourceMode: pendingSourceMode.value, kind: pendingKind.value }))
   const ticket = generation; busy.value = true; error.value = ''
   try {
@@ -111,9 +126,17 @@ function again() { if (result.value?.status !== 'CONFIRMED' && !draftResult.valu
       <p id="production-input-scan-help" class="secondary">按“工单号:材料品号#批次号”填写，例如 WO001:M001#0001；材料必须属于工单选定BOM的直接组件；领料成功后，使用返回的生产身份码报工。批次原文保持不变。</p>
       <template v-if="supply">
         <el-alert :title="supply.sourceMode === 'LOCAL_ONLY' ? '独立 MES 模式：使用本地批次库存与受控工单用料依据' : 'ERP 模式：由配置的适配器提供库存与工单依据'" type="info" :closable="false" />
+        <el-alert v-if="numberingError" :title="numberingError" type="error" :closable="false"><el-button size="small" @click="loadNumberingRules(contextSequence)">重试读取编码规则</el-button></el-alert>
         <el-empty v-if="!supply.stocks.length" description="没有该材料批次的合法可用库存" />
         <el-empty v-else-if="!supply.orders.length" description="没有匹配的工单；请检查已下达工单、BOM用料与允许仓库" />
         <el-form v-else label-position="top" class="panel">
+          <el-form-item v-if="requiresNumberingRule" label="领料出库单编码规则" required>
+            <el-select v-model="selectedRuleCode" :disabled="busy || !!pending || !!numberingError" placeholder="请选择 STOCK_OUT 编码规则">
+              <el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode} · ${rule.prefix}）`" />
+            </el-select>
+            <p v-if="numberingLoading" class="secondary">正在读取当前工厂的出库编码规则；必须明确选择后才能保存草稿或确认投产。</p>
+            <p v-else-if="!numberingRules.length && !numberingError" class="secondary">当前工厂没有可用的 STOCK_OUT 编码规则，请先维护规则后重试。</p>
+          </el-form-item>
           <el-form-item label="生产工单"><el-select v-model="orderId" :disabled="busy || !!pending" placeholder="选择工单、产出产品与工作中心"><el-option v-for="o in supply.orders" :key="o.workorderId" :value="o.workorderId" :label="`${o.workorderCode} · ${o.productCode} ${o.productName} · ${o.workCenter} · 计划 ${displayQuantity(o.plannedQty)} ${o.outputUnitCode} · ${o.status}`" /></el-select></el-form-item>
           <p class="secondary">已加载 {{ supply.orders.length }} / {{ supply.total ?? supply.orders.length }} 张匹配工单 <el-button v-if="supply.orders.length < supply.total" link :loading="busy" :disabled="!!pending" @click="moreOrders">加载更多匹配工单</el-button></p>
           <el-form-item label="材料库存来源"><el-select v-model="stockId" :disabled="!orderId || busy || !!pending" placeholder="明确选择仓库、批次及库位"><el-option v-for="s in stockOptions" :key="s.reference" :value="s.reference" :label="`${s.materialCode} / ${s.lotCode} · ${s.warehouseCode}${s.binCode ? ' / '+s.binCode : ''} · 可用 ${displayQuantity(s.availableQty)} ${s.unitCode}`" /></el-select></el-form-item>
@@ -133,8 +156,8 @@ function again() { if (result.value?.status !== 'CONFIRMED' && !draftResult.valu
             <p class="secondary">实际路径在首次领料确认后锁定；追加投产不会改变工艺版本或路径。</p>
           </template>
           <div class="table-toolbar">
-            <el-button v-if="canDraft && (!pending || pendingKind==='draft')" :loading="busy" :disabled="terminal || !!draftResult || result?.status==='CONFIRMED' || (!pending && (!calculation || !pathComplete))" @click="submit('draft')">{{ pending ? '核对原草稿请求' : '保存正式领料草稿' }}</el-button>
-            <el-button v-if="canConfirm && (!pending || pendingKind==='confirm')" type="primary" :loading="busy" :disabled="terminal || !!draftResult || result?.status==='CONFIRMED' || (!pending && (!calculation || !pathComplete))" @click="submit('confirm')">{{ pending ? '使用原请求重查结果' : '确认正式投产' }}</el-button>
+            <el-button v-if="canDraft && (!pending || pendingKind==='draft')" :loading="busy" :disabled="terminal || !!draftResult || result?.status==='CONFIRMED' || (!pending && (!calculation || !pathComplete || !numberingReady))" @click="submit('draft')">{{ pending ? '核对原草稿请求' : '保存正式领料草稿' }}</el-button>
+            <el-button v-if="canConfirm && (!pending || pendingKind==='confirm')" type="primary" :loading="busy" :disabled="terminal || !!draftResult || result?.status==='CONFIRMED' || (!pending && (!calculation || !pathComplete || !numberingReady))" @click="submit('confirm')">{{ pending ? '使用原请求重查结果' : '确认正式投产' }}</el-button>
           </div>
           <p class="secondary">保存草稿不扣库存、不形成生产投入或执行；审核通过才生效。便捷投产在后端同一事务新增正式出库单、明细并审核，需具备审核权限。</p>
         </el-form>

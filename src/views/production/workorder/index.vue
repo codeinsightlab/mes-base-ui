@@ -24,7 +24,7 @@ import WorkOrderCancellation from '@/components/business/production/WorkOrderCan
 import WorkorderMaterialPanel from '@/components/business/production/WorkorderMaterialPanel.vue'
 import WorkOrderExecutions from '@/components/business/production/WorkOrderExecutions.vue'
 import WorkOrderRoutePreview from '@/components/business/production/WorkOrderRoutePreview.vue'
-import { api, type BatchHistory, type Detail, type RoutingOption, type Save } from '@/api/production/workorder'
+import { api, type BatchHistory, type Detail, type NumberingRuleOption, type RoutingOption, type Save } from '@/api/production/workorder'
 import { api as materials, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
@@ -48,19 +48,20 @@ onMounted(() => { resizeDetails(); window.addEventListener('resize', resizeDetai
 onBeforeUnmount(() => window.removeEventListener('resize', resizeDetails))
 const dialog = ref(false), drawer = ref(false), detail = ref<Detail | null>(null), editId = ref<string | null>(null)
 const productOptions = ref<MaterialVo[]>([]), routeOptions = ref<RoutingOption[]>([])
+const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false)
 const routesLoading = ref(false)
 const originalProductId = ref('')
 const originalPlannedQty = ref('')
 const plannedQuantityValid = ref(false)
-const blank = (): Save => ({ code: '', productId: '', routingId: '', plannedQty: '', plannedStartAt: null, plannedEndAt: null, externalId: null, externalCode: null, remark: null })
+const blank = (): Save => ({ ruleCode: '', productId: '', routingId: '', plannedQty: '', plannedStartAt: null, plannedEndAt: null, externalId: null, externalCode: null, remark: null })
 const form = reactive<Save>(blank())
 const histories = ref<Record<string, BatchHistory>>({}), historyLoading = ref<Record<string, boolean>>({})
 let historyAttempt = 0
-let listAttempt = 0, detailAttempt = 0, productAttempt = 0, routeAttempt = 0
+let listAttempt = 0, detailAttempt = 0, productAttempt = 0, routeAttempt = 0, numberingAttempt = 0
 function clear() {
   historyAttempt++; histories.value = {}; historyLoading.value = {}
-  listAttempt++; detailAttempt++; productAttempt++; routeAttempt++
-  rows.value = []; total.value = 0; detail.value = null; productOptions.value = []; routeOptions.value = []
+  listAttempt++; detailAttempt++; productAttempt++; routeAttempt++; numberingAttempt++
+  rows.value = []; total.value = 0; detail.value = null; productOptions.value = []; routeOptions.value = []; numberingRules.value = []; numberingRulesLoading.value = false
   dialog.value = drawer.value = loading.value = busy.value = false; error.value = ''; page.value = 1; editId.value = null; Object.assign(form, blank())
 }
 watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), auth.hasPermission('batch:query', 'factory'), canExecutions.value], () => { clear(); if (can('list')) void load() }, { flush: 'sync' })
@@ -82,7 +83,7 @@ async function searchProducts(search: string) {
   try { const result = await materials.list({ name: search, status: 'ENABLED', limit: 100 }); if (attempt === productAttempt) productOptions.value = result.items } catch(e) { if (attempt === productAttempt) error.value = e instanceof Error ? e.message : '物料读取失败' }
 }
 function resetRouteOptions() { routeAttempt++; routeOptions.value = []; routesLoading.value = false }
-watch(dialog, (visible) => { if (!visible) { productAttempt++; resetRouteOptions() } }, { flush: 'sync' })
+watch(dialog, (visible) => { if (!visible) { productAttempt++; numberingAttempt++; numberingRulesLoading.value = false; resetRouteOptions() } }, { flush: 'sync' })
 async function searchRoutes(search = '', selectOnly = false) {
   const attempt = ++routeAttempt, productId = form.productId
   if (!dialog.value || !productId) { routeOptions.value = []; routesLoading.value = false; return }
@@ -95,7 +96,17 @@ async function searchRoutes(search = '', selectOnly = false) {
   } catch(e) { if (attempt === routeAttempt) error.value = e instanceof Error ? e.message : '工艺版本读取失败' } finally { if (attempt === routeAttempt) routesLoading.value = false }
 }
 function productChanged() { form.routingId = ''; resetRouteOptions(); void searchRoutes('', true) }
-function create() { resetRouteOptions(); editId.value = null; plannedQuantityValid.value = false; Object.assign(form, blank()); error.value = ''; dialog.value = true; void searchProducts('') }
+async function create() {
+  resetRouteOptions(); editId.value = null; plannedQuantityValid.value = false; Object.assign(form, blank()); error.value = ''; numberingRules.value = []; dialog.value = true; void searchProducts('')
+  const attempt = ++numberingAttempt, factory = auth.factoryId, revision = auth.revision
+  if (!factory || !can('create')) return
+  numberingRulesLoading.value = true
+  try {
+    const result = await api.numberingRules()
+    if (attempt !== numberingAttempt || factory !== auth.factoryId || revision !== auth.revision) return
+    numberingRules.value = result
+  } catch(e) { if (attempt === numberingAttempt) error.value = e instanceof Error ? e.message : '工单编码规则读取失败' } finally { if (attempt === numberingAttempt) numberingRulesLoading.value = false }
+}
 async function open(id: string) {
   if (!can('query')) return
   const attempt = ++detailAttempt
@@ -122,7 +133,8 @@ async function edit(id: string) {
 }
 async function save() {
   if (!can(editId.value ? 'update' : 'create') || busy.value) return
-  if (!form.code.trim() || !form.productId || !form.routingId || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) { error.value = '请填写工单号、产出物料、已发布默认工艺和符合单位精度的正计划数量'; return }
+  if (!editId.value && (!form.ruleCode || !numberingRules.value.some(rule => rule.ruleCode === form.ruleCode))) { error.value = '请选择有效的工单编码规则'; return }
+  if (!form.productId || !form.routingId || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) { error.value = '请填写产出物料、已发布默认工艺和符合单位精度的正计划数量'; return }
   const attempt = detailAttempt
   busy.value = true; error.value = ''
   try {
@@ -198,7 +210,8 @@ onMounted(load)
     <Pagination :total="total" v-model:page="page" v-model:limit="pageSize" @pagination="load" />
     <PageDialog v-model="dialog" :title="editId?'编辑工单':'新增工单'" width="min(760px,94vw)">
       <el-form label-width="110px">
-        <el-form-item label="工单号" required><el-input v-model="form.code" maxlength="64" /></el-form-item>
+        <el-form-item v-if="!editId" label="工单编码规则" required><el-select v-model="form.ruleCode" :loading="numberingRulesLoading" :disabled="busy" placeholder="选择工单编码规则"><el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode}）`" /></el-select><span class="help-block">单号由服务端按所选规则生成。</span></el-form-item>
+        <el-form-item v-else label="工单号"><span>{{ form.code }}</span></el-form-item>
         <el-form-item label="产出物料" required><el-select v-model="form.productId" filterable remote :remote-method="searchProducts" @change="productChanged"><el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="p.code+' · '+p.name" /></el-select></el-form-item>
         <el-form-item label="计划数量" required><QuantityInput required positive :unchanged-value="editId && form.productId === originalProductId ? originalPlannedQty : null" v-model="form.plannedQty" :material-id="form.productId" :disabled="busy" @validity="plannedQuantityValid = $event" /></el-form-item>
         <el-form-item label="默认工艺" required><el-select v-model="form.routingId" :disabled="!form.productId" :loading="routesLoading" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" no-data-text="该物料暂无匹配的已发布工艺" filterable remote :remote-method="searchRoutes" @visible-change="(v: boolean)=>v && !routesLoading && searchRoutes()"><el-option v-for="r in routeOptions" :key="r.id" :value="r.id" :label="r.code+' / V'+r.version+' · '+r.name" /></el-select></el-form-item>
