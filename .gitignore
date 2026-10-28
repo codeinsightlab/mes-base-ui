@@ -6,6 +6,7 @@ target/
 /docs/*
 !/docs/development.md
 !/docs/UI_DESIGN_SYSTEM.md
+!/docs/components.md
 .vscode
 .idea
 deploy/*

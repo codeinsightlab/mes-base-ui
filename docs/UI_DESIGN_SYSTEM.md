@@ -21,6 +21,8 @@
 
 ## 页面结构与公共实现
 
+单位、BOM版本、数量输入等通用控件的查找和登记入口为[通用组件清单](components.md)。本页维护视觉与页面组合规范，不替代组件清单或组件自身的业务规则。
+
 ```vue
 <div class="app-container">
   <PageHeader title="页面名称" description="仅必要时解释管理对象" />

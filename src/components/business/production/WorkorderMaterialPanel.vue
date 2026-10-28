@@ -18,16 +18,26 @@ const ElMessageBox = usePageMessageBox()
 const props = defineProps<{ workorderId: string; productId: string; readonly?: boolean }>(), auth = useAuth()
 const data = ref<WorkorderMaterial | null>(null), bom = ref<Bom | null>(null), selectedBom = ref<Bom | null>(null), bomError = ref(''), defaultError = ref(''), error = ref(''), busy = ref(false), editing = ref(false), defaultLoading = ref(false), defaultResolved = ref(false), defaultExists = ref(false)
 const form = reactive({ bomId: null as string | null, warehouseIds: [] as string[], workCenter: '', enabled: true })
+const bomSelectorGeneration = ref(0)
 const canRead = () => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission('workorder:query', 'factory')
 const canWrite = () => canRead() && !props.readonly && auth.hasPermission('workorder:material:update', 'factory')
 let generation = 0, bomGeneration = 0, defaultGeneration = 0, defaultSelectionPristine = false, automaticDefaultId: string | null = null
 function clear() { generation++; bomGeneration++; defaultGeneration++; data.value = null; bom.value = null; selectedBom.value = null; bomError.value = ''; defaultError.value = ''; defaultLoading.value = false; defaultResolved.value = false; defaultExists.value = false; error.value = ''; busy.value = false; editing.value = false; defaultSelectionPristine = false; automaticDefaultId = null; Object.assign(form, { bomId: null, warehouseIds: [], workCenter: '', enabled: true }) }
 async function loadBom() {
-  const ticket = ++bomGeneration; bom.value = null; bomError.value = ''
-  if (!data.value?.bomId || !auth.hasPermission('business:material:query', 'factory')) return
-  try { const value = await bomApi.detail!(data.value.bomId) as Bom; if (ticket === bomGeneration) { if (value.productId === props.productId && value.status === 'PUBLISHED') { bom.value = value; selectedBom.value = value } else bomError.value = '已保存的BOM版本不属于当前产品或已不可用，请刷新工单核对' } } catch(e) { if (ticket === bomGeneration) bomError.value = e instanceof Error ? e.message : 'BOM版本名称读取失败' }
+  const ticket = ++bomGeneration, context = generation, workorderId = props.workorderId, productId = props.productId
+  const bomId = data.value?.bomId
+  bom.value = null; bomError.value = ''
+  if (!bomId || !auth.hasPermission('business:material:query', 'factory')) return
+  try {
+    const value = await bomApi.detail!(bomId) as Bom
+    if (ticket !== bomGeneration || context !== generation || workorderId !== props.workorderId
+      || productId !== props.productId || data.value?.bomId !== bomId) return
+    if (value.productId === productId) bom.value = value
+    else bomError.value = '已保存的BOM版本不属于当前产品，无法读取历史详情'
+  } catch(e) { if (ticket === bomGeneration && context === generation) bomError.value = e instanceof Error ? e.message : 'BOM版本名称读取失败' }
 }
-function fill(value: WorkorderMaterial) { Object.assign(form, { bomId: value.bomId, warehouseIds: JSON.parse(value.warehouseIds), workCenter: value.workCenter, enabled: value.status === 'ENABLED' }); selectedBom.value = null; if (value.bomId) void loadBom() }
+function fill(value: WorkorderMaterial) { Object.assign(form, { bomId: value.bomId, warehouseIds: JSON.parse(value.warehouseIds), workCenter: value.workCenter, enabled: value.status === 'ENABLED' }); selectedBom.value = null }
+function bomStatusLabel(status: string) { return ({ DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '已停用' } as Record<string, string>)[status] ?? status }
 async function loadDefault() {
   const ticket = ++defaultGeneration, context = generation, productId = props.productId
   defaultLoading.value = true; defaultError.value = ''; defaultResolved.value = false
@@ -61,7 +71,7 @@ async function load() {
 async function closeEditor(done: () => void) {
   try { await ElMessageBox.confirm('关闭并放弃未保存的用料编辑？', '关闭用料维护', { type: 'warning' }); generation++; busy.value = false; editing.value = false; done() } catch { return }
 }
-function edit() { if (data.value) fill(data.value); editing.value = true; defaultSelectionPristine = !form.bomId; if (!form.bomId) void loadDefault() }
+function edit() { if (data.value) fill(data.value); selectedBom.value = null; bomSelectorGeneration.value++; editing.value = true; defaultSelectionPristine = !form.bomId; if (!form.bomId) void loadDefault() }
 async function save() {
   if (!canWrite() || busy.value || data.value?.frozenAt) return
   if (!form.bomId) { error.value = '请选择该产出物料的已发布BOM版本'; return }
@@ -82,7 +92,7 @@ onBeforeUnmount(clear)
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <p v-if="!data?.bomId" class="secondary">尚未选择BOM。下达不会固定用料；首次正式领料前可选择默认版本或人工选择其他已发布版本，服务端按当前计划计算单材料需求。</p>
     <el-descriptions v-if="data" :column="2" border>
-      <el-descriptions-item label="BOM版本">{{ bom ? `${bom.code} · ${bom.version}` : data.bomId || '尚未选择' }}</el-descriptions-item>
+      <el-descriptions-item label="BOM版本">{{ bom ? `${bom.code} · ${bom.version} · ${bomStatusLabel(bom.status)}` : data.bomId || '尚未选择' }}</el-descriptions-item>
       <el-descriptions-item label="用料依据">{{ data.frozenAt ? '已固定 · ' + data.frozenAt : '首次正式领料前可调整' }}</el-descriptions-item>
       <el-descriptions-item label="直接材料"><MaterialSelect :model-value="data.materialId" disabled /></el-descriptions-item>
       <el-descriptions-item label="材料基本单位"><UnitMeasureSelect :model-value="data.unitId" disabled /></el-descriptions-item>
@@ -92,7 +102,7 @@ onBeforeUnmount(clear)
     <el-alert v-if="bomError" :title="bomError" type="error" :closable="false"><el-button link @click="loadBom">重试BOM名称</el-button></el-alert>
     <PageDialog v-model="editing" title="选择工单BOM用料" width="min(760px,94vw)" append-to-body :before-close="closeEditor">
       <el-form v-if="canWrite()" label-width="120px" :disabled="busy">
-        <el-form-item label="已发布BOM"><BomVersionSelect :model-value="form.bomId" :material-id="productId" placeholder="选择默认版本或其他已发布版本" @update:model-value="form.bomId=$event" @selected="onBomSelected" /><el-alert v-if="defaultLoading" title="正在读取产品默认BOM…" type="info" :closable="false" /><el-alert v-if="defaultError" :title="defaultError" type="error" :closable="false"><el-button link :disabled="defaultLoading" @click="void loadDefault()">重试读取默认BOM</el-button></el-alert><el-alert v-else-if="defaultResolved && !defaultExists && !defaultLoading && !form.bomId" title="产品尚未设置默认BOM，可人工选择任一已发布版本。" type="info" :closable="false" /></el-form-item>
+        <el-form-item label="已发布BOM"><BomVersionSelect :key="bomSelectorGeneration" :model-value="form.bomId" :material-id="productId" placeholder="选择默认版本或其他已发布版本" @update:model-value="form.bomId=$event" @selected="onBomSelected" /><el-alert v-if="defaultLoading" title="正在读取产品默认BOM…" type="info" :closable="false" /><el-alert v-if="defaultError" :title="defaultError" type="error" :closable="false"><el-button link :disabled="defaultLoading" @click="void loadDefault()">重试读取默认BOM</el-button></el-alert><el-alert v-else-if="defaultResolved && !defaultExists && !defaultLoading && !form.bomId" title="产品尚未设置默认BOM，可人工选择任一已发布版本。" type="info" :closable="false" /></el-form-item>
         <el-form-item label="允许领料仓库"><WarehouseSelect v-for="(_, index) in form.warehouseIds" :key="index" v-model="form.warehouseIds[index]" source="LOCAL" /><el-button @click="form.warehouseIds.push('')">添加仓库</el-button><el-button :disabled="!form.warehouseIds.length" @click="form.warehouseIds.pop()">移除末项</el-button></el-form-item>
         <el-form-item label="工作中心"><el-input v-model="form.workCenter" maxlength="100" /></el-form-item><el-form-item label="需求启用"><el-switch v-model="form.enabled" /></el-form-item>
         <el-alert title="当前正式领料要求一个直接组件。比例和基本单位取自BOM，累计领料不得超过计划额度；已有正式领料后保留原依据。" type="info" :closable="false" />
