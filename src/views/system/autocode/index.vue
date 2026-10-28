@@ -149,8 +149,8 @@
     <!-- 添加或修改参数配置对话框 -->
     <PageDialog v-model="open" :title="title" width="500px" append-to-body>
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="规则编码" prop="ruleCode">
-          <el-input v-model="form.ruleCode" placeholder="请输入规则编码" />
+        <el-form-item :label="form.ruleId != undefined ? '规则编码（不可修改）' : '规则编码'" prop="ruleCode">
+          <el-input v-model="form.ruleCode" :disabled="form.ruleId != undefined" :placeholder="form.ruleId != undefined ? '规则编码保存后不可修改' : '请输入规则编码'" />
         </el-form-item>
         <el-form-item label="规则名称" prop="ruleName">
           <el-input v-model="form.ruleName" placeholder="请输入规则名称" />
