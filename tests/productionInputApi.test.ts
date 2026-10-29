@@ -9,8 +9,8 @@ beforeEach(() => request.mockReset())
 
 it('loads numbering rules by the explicit OUT direction in the current factory scope', async() => {
   await productionInput.numberingRules()
-  expect(request).toHaveBeenCalledExactlyOnceWith('/api/wm/stock-documents/numbering-rules', {
-    query: { direction: 'OUT' }, scope: 'factory'
+  expect(request).toHaveBeenCalledExactlyOnceWith('/api/wm/outbound-documents/numbering-rules', {
+    scope: 'factory'
   })
 })
 

@@ -9,7 +9,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { productionClosure as api, type ClosureSummary } from '@/api/production/productionClosure'
 const props = defineProps<{ id: string }>(), emit = defineEmits<{ changed: [] }>(), auth = useAuth()
-const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
+const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/inboundDocuments/index'))
 const visible = ref(false), data = ref<ClosureSummary | null>(null), loading = ref(false), loadError = ref('')
 const can = (p:string) => auth.hasPermission(p, 'factory'), readable = computed(() => can('business:mes:production:execution:query'))
 const receiptLabel = computed(() => data.value ? ({ PENDING: '待入库', PARTIAL: '部分入库', FULLY_RECEIVED: '完全入库' }[data.value.receiptState] ?? '入库状态待确认') : '')

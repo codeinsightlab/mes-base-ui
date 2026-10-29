@@ -9,13 +9,13 @@ import { ApiError, configureRequests } from '../src/lib/request'
 const { context, submit, scan, materialDetail, unitDetail } = vi.hoisted(() => ({ context: vi.fn(), submit: vi.fn(), scan: vi.fn(), materialDetail: vi.fn(), unitDetail: vi.fn() }))
 vi.mock('../src/api/production/productionScan', () => ({ scanExecution: scan }))
 vi.mock('../src/api/production/productionReporting', () => ({ submitPermission: 'business:production:report:submit', productionReporting: { context, submit }}))
-vi.mock('../src/api/basic/material', () => ({ api: { detail: materialDetail } }))
-vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: unitDetail } }))
+vi.mock('../src/api/basic/material', () => ({ api: { detail: materialDetail }}))
+vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: unitDetail }}))
 const data = (id = '1') => ({ identity: { executionId: id, workorderCode: 'TEST_WO', productCode: 'M', productName: '阶段物料', batchNo: 'BATCH-001', routingId: '7', routingCode: 'R', routingVersion: 2, status: 'READY', targetQty: '10.000001' }, quantities: { routingLabel: 'R / V2 · 工艺', executionId: id, pathStatus: 'LOCKED', nodes: [{ routingNodeId: '11', code: 'A', name: '钻孔', sequenceNo: 1, inputQty: '10.000001', reportedQty: '3.000001', defectQty: '1.000000', effectiveOutputQty: '2.000001', qualityIntegrated: true, availableQty: '7.000000' }, { routingNodeId: '12', code: 'B', name: '铣削', sequenceNo: 2, inputQty: '0', reportedQty: '0', defectQty: '0', effectiveOutputQty: '0', qualityIntegrated: true, availableQty: '0' }] }, candidates: [{ routingNodeId: '11', status: 'AVAILABLE', reason: null }, { routingNodeId: '12', status: 'NOT_ASSIGNED', reason: '不在派工名单中' }], path: { nodes: [], edges: [], selectedNodeIds: [] }})
 type State = { code: string; locate: () => Promise<void>; submit: () => Promise<void>; retryPending: () => Promise<void>; selectedId: string; quantity: string; context: ReturnType<typeof data> | null; result: { id: string } | null; pending: { requestId: string } | null; error: string; showAll: boolean; loading: boolean }
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
-  sessionStorage.clear(); vi.resetAllMocks(); invalidateQuantityRules();scan.mockImplementation((_type:string, code:string) => Promise.resolve(data(code === 'WO2:P001#BATCH-002' ? '2' : '1').identity)); materialDetail.mockResolvedValue({ unitId: '4' }); unitDetail.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 }); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); context.mockResolvedValue({ ...data(), identity: { ...data().identity, productId: '3' } })
+  sessionStorage.clear(); vi.resetAllMocks(); invalidateQuantityRules();scan.mockImplementation((_type:string, code:string) => Promise.resolve(data(code === 'WO2:P001#BATCH-002' ? '2' : '1').identity)); materialDetail.mockResolvedValue({ unitId: '4' }); unitDetail.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 }); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); context.mockResolvedValue({ ...data(), identity: { ...data().identity, productId: '3' }})
   submit.mockResolvedValue({ id: '81', executionId: '1', quantityDelta: '2.000001', reportTime: '2026-10-16T09:00:00' })
 })
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; vi.restoreAllMocks(); vi.unstubAllGlobals() })
@@ -232,4 +232,32 @@ it('blocks both ordinary DOM entries while pending and replays only from the exp
   await flushPromises()
   expect(submit).toHaveBeenCalledTimes(2); expect(submit.mock.calls[1]![0]).toEqual(original)
   expect(state.result?.id).toBe('81')
+})
+
+it('clears success A when new request B is unknown, preserving only B through conflict and refresh', async() => {
+  const { state, pinia } = await setup()
+  state.selectedId = '11'; state.quantity = '1'; await flushPromises(); await state.submit()
+  expect(state.result?.id).toBe('81')
+  const first = { ...submit.mock.calls[0]![0] }
+  submit.mockRejectedValueOnce(new ApiError('NETWORK_ERROR', '结果未知'))
+  state.selectedId = '11'; state.quantity = '2'; await flushPromises(); await state.submit()
+  const second = { ...submit.mock.calls[1]![0] }
+  expect(second.requestId).not.toBe(first.requestId)
+  expect(state.result).toBeNull(); expect(state.pending).toEqual(second)
+  expect(wrapper.text()).toContain('报工结果待确认')
+  expect(wrapper.text()).not.toContain('报工已成功，恢复记录待清理')
+  submit.mockRejectedValueOnce(new ApiError('REPORT_QUANTITY_CONFLICT', '内容冲突', '', 409))
+  await state.retryPending()
+  expect(submit.mock.calls[2]![0]).toEqual(second)
+  expect(state.result).toBeNull(); expect(state.pending).toEqual(second)
+  wrapper.unmount()
+  wrapper = mount(Reporting, { global: { plugins: [pinia, ElementPlus] }})
+  await flushPromises()
+  const restored = wrapper.vm as unknown as State
+  expect(submit).toHaveBeenCalledTimes(3)
+  expect(restored.result).toBeNull(); expect(restored.pending).toEqual(second)
+  submit.mockResolvedValueOnce({ id: '82' })
+  await restored.retryPending()
+  expect(submit.mock.calls[3]![0]).toEqual(second)
+  expect(restored.result?.id).toBe('82'); expect(restored.pending).toBeNull()
 })

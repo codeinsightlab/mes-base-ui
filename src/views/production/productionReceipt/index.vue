@@ -12,7 +12,7 @@ import { quantityColumn } from '@/lib/production/quantity'
 import WarehouseAcceptancePanel from '@/components/business/warehouse/WarehouseAcceptancePanel.vue'
 const auth = useAuth(), rows = ref<Receipt[]>([]), total = ref(0), offset = ref(0), error = ref(''), loading = ref(false)
 const filters = reactive({ workorderId: '', executionId: '', productLotCode: '' }), requestId = ref(''), detail = ref<Awaited<ReturnType<typeof api.detail>> | null>(null), detailOpen = ref(false)
-const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
+const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/inboundDocuments/index'))
 let generation = 0
 function clear() { generation++;rows.value = [];total.value = offset.value = 0;error.value = '';loading.value = false;Object.assign(filters, { workorderId: '', executionId: '', productLotCode: '' });detail.value = null;detailOpen.value = false;requestId.value = '' }
 async function load() { if (!auth.hasPermission(receiptPermissions.list, 'factory')) return;const g = ++generation;loading.value = true;error.value = '';try { const p = await api.page({ offset: offset.value, limit: 20, ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v !== '')) });if (g === generation) { rows.value = p.items;total.value = p.total } } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '历史读取失败' } finally { if (g === generation)loading.value = false } }

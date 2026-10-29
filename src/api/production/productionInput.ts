@@ -13,7 +13,7 @@ export interface Command { requestId: string; code: string; workorderId: string;
 export interface Result { requestId: string; documentId: string | null; executionId: string; code: string | null; status: string; productionInputQty: string; availableQty: string }
 const base = '/api/production/input'
 export const productionInput = {
-  numberingRules: () => request<NumberingRuleOption[]>('/api/wm/stock-documents/numbering-rules', { query: { direction: 'OUT' }, scope: 'factory' }),
+  numberingRules: () => request<NumberingRuleOption[]>('/api/wm/outbound-documents/numbering-rules', { scope: 'factory' }),
   query: (code: string, offset = 0, limit = 20) => request<Supply>(base, { query: { code, offset, limit }, scope: 'factory' }),
   calculate: (query: { code: string; workorderId: string; stockReference: string; outputQty: string }) => request<Calculation>(base + '/calculate', { query, scope: 'factory' }),
   manualCalculate: (query: { workorderId: string; stockReference: string; outputQty: string }) => request<{ code: string; calculation: Calculation }>(base + '/manual-calculate', { query, scope: 'factory' }),

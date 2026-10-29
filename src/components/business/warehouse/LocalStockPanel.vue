@@ -31,7 +31,8 @@ const settlementQuantity = computed(() => {
 const pending = ref<{ operation: StockOperation; command: StockCommand } | null>(null)
 const granted = computed(() => stockOperations.filter(o => auth.hasPermission('business:wm:stock:' + o.value, 'factory')))
 const options = computed(() => (pending.value || auth.runtimeMode === 'LOCAL' && stock.value?.warehouseSource === 'LOCAL' ? granted.value : []).filter(o => o.value !== 'receipt' || pending.value?.operation === 'receipt'))
-const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
+const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/inboundDocuments/index'))
+const outboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/outboundDocuments/index'))
 const readable = computed(() => auth.hasPermission('business:wm:stock:action:list', 'factory'))
 let generation = 0, attempt = 0, uncertain = false
 const key = () => `mes-stock-pending:${auth.username}:${auth.factoryId}:${stockId.value}`
@@ -80,11 +81,11 @@ async function beforeClose(done: () => void) {
   if (scope !== generation) return
   clear(); done()
 }
-async function openInbound() { if (!inboundPath.value) return;const path = inboundPath.value;await beforeClose(() => { visible.value = false;void router.push({ path, query: { direction: 'IN' }}) }) }
+async function openInbound() { if (!inboundPath.value) return;const path = inboundPath.value;await beforeClose(() => { visible.value = false;void router.push({ path, query: {}}) }) }
 async function openIssues() {
   await beforeClose(() => {
     visible.value = false
-    if (inboundPath.value) void router.push({ path: inboundPath.value, query: { direction: 'OUT', documentType: 'MATERIAL_ISSUE' }})
+    if (outboundPath.value) void router.push({ path: outboundPath.value, query: { documentType: 'MATERIAL_ISSUE' }})
   })
 }
 watch(() => [auth.factoryId, auth.revision, granted.value.map(o => o.value).join(','), readable.value], () => { clear(); visible.value = false }, { flush: 'sync' })
@@ -110,7 +111,7 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
         <el-form-item label="数量增减量"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" required :disabled="busy || !!pending" placeholder="盘亏填写正数；业务纠错使用有符号增减量" @validity="quantityValid = $event" /></el-form-item>
         <el-form-item label="依据 / 凭据"><el-input v-model="form.reason" type="textarea" maxlength="500" placeholder="期初依据、入库来源、外部凭据或调整原因" /></el-form-item>
       </el-form>
-      <div class="table-toolbar"><el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading" @click="submit">{{ pending ? '核实原请求' : '确认库存动作' }}</el-button><el-button :disabled="busy" @click="load">刷新余额与流水</el-button><el-button v-if="inboundPath" :disabled="busy" @click="openInbound">办理入库单</el-button><el-button v-if="inboundPath" type="primary" plain :disabled="busy" @click="openIssues">原领料状态及撤销</el-button></div>
+      <div class="table-toolbar"><el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading" @click="submit">{{ pending ? '核实原请求' : '确认库存动作' }}</el-button><el-button :disabled="busy" @click="load">刷新余额与流水</el-button><el-button v-if="inboundPath" :disabled="busy" @click="openInbound">办理入库单</el-button><el-button v-if="outboundPath" type="primary" plain :disabled="busy" @click="openIssues">原领料状态及撤销</el-button></div>
       <el-alert v-if="!readable" title="当前账号未获库存流水查询权限" type="info" :closable="false" />
       <el-table v-if="readable" :data="rows" empty-text="暂无库存动作；历史余额不会自动补记流水">
         <el-table-column label="动作" min-width="120"><template #default="{row}">{{ label(row.actionType) }}</template></el-table-column>

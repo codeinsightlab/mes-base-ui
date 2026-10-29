@@ -10,7 +10,7 @@ import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
-import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
 import WorkOrderSelect from '@/components/business/production/WorkOrderSelect.vue'
@@ -25,7 +25,9 @@ import type { ProductionInputBasis } from '@/api/wm/stockDocuments'
 import { ApiError } from '@/lib/request'
 import type { Field, Row } from '@/lib/crud'
 const route = useRoute(), router = useRouter()
-const direction = computed<StockDocumentDirection>(() => route.query.direction === 'IN' ? 'IN' : 'OUT')
+const props = defineProps<{ direction: StockDocumentDirection }>()
+const direction = computed(() => props.direction)
+const transferPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockTransfers/index'))
 const typeOptions = ref<StockDocumentTypeOption[]>([]), typeOptionsError = ref('')
 const manualIssueVisible = ref(false), manualWorkorderId = ref<string | null>(null), manualWarehouseId = ref<string | null>(null)
 const manualMaterialId = ref<string | null>(null), manualStockId = ref<string | null>(null), manualOutputQty = ref('')
@@ -145,11 +147,11 @@ async function openLinkedDocument() {
   const attempt = ++linkAttempt, factory = auth.factoryId, revision = auth.revision
   try {
     const detail = hasDocument
-      ? await stockDocuments.detail(id, undefined, issueQueryOnly.value)
+      ? await stockDocuments.detail(id, direction.value, issueQueryOnly.value)
       : await stockDocuments.byRequest(requestId as string)
     if (attempt !== linkAttempt || factory !== auth.factoryId || revision !== auth.revision) return
     if (!hasDocument || detail.document.direction !== direction.value) {
-      await router.replace({ path: route.path, query: { ...route.query, documentId: detail.document.id, direction: detail.document.direction }})
+      await router.replace({ path: route.path, query: { ...route.query, documentId: detail.document.id }})
       return
     }
     await loadTypes()
@@ -157,7 +159,7 @@ async function openLinkedDocument() {
   } catch(error) { if (attempt === linkAttempt) lineError.value = error instanceof Error ? error.message : '单据读取失败' }
 }
 onMounted(() => { void loadTypes();void openLinkedDocument() })
-watch(() => route.query.direction, () => { void loadTypes(); if (!route.query.documentId) void document.value?.back() })
+watch(() => props.direction, () => { void loadTypes(); if (!route.query.documentId) void document.value?.back() })
 watch(() => [route.query.documentId, route.query.requestId], openLinkedDocument)
 watch(() => route.query.documentType, () => { if (!route.query.documentId) void document.value?.back() })
 let generation = 0, numberingAttempt = 0
@@ -171,7 +173,7 @@ async function showAction(id:unknown) {
   try { const result = await request<StockAction>('/api/wm/wm-stock-action/' + encodeURIComponent(String(id)), { scope: 'factory' });if (g === generation)action.value = result } catch(e) { if (g === generation)actionError.value = e instanceof Error ? e.message : '动作读取失败' }
 }
 const manualDocumentTypes = computed(() => typeOptions.value.filter(t => t.enabled && t.approvalAvailable
-  && t.value !== 'MATERIAL_ISSUE'))
+  && t.value !== 'MATERIAL_ISSUE' && !t.value.startsWith('TRANSFER_')))
 const ruleCodeVisibility: Field['showWhen'] = Object.freeze({
   key: 'isNew',
   value: 'Y'
@@ -287,12 +289,6 @@ async function saveManualIssue() {
   } finally { if (factory === auth.factoryId && revision === auth.revision) manualBusy.value = false }
 }
 function documentTypeChanged(draft: Row) { draft.sourceExecutionId = null;draft.ruleCode = null;void loadNumberingRules(draft.documentType, draft) }
-function directionLink(next: StockDocumentDirection) {
-  const query: LocationQueryRaw = { ...route.query, direction: next }
-  delete query.documentType
-  delete query.documentId
-  return { path: route.path, query }
-}
 const documentTitle = computed(() => direction.value === 'IN' ? '入库单' : '出库单')
 const headerFields = computed<Field[]>(() => [
   { key: 'isNew', label: '新建状态', kind: 'text', readonly: true, hidden: true, defaultValue: 'Y' },
@@ -324,14 +320,11 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
 </script>
 <template>
   <div class="stock-documents">
-    <div class="document-toolbar direction-tabs" role="tablist" aria-label="单据方向">
-      <router-link role="tab" :aria-selected="direction==='IN'" :to="directionLink('IN')">入库单</router-link>
-      <router-link role="tab" :aria-selected="direction==='OUT'" :to="directionLink('OUT')">出库单</router-link>
-    </div>
+    <router-link v-if="transferPath" :to="transferPath">办理库存调拨</router-link>
     <el-alert v-if="typeOptionsError" :title="typeOptionsError" type="error" :closable="false" />
     <el-alert :title="direction==='IN'?'新建入库单先保存草稿，审核通过后才增加库存。未接入来源的类型禁止审核。':'新建出库单先保存草稿，审核通过后才扣减库存。生产领料需依据工单BOM、单位及实际路径。'" type="info" :closable="false" />
     <el-button v-if="direction==='OUT' && auth.runtimeMode==='LOCAL' && auth.hasPermission(p+':create','factory')" type="primary" plain @click="openManualIssue">新增生产领料草稿</el-button>
-    <router-link v-if="direction==='OUT' && productionInputPath && auth.hasPermission('business:mes:material:issue:update','factory')" :to="{path:productionInputPath,query:{direction:'OUT'}}">扫码投产并领料</router-link>
+    <router-link v-if="direction==='OUT' && productionInputPath && auth.hasPermission('business:mes:material:issue:update','factory')" :to="productionInputPath">扫码投产并领料</router-link>
     <section v-if="!canStockList && !canStockQuery && !issueListOnly && !issueQueryOnly && (canIssueLines || canIssueLine)">
       <h3>读取生产领料明细</h3>
       <el-input v-model="directDocumentId" aria-label="领料单据 ID" placeholder="单据 ID" />
@@ -358,11 +351,11 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
       :header-permission-overrides="headerPermissions"
       :item-permission="p"
       parent-key="documentId"
-      :items-readonly="row=>row.documentType==='MATERIAL_ISSUE'"
-      :header-readonly="row=>row.documentType==='MATERIAL_ISSUE'||row.status!=='DRAFT'||auth.runtimeMode!=='LOCAL'||pendingDocument===row.id"
+      :items-readonly="row=>String(row.documentType).startsWith('TRANSFER_')||row.documentType==='MATERIAL_ISSUE'"
+      :header-readonly="row=>String(row.documentType).startsWith('TRANSFER_')||row.documentType==='MATERIAL_ISSUE'||row.status!=='DRAFT'||auth.runtimeMode!=='LOCAL'||pendingDocument===row.id"
       :item-permission-overrides="{list:p+':query',query:p+':query',create:p+':update',update:p+':update',delete:p+':update'}"
     >
-      <template #header-actions="{row,refresh,dirty}"><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
+      <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
       <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>documentTypeChanged(draft)"><el-option v-for="type in draft.id?typeOptions:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value" :disabled="!type.enabled" /></el-select></template>
       <template #field-ruleCode="{draft,disabled}"><div @vue:mounted="!draft.id && loadNumberingRules(draft.documentType,draft)"><el-alert v-if="numberingRulesError" :title="numberingRulesError" type="error" :closable="false" /><el-select v-model="draft.ruleCode as string" :disabled="disabled||!!draft.id||numberingRules.length!==1" :loading="numberingRulesLoading" placeholder="请选择与单据类型 key 对应的编码规则" @visible-change="(visible: boolean)=>visible&&numberingRules.length===0&&!numberingRulesLoading&&loadNumberingRules(draft.documentType,draft)"><el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode} · ${rule.prefix}）`" /></el-select><span v-if="selectedNumberRule" class="secondary">规则 {{ selectedNumberRule.ruleCode }}；实际前缀 {{ selectedNumberRule.prefix }}；本次预览 {{ selectedNumberRule.preview }}。单号仅在正式保存时取号。</span><span v-else class="secondary">业务类型 key 与规则编码一一对应；不能改选其他类型规则。</span></div></template>
       <template #field-sourceExecutionId="{draft,disabled}"><ProductionExecutionSelect v-model="(draft.sourceExecutionId as string|null)" :statuses="['RUNNING']" :disabled="disabled||!!draft.id||draft.documentType!=='PRODUCTION_RECEIPT'" /></template>

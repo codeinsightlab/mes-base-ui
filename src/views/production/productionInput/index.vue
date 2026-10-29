@@ -20,7 +20,7 @@ const allowed = computed(() => auth.hasPermission(inputPermission, 'factory'))
 const canOperate = computed(() => allowed.value && auth.runtimeMode === 'LOCAL')
 const canDraft = computed(() => canOperate.value)
 const canConfirm = computed(() => canOperate.value)
-const documentPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockDocuments/index'))
+const documentPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/outboundDocuments/index'))
 const draftResult = ref<StockDocumentDetail | null>(null), pendingKind = ref<'draft' | 'confirm'>('confirm')
 const code = ref(''), orderId = ref(''), stockId = ref(''), outputQty = ref(''), nextNode = ref('')
 const numberingRules = ref<NumberingRuleOption[]>([]), selectedRuleCode = ref(''), numberingError = ref(''), numberingLoading = ref(false)
@@ -175,8 +175,8 @@ function again() { if (result.value?.status !== 'CONFIRMED' && !draftResult.valu
         </el-form>
       </template>
       <div v-if="pending && result?.status !== 'CONFIRMED'" class="table-toolbar" role="status"><span>原投产请求 {{ pending.requestId }}：结果待确认</span><el-button :loading="busy" :disabled="!canReplay" @click="submit()">使用原请求重查</el-button></div>
-      <div v-if="draftResult" class="panel"><el-alert title="正式领料草稿已保存，库存和生产投入未改变。请稍后打开出库单核对并独立审核。冻结的BOM、数量及库存明细不可直接修改；变更需取消后重新计算建草稿。" type="success" :closable="false" /><p>单号 {{ draftResult.document.documentNo }} · {{ draftResult.document.id }}</p><router-link v-if="documentPath" :to="{path:documentPath,query:{direction:'OUT',documentId:draftResult.document.id}}">打开领料出库草稿</router-link><el-button @click="again">新增下一张领料草稿</el-button></div>
-      <el-button v-if="result?.documentId && documentPath" @click="router.push({path:documentPath,query:{direction:'OUT',documentId:result.documentId}})">打开本次领料单并核实</el-button>
+      <div v-if="draftResult" class="panel"><el-alert title="正式领料草稿已保存，库存和生产投入未改变。请稍后打开出库单核对并独立审核。冻结的BOM、数量及库存明细不可直接修改；变更需取消后重新计算建草稿。" type="success" :closable="false" /><p>单号 {{ draftResult.document.documentNo }} · {{ draftResult.document.id }}</p><router-link v-if="documentPath" :to="{path:documentPath,query:{documentId:draftResult.document.id}}">打开领料出库草稿</router-link><el-button @click="again">新增下一张领料草稿</el-button></div>
+      <el-button v-if="result?.documentId && documentPath" @click="router.push({path:documentPath,query:{documentId:result.documentId}})">打开本次领料单并核实</el-button>
       <el-descriptions v-if="result" :column="1" border><el-descriptions-item label="执行单元">{{ result.executionId }}</el-descriptions-item><el-descriptions-item label="领料结果">{{ result.status }}</el-descriptions-item><el-descriptions-item label="生产身份码">{{ result.code || '未生成（未记录批次）' }}</el-descriptions-item><el-descriptions-item label="累计正式投入（产出基本单位）"><QuantityText :value="result.productionInputQty" /></el-descriptions-item><el-descriptions-item label="首工序剩余可报"><QuantityText :value="result.availableQty" /></el-descriptions-item><el-descriptions-item label="请求号">{{ result.requestId }}</el-descriptions-item></el-descriptions>
       <el-alert v-if="result && result.status !== 'CONFIRMED'" title="本次尚未贡献投产额度，请在领料管理中核实原操作；不要重新发起同一次领料。" type="warning" :closable="false" />
       <div v-if="result?.status === 'CONFIRMED'" class="table-toolbar"><el-button @click="again">再次投产</el-button><el-button @click="router.push({path:'/production/productionReport',query:{executionId:result.executionId,workorderId:orderId}})">查看生产数量</el-button></div>

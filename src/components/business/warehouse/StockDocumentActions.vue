@@ -17,10 +17,10 @@ const auth = useAuth(), basis = ref<CancellationBasis | null>(null), production 
 const intent = useClosureCommand<ApprovalIntent>(() => `stock-document-post:${auth.username}:${auth.factoryId}:${props.row.id}`)
 const materialIssueBasis = computed(() => props.row.materialIssueBasis as MaterialIssueBasis | null | undefined)
 const canIssueApprove = computed(() => props.row.documentType !== 'MATERIAL_ISSUE' || auth.runtimeMode === 'LOCAL' && !props.row.materialIssueBasisError && auth.hasPermission('business:mes:material:issue:update', 'factory'))
-const canApprove = computed(() => canIssueApprove.value && !!props.row.id
+const canApprove = computed(() => !String(props.row.documentType).startsWith('TRANSFER_') && canIssueApprove.value && !!props.row.id
   && (props.row.documentType === 'MATERIAL_ISSUE' || auth.hasPermission(p + ':post', 'factory'))
   && (!!intent.pending.value || props.row.status === 'DRAFT' && auth.runtimeMode === 'LOCAL'))
-const canCancel = computed(() => (props.row.documentType !== 'MATERIAL_ISSUE' || auth.runtimeMode === 'LOCAL')
+const canCancel = computed(() => !String(props.row.documentType).startsWith('TRANSFER_') && (props.row.documentType !== 'MATERIAL_ISSUE' || auth.runtimeMode === 'LOCAL')
   && (auth.hasPermission(p + ':cancel', 'factory')
     || props.row.documentType === 'MATERIAL_ISSUE' && auth.hasPermission('business:mes:material:issue:update', 'factory')))
 watch(() => intent.pending.value, value => emit('pending', value ? String(props.row.id) : null), { immediate: true })

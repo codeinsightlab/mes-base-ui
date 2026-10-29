@@ -4,7 +4,7 @@ import { defineComponent, reactive, ref } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import { useAuth } from '../src/stores/auth'
-import Page from '../src/views/wm/stockDocuments/index.vue'
+import Page from '../src/views/wm/stockDocuments/StockDocumentPage.vue'
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), direction: 'IN' }))
 vi.mock('../src/lib/request', () => ({ request: mocks.request }))
@@ -40,7 +40,7 @@ it.each([
   })
   const pinia = createPinia(), auth = useAuth(pinia)
   auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = ['business:wm:stock:document:create', 'business:wm:stock:document:list', 'business:wm:stock:document:query']
-  wrapper = mount(Page, { global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: Document, RouterLink: true }}})
+  wrapper = mount(Page, { props: { direction: direction as 'IN' | 'OUT' }, global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: Document, RouterLink: true }}})
   await flushPromises()
   expect(mocks.request.mock.calls.filter(([url]) => url.endsWith('/numbering-rules'))).toHaveLength(0)
   await wrapper.findComponent(Document).get('button').trigger('click');await flushPromises()
@@ -51,7 +51,7 @@ it.each([
   expect(wrapper.text()).toContain(`本次预览 ${preview}`)
   expect(wrapper.text()).not.toContain('WRONG001')
   expect(mocks.request.mock.calls.filter(([url]) => url.endsWith('/numbering-rules'))).toEqual([
-    ['/api/wm/stock-documents/numbering-rules', { query: { direction }, scope: 'factory' }]
+    [`/api/wm/${direction === 'IN' ? 'inbound' : 'outbound'}-documents/numbering-rules`, { scope: 'factory' }]
   ])
   expect(mocks.request.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
 })

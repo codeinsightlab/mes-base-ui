@@ -73,6 +73,7 @@ async function submit(recover = false) {
   // A write invalidates earlier context reads, even when recovery has no loaded context.
   const ticket = ++version
   loading.value = false
+  if (fresh) result.value = null
   pending.value = command
   busy.value = true; error.value = ''
   let saved: Ledger
