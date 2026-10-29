@@ -4,7 +4,7 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 import PageDialog from '@/components/page/PageDialog.vue'
 import PageDrawer from '@/components/page/PageDrawer.vue'
 
-import { computed, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import CrudPage from '@/components/CrudPage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -111,6 +111,10 @@ async function sync(kind:'material') {
 }
 function clear() { generation++;editRequest++;categoryGeneration++;categoryRows.value = [];unitNames.value = {};unitError.value = '';selected.value = 'all';categoryError.value = '';categoryLoading.value = false;editorOpen.value = false;bomMaterial.value = null;saving.value = false;syncBusy.value = false;resetDraft() }
 watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|')], () => { clear();void loadCategories();void loadUnitNames() }, { immediate: true, flush: 'sync' })
+watch([selected, nodes], async() => {
+  await nextTick()
+  treeRef.value?.setCurrentKey(selectedCategory.value?.id ?? null)
+}, { flush: 'post' })
 watch(categoryKeyword, value => treeRef.value?.filter(value))
 onActivated(() => { void loadCategories();void loadUnitNames() })
 onBeforeUnmount(clear)

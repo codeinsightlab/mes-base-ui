@@ -19,7 +19,7 @@
 | --- | --- | --- | --- |
 | 计量单位 `UnitMeasureSelect` | [UnitMeasureSelect.vue](../src/components/business/material/UnitMeasureSelect.vue) | 单位ID、禁用状态；组件负责远程分页检索、已选项回显、错误重试和上下文失效 | [物料维护](../src/views/basic/materials/index.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
 | BOM版本 `BomVersionSelect` | [BomVersionSelect.vue](../src/components/business/material/BomVersionSelect.vue) | BOM ID、所属物料ID、禁用状态；按物料选择已发布版本，返回选中版本及revision并补查当前已选项以支持跨页回显；只显示默认标记，不自行应用默认。子BOM未选仍表示叶项 | [BOM组成](../src/components/business/material/MaterialBomPanel.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
-| 实物数量 `QuantityInput` | [QuantityInput.vue](../src/components/business/material/QuantityInput.vue) | 数量值、物料ID及必要输入状态；规则取自物料单位；原值不变、官方精确余量等使用已有明确契约，不能由页面伪造或自由指定精度 | [质量申报](../src/components/business/quality/DefectDeclarationPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue)、[销售订单](../src/views/sales/order/index.vue) |
+| 实物数量 `QuantityInput` | [QuantityInput.vue](../src/components/business/material/QuantityInput.vue) | 数量值、物料ID及必要输入状态；规则取自物料单位；原值不变、官方精确余量等使用已有明确契约，不能由页面伪造或自由指定精度。默认 `physical`；BOM基准/组件系数显式 `semantic="bom-ratio"`，`showUnit` 按同次读取的正式单位显示后缀；比例不使用实物余量/原值豁免参数 | [质量申报](../src/components/business/quality/DefectDeclarationPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue)、[销售订单](../src/views/sales/order/index.vue) |
 | 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态；远程检索、分页、回显及上下文保护在组件内维护 | [销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/index.vue) |
 | 仓库 `WarehouseSelect` | [WarehouseSelect.vue](../src/components/business/WarehouseSelect.vue) | 仓库ID、可信来源及已有历史读取语义；保留LOCAL/EXTERNAL来源约束，不由页面另写候选算法 | [工单用料](../src/components/business/production/WorkorderMaterialPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 库存来源 `StockSourceSelect` | [StockSourceSelect.vue](../src/components/business/warehouse/StockSourceSelect.vue) | 当前物料、仓库和库存身份；选择具体库存来源，不等同于选择仓库或选择物料 | [库存单据](../src/views/wm/stockDocuments/index.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
@@ -61,7 +61,7 @@
 - **单位回显：** 物料页仍有独立loadUnitNames查询；已复用单位选择器不等于所有单位名称读取都已统一。后续按统一引用读取与缓存规则治理，不再复制页面查询。
 - **物料对话框：** BOM面板内部仍使用MaterialPicker，与公共MaterialSelect的交互/读取需要核对并统一同义规则。该局部实现不作为另一个推荐公共入口，不能未经边界分析就复制到新页面。
 - **执行选择：** ExecutionSelect与ProductionExecutionSelect尚未统一；先明确记录查询、单据选择、可信状态候选和扫码定位的差异，再收敛共同选择能力。不能仅为减少文件而删除必要准入，也不能以不同组件名长期维护相同业务规则。
-- **数量语义：** QuantityInput用于物料单位约束的实际数量。BOM基准/系数等现有局部输入尚未形成独立公共控件；新增复用前需明确语义，不能借用任意精度开关掩盖业务差异。
+- **数量语义：** QuantityInput用于物料单位约束的实际数量。BOM基准/组件系数使用 `QuantityInput semantic="bom-ratio"`，单位用于说明对应物料的基本单位，不限制配比为整数；配比校验复用固定的 `bomRatio` 契约，不开放任意精度或跳过校验开关。
 
 这些条目是后续治理范围，不表示本清单已经修改了组件行为。
 

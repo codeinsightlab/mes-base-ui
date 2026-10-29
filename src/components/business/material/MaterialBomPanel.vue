@@ -4,31 +4,28 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
+import QuantityInput from './QuantityInput.vue'
+import { bomRatio } from '@/lib/bomRatio'
 import MaterialPicker from './MaterialPicker.vue'
 import BomVersionSelect from './BomVersionSelect.vue'
 import { bomApi, bomItemApi, setDefaultBom, structure, transition, type BomGraph } from '@/api/basic/materialBom'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
-import { quantityInputError, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
 
-function coefficient(raw:unknown) {
-  const value = normalizedQuantityInput(String(raw ?? ''))
-  const error = quantityInputError(value, { mustBeWholeNumber: false, quantityPrecision: 6 })
-  if (error || !positiveQuantity(value)) throw Error(error || 'BOM数量必须大于零')
-  return value
-}
 const props = defineProps<{ material: Row; unitNames: Record<string, string> }>()
 const auth = useAuth(), document = ref<InstanceType<typeof MasterDetailDocument> | null>(null)
 const revision = ref(''), graph = ref<BomGraph | null>(null), graphId = ref(''), quantity = ref('1'), error = ref(''), graphLoading = ref(false), acting = ref(false)
+const quantityValid = ref(false)
+let initialGraphPending = false
 let generation = 0
 const canUpdate = computed(() => auth.hasPermission('business:material:update', 'factory'))
 const headerApi:CrudApi = { ...bomApi,
   list: q => bomApi.list({ ...q, productId: String(props.material.id) }),
   detail: async id => { const row = await bomApi.detail!(id);revision.value = String(row.revision);return row },
-  create: async body => { const row = await bomApi.create({ ...body as Row, productId: props.material.id, baseQty: coefficient((body as Row).baseQty) });revision.value = String(row.revision);return row },
-  update: async(id, body) => { const row = await bomApi.update(id, { ...body as Row, revision: revision.value, baseQty: coefficient((body as Row).baseQty) });revision.value = String(row.revision);return row }
+  create: async body => { const row = await bomApi.create({ ...body as Row, productId: props.material.id, baseQty: bomRatio((body as Row).baseQty) });revision.value = String(row.revision);return row },
+  update: async(id, body) => { const row = await bomApi.update(id, { ...body as Row, revision: revision.value, baseQty: bomRatio((body as Row).baseQty) });revision.value = String(row.revision);return row }
 }
 const picker = ref<InstanceType<typeof MaterialPicker> | null>(null)
 const materialLabels = ref<Record<string, string>>({})
@@ -39,8 +36,8 @@ async function chooseComponent() {
   return { materialId: selected.id, specification: selected.specification, unitName: props.unitNames[String(selected.unitId)] ?? String(selected.unitId) }
 }
 const itemApi:CrudApi = { ...bomItemApi,
-  create: async body => { const result = await bomItemApi.create({ ...body as Row, quantity: coefficient((body as Row).quantity) });clearGraph();return result },
-  update: async(id, body) => { const result = await bomItemApi.update(id, { ...body as Row, quantity: coefficient((body as Row).quantity) });clearGraph();return result },
+  create: async body => { const result = await bomItemApi.create({ ...body as Row, quantity: bomRatio((body as Row).quantity) });clearGraph();return result },
+  update: async(id, body) => { const row = body as Row;const result = await bomItemApi.update(id, { materialId: row.materialId, quantity: bomRatio(row.quantity), childBomId: row.childBomId, sort: row.sort });clearGraph();return result },
   remove: async id => { await bomItemApi.remove(id);clearGraph() },
   delids: async ids => { await bomItemApi.delids!(ids);clearGraph() },
   list: async query => {
@@ -91,13 +88,25 @@ async function makeDefault(row:Row, refresh:() => Promise<void>) {
     if (current === generation) { await refresh(); ElMessage.success('产品默认BOM版本已更新') }
   } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '设置默认版本失败') } finally { if (current === generation) acting.value = false }
 }
-async function loadGraph(id = graphId.value) {
-  if (!id) return
-  const current = ++generation;graphId.value = id;graphLoading.value = true;graph.value = null;error.value = ''
-  try { const result = await structure(id, coefficient(quantity.value));if (current === generation) graph.value = result } catch(e) { if (current === generation) error.value = e instanceof Error ? e.message : '组成计算失败' } finally { if (current === generation) graphLoading.value = false }
+function openGraph(id:string) {
+  graphId.value = id
+  initialGraphPending = true
+  if (quantityValid.value) acceptQuantityValidity(true)
 }
-function clearGraph() { graph.value = null;graphId.value = '';error.value = '' }
-function clear() { picker.value?.cancel();materialLabels.value = {};generation++;graph.value = null;graphId.value = '';error.value = '';graphLoading.value = false;acting.value = false }
+function acceptQuantityValidity(valid:boolean) {
+  quantityValid.value = valid
+  if (valid && initialGraphPending) {
+    initialGraphPending = false
+    void loadGraph()
+  }
+}
+async function loadGraph(id = graphId.value) {
+  if (!id || !quantityValid.value) return
+  const current = ++generation;graphId.value = id;graphLoading.value = true;graph.value = null;error.value = ''
+  try { const result = await structure(id, bomRatio(quantity.value));if (current === generation) graph.value = result } catch(e) { if (current === generation) error.value = e instanceof Error ? e.message : '组成计算失败' } finally { if (current === generation) graphLoading.value = false }
+}
+function clearGraph() { initialGraphPending = false;quantityValid.value = false;generation++;graphLoading.value = false;graph.value = null;graphId.value = '';error.value = '' }
+function clear() { initialGraphPending = false;quantityValid.value = false;picker.value?.cancel();materialLabels.value = {};generation++;graph.value = null;graphId.value = '';error.value = '';graphLoading.value = false;acting.value = false }
 watch(() => [auth.revision, auth.factoryId, props.material.id], clear)
 defineExpose({ hasUnsavedChanges: () => document.value?.hasUnsavedChanges() ?? false })
 onBeforeUnmount(clear)
@@ -122,21 +131,21 @@ onBeforeUnmount(clear)
   >
     <template #header-actions="{row,refresh,dirty}">
       <el-button v-if="row.id" :disabled="dirty || acting" @click="refresh">刷新版本</el-button>
-      <el-button v-if="row.id" :disabled="dirty" @click="loadGraph(String(row.id))">多阶结构与需求</el-button>
+      <el-button v-if="row.id" :disabled="dirty" @click="openGraph(String(row.id))">多阶结构与需求</el-button>
       <el-button v-if="row.id && row.status==='DRAFT' && canUpdate" :disabled="dirty || acting" type="primary" plain @click="act(row,'publish',refresh)">发布</el-button>
       <el-button v-if="row.id && row.status==='PUBLISHED' && row.defaultVersion!==true && canUpdate" :disabled="dirty || acting" @click="makeDefault(row,refresh)">设为默认</el-button>
       <el-tag v-if="row.id && row.defaultVersion===true" type="success">产品默认版本</el-tag>
       <el-button v-if="row.id && row.status==='PUBLISHED' && canUpdate" :disabled="acting" @click="act(row,'disable',refresh)">停用</el-button>
     </template>
-    <template #field-baseQty="{draft,disabled}"><el-input v-model="draft.baseQty" inputmode="decimal" :disabled="disabled" @blur="draft.baseQty=normalizedQuantityInput(String(draft.baseQty))" /><span class="secondary">BOM基准数量，最多六位有效小数</span></template>
-    <template #field-quantity="{draft,disabled}"><el-input v-model="draft.quantity" inputmode="decimal" :disabled="disabled" @blur="draft.quantity=normalizedQuantityInput(String(draft.quantity))" /><span class="secondary">用量系数允许小数，不套库存整数限制</span></template>
+    <template #field-baseQty="{draft,disabled}"><QuantityInput v-model="draft.baseQty" semantic="bom-ratio" show-unit :material-id="String(material.id)" :disabled="disabled" /><span class="secondary">BOM基准数量，最多六位有效小数</span></template>
+    <template #field-quantity="{draft,disabled}"><QuantityInput v-model="draft.quantity" semantic="bom-ratio" show-unit :material-id="draft.materialId as string" :disabled="disabled" /><span class="secondary">用量系数允许小数，不套库存整数限制</span></template>
     <template #field-materialId="{draft,disabled}"><span>{{ materialLabels[String(draft.materialId)] ?? draft.materialId }}</span><el-button :disabled="disabled" link @click="async()=>{const selected=await chooseComponent();if(selected){draft.materialId=selected.materialId;draft.specification=selected.specification;draft.unitName=selected.unitName;draft.childBomId=null}}">选择物料</el-button></template>
     <template #field-childBomId="{draft,disabled}"><BomVersionSelect v-model="draft.childBomId as string" :material-id="draft.materialId as string" :disabled="disabled" /></template>
   </MasterDetailDocument>
   <section v-if="graphId" class="panel graph-panel" aria-label="多阶BOM结构与需求">
-    <div class="table-toolbar"><strong>多阶结构与展开需求</strong><el-input v-model="quantity" aria-label="预计产出数量" style="width:160px" /><el-button :loading="graphLoading" @click="loadGraph()">计算</el-button><el-button @click="clear">收起</el-button></div>
+    <div class="table-toolbar"><strong>多阶结构与展开需求</strong><QuantityInput v-model="quantity" positive required show-unit :material-id="String(material.id)" aria-label="预计产出数量" style="width:240px" @validity="acceptQuantityValidity" /><el-button :loading="graphLoading" :disabled="!quantityValid || graphLoading" @click="loadGraph()">计算</el-button><el-button @click="clear">收起</el-button></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-    <p v-if="!graph && !error">正在读取组成结构…</p>
+    <p v-if="!graph && !error">{{ graphLoading ? '正在读取组成结构…' : '请输入符合物料单位规则的产出数量后计算' }}</p>
     <template v-if="graph">
       <el-table :data="graph.items" row-key="path" default-expand-all><el-table-column prop="code" label="组件编码" min-width="180" /><el-table-column prop="name" label="组件名称" min-width="160" /><el-table-column :formatter="quantityColumn" prop="quantity" label="本次需求" min-width="130" /><el-table-column prop="unitName" label="基本单位" width="110" /><el-table-column prop="childBomId" label="子BOM版本ID" min-width="120" /></el-table>
       <h3>展开汇总（不产生库存动作）</h3><el-table :data="graph.totals"><el-table-column prop="code" label="物料编码" /><el-table-column prop="name" label="名称" /><el-table-column :formatter="quantityColumn" prop="quantity" label="需求数量" /><el-table-column prop="unitName" label="基本单位" /></el-table>

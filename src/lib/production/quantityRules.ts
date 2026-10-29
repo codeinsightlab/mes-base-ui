@@ -4,6 +4,7 @@ import { quantityInput } from './quantity'
 import { quantityRuleRevision } from './quantityRuleInvalidation'
 
 export interface QuantityRule {
+  unitName?: string
   mustBeWholeNumber: boolean
   quantityPrecision: number
 }
@@ -22,7 +23,7 @@ export function loadQuantityRule(materialId: string, factoryId: string, revision
   const key = JSON.stringify([factoryId, revision, materialId])
   const existing = ruleCache.get(key)
   if (existing) return existing.request
-  const request = (async () => {
+  const request = (async() => {
     const material = await materialApi.detail(materialId)
     if (!isCurrent()) throw new Error('工厂上下文已变化，请重新读取单位规则')
     if (typeof material.unitId !== 'string' || !material.unitId) throw new Error('物料未配置有效的计量单位')
@@ -33,7 +34,7 @@ export function loadQuantityRule(materialId: string, factoryId: string, revision
     if (!Number.isInteger(precision) || precision < 0 || precision > 6 || (whole !== 0 && whole !== 1)) {
       throw new Error('计量单位数量精度配置无效')
     }
-    return { mustBeWholeNumber: whole === 1, quantityPrecision: precision }
+    return { mustBeWholeNumber: whole === 1, quantityPrecision: precision, unitName: unit.name }
   })()
   if (ruleCache.size >= 256) ruleCache.delete(ruleCache.keys().next().value!)
   const entry = { expiresAt: now + QUANTITY_RULE_TTL_MS, request }
