@@ -31,8 +31,7 @@ async function loadBasis() {
   if (props.row.documentType === 'MATERIAL_ISSUE') {
     inputBasis.value = null
     if (!auth.hasPermission(p + ':query', 'factory') && !auth.hasPermission('business:mes:material:issue:item:list', 'factory')) return
-    try { const r = await stockDocuments.productionInputBasis(String(props.row.id), auth.hasPermission('business:wm:stock:document:query', 'factory') ? false : true);if (g === generation)inputBasis.value = r }
-    catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '生产投入依据读取失败' }
+    try { const r = await stockDocuments.productionInputBasis(String(props.row.id), auth.hasPermission('business:wm:stock:document:query', 'factory') ? false : true);if (g === generation)inputBasis.value = r } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '生产投入依据读取失败' }
     return
   }
   if (props.row.sourceExecutionId) { try { const r = await stockDocuments.productionBasis(String(props.row.sourceExecutionId));if (g === generation)production.value = r } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '生产入库依据读取失败' } return }
@@ -46,10 +45,9 @@ async function approve() {
   if (props.dirty && !intent.pending.value) { error.value = '请先保存主单，再核对并审核';return }
   if (!stockDocumentPurpose(props.row.documentType)?.approvalAvailable) { error.value = '来源业务尚未接通，禁止审核；草稿可继续保存';return }
   const g = generation
-  try { await ElMessageBox.confirm(`${!['OTHER_ISSUE', 'MATERIAL_ISSUE'].includes(String(props.row.documentType)) ? '增加' : '减少'}所选库存。审核通过后在同一事务执行全部明细；成功后单据与库存事实不可编辑。`, '审核单据', { type: 'warning', confirmButtonText: '确认审核', cancelButtonText: '取消' }) } catch { return }
+  try { await ElMessageBox.confirm(`${props.row.direction === 'IN' ? '增加' : '减少'}所选库存。审核通过后在同一事务执行全部明细；成功后单据与库存事实不可编辑。`, '审核单据', { type: 'warning', confirmButtonText: '确认审核', cancelButtonText: '取消' }) } catch { return }
   if (g !== generation || !canApprove.value) return
-  if (props.row.documentType === 'MATERIAL_ISSUE' && !props.row.postRequestId) { error.value = '正式领料原请求身份缺失，禁止审核';return }
-  await intent.run(() => ({ requestId: props.row.documentType === 'MATERIAL_ISSUE' ? String(props.row.postRequestId) : crypto.randomUUID(), expectedRevision: String(props.row.revision) }), c => stockDocuments.approve(String(props.row.id), c), async() => { await props.refresh();await loadBasis() })
+  await intent.run(() => ({ requestId: crypto.randomUUID(), expectedRevision: String(props.row.revision) }), c => stockDocuments.approve(String(props.row.id), c, String(props.row.direction) === 'IN' ? 'IN' : 'OUT'), async() => { await props.refresh();await loadBasis() })
 }
 async function cancel() {
   if (props.row.status !== 'DRAFT' || props.dirty || cancelBusy.value || intent.pending.value || !canCancel.value) return
@@ -57,7 +55,7 @@ async function cancel() {
   try { await ElMessageBox.confirm('作废草稿不改变库存，确认作废？', '作废草稿', { type: 'warning' }) } catch { return }
   if (g !== generation || !canCancel.value || props.row.status !== 'DRAFT' || props.dirty || intent.pending.value) return
   cancelBusy.value = true
-  try { await stockDocuments.cancel(String(props.row.id), String(props.row.revision));if (g === generation) await props.refresh() } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '作废失败' } finally { if (g === generation)cancelBusy.value = false }
+  try { await stockDocuments.cancel(String(props.row.id), String(props.row.revision), String(props.row.direction) === 'IN' ? 'IN' : 'OUT');if (g === generation) await props.refresh() } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '作废失败' } finally { if (g === generation)cancelBusy.value = false }
 }
 onBeforeUnmount(clear)
 </script>

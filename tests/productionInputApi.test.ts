@@ -7,10 +7,10 @@ import { productionInput } from '../src/api/production/productionInput'
 
 beforeEach(() => request.mockReset())
 
-it('loads numbering rules only for the fixed STOCK_OUT category in the current factory scope', async() => {
+it('loads numbering rules by the explicit OUT direction in the current factory scope', async() => {
   await productionInput.numberingRules()
   expect(request).toHaveBeenCalledExactlyOnceWith('/api/wm/stock-documents/numbering-rules', {
-    query: { type: 'STOCK_OUT' }, scope: 'factory'
+    query: { direction: 'OUT' }, scope: 'factory'
   })
 })
 

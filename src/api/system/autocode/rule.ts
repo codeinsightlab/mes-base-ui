@@ -35,7 +35,11 @@ export function getRule(ruleId: any) {
   })
 }
 
-// 新增字典类型
+export function getRuleDocument(ruleId: string) {
+  return request({ scope: 'platform', url: '/system/autocode/rule/' + ruleId + '/document', method: 'get' })
+}
+
+// 一次创建规则及完整组成
 export function addRule(data: any) {
   return request({
     scope: 'platform', url: '/system/autocode/rule',
@@ -44,7 +48,7 @@ export function addRule(data: any) {
   })
 }
 
-// 修改字典类型
+// 一次修改规则及组成，携带读取时的版本
 export function updateRule(data: any) {
   return request({
     scope: 'platform', url: '/system/autocode/rule',

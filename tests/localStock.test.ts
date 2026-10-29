@@ -37,7 +37,7 @@ it('closes the stock drawer before navigating to material issues and rejects lat
   const { s, router } = await setup();let release!:(v:unknown) => void
   calls.detail.mockImplementationOnce(() => new Promise(r => release = r));const reading = s.load()
   await s.openIssues();await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/wm/stockDocuments');expect(router.currentRoute.value.query).toEqual({ documentType: 'MATERIAL_ISSUE' });expect(s.visible).toBe(false)
+  expect(router.currentRoute.value.path).toBe('/wm/stockDocuments');expect(router.currentRoute.value.query).toEqual({ direction: 'OUT', documentType: 'MATERIAL_ISSUE' });expect(s.visible).toBe(false)
   release({ id: 'late', quantity: '999' });await reading;expect(s.stock).toBeNull()
   expect(calls.execute).not.toHaveBeenCalled()
 })

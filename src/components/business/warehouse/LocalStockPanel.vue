@@ -24,8 +24,8 @@ const form = reactive({ quantity: '', reason: '', documentId: '' })
 const quantityValid = ref(false)
 const settlementQuantity = computed(() => {
   if (!stock.value) return null
-  if (operation.value==='loss') return stock.value.quantity
-  if (operation.value==='correction') return '-' + normalizedQuantityInput(stock.value.quantity)
+  if (operation.value === 'loss') return stock.value.quantity
+  if (operation.value === 'correction') return '-' + normalizedQuantityInput(stock.value.quantity)
   return null
 })
 const pending = ref<{ operation: StockOperation; command: StockCommand } | null>(null)
@@ -80,11 +80,11 @@ async function beforeClose(done: () => void) {
   if (scope !== generation) return
   clear(); done()
 }
-async function openInbound() { if (!inboundPath.value) return;const path = inboundPath.value;await beforeClose(() => { visible.value = false;void router.push({ path }) }) }
+async function openInbound() { if (!inboundPath.value) return;const path = inboundPath.value;await beforeClose(() => { visible.value = false;void router.push({ path, query: { direction: 'IN' }}) }) }
 async function openIssues() {
   await beforeClose(() => {
     visible.value = false
-    if (inboundPath.value) void router.push({ path: inboundPath.value, query: { documentType: 'MATERIAL_ISSUE' }})
+    if (inboundPath.value) void router.push({ path: inboundPath.value, query: { direction: 'OUT', documentType: 'MATERIAL_ISSUE' }})
   })
 }
 watch(() => [auth.factoryId, auth.revision, granted.value.map(o => o.value).join(','), readable.value], () => { clear(); visible.value = false }, { flush: 'sync' })
@@ -107,7 +107,7 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
       <el-form v-if="options.length" label-width="110px" :disabled="busy || !!pending">
         <el-form-item label="业务动作"><el-select v-model="operation"><el-option v-for="o in options" :key="o.value" :value="o.value" :label="o.label" /></el-select></el-form-item>
         <el-form-item v-if="operation === 'return'" label="原领料单ID"><el-input v-model="form.documentId" placeholder="统一出库单 ID" /></el-form-item>
-        <el-form-item label="数量增减量"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" required :disabled="busy || !!pending" @validity="quantityValid = $event" placeholder="盘亏填写正数；业务纠错使用有符号增减量" /></el-form-item>
+        <el-form-item label="数量增减量"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" required :disabled="busy || !!pending" placeholder="盘亏填写正数；业务纠错使用有符号增减量" @validity="quantityValid = $event" /></el-form-item>
         <el-form-item label="依据 / 凭据"><el-input v-model="form.reason" type="textarea" maxlength="500" placeholder="期初依据、入库来源、外部凭据或调整原因" /></el-form-item>
       </el-form>
       <div class="table-toolbar"><el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading" @click="submit">{{ pending ? '核实原请求' : '确认库存动作' }}</el-button><el-button :disabled="busy" @click="load">刷新余额与流水</el-button><el-button v-if="inboundPath" :disabled="busy" @click="openInbound">办理入库单</el-button><el-button v-if="inboundPath" type="primary" plain :disabled="busy" @click="openIssues">原领料状态及撤销</el-button></div>

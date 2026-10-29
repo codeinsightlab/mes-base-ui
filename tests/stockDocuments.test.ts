@@ -12,6 +12,14 @@ vi.mock('element-plus', async original => ({ ...await original<object>(), ElMess
 let wrapper:ReturnType<typeof mount> | undefined
 beforeEach(() => { sessionStorage.clear();vi.clearAllMocks();mocks.confirm.mockResolvedValue('confirm');vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}}) })
 afterEach(() => { wrapper?.unmount();wrapper = undefined;vi.unstubAllGlobals() })
+it('recovers a production request with a factory-scoped GET and no command body', async() => {
+  const requestId = '00000000-0000-4000-8000-000000000001'
+  mocks.request.mockResolvedValueOnce({ document: { id: '9007199254740999', documentType: 'MATERIAL_ISSUE' }, lines: [] })
+  const detail = await stockDocuments.byRequest(requestId)
+  expect(detail.document.id).toBe('9007199254740999')
+  expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/by-request/' + requestId, { scope: 'factory' })
+  expect(mocks.request.mock.calls[0]![1]).not.toHaveProperty('body')
+})
 function setup(post = true) {
   const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'PROD';auth.runtimeMode = 'LOCAL';auth.username = 'admin';auth.factoryPermissions = ['business:wm:stock:document:query', ...(post ? ['business:wm:stock:document:post'] : [])]
   const refresh = vi.fn().mockResolvedValue(undefined)
@@ -37,16 +45,16 @@ it('saves one aggregate command with exact quantities and server-owned parent id
   for (const key of ['documentId', 'operatorUserId', 'status', 'stockActionId']) expect(options.body.items[0]).not.toHaveProperty(key)
   expect(mocks.request).toHaveBeenCalledOnce()
 })
-it('approval endpoint preserves the exact caller intent for replay', async() => { mocks.request.mockResolvedValue({});const body = { requestId: 'c7b6c1e2-2e51-41d6-86b6-620efc433027', expectedRevision: '7' };await stockDocuments.approve('8', body);expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/8/actions/approve', { method: 'POST', body, scope: 'factory' }) })
+it('approval endpoint preserves the exact caller intent and explicit flow for replay', async() => { mocks.request.mockResolvedValue({});const body = { requestId: 'c7b6c1e2-2e51-41d6-86b6-620efc433027', expectedRevision: '7' };await stockDocuments.approve('8', body);expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/8/actions/approve', { method: 'POST', query: { direction: 'OUT' }, body, scope: 'factory' }) })
 
 it('creates a document and its lines with the selected rule in one request', async() => {
-  const { aggregateApi } = stockDocumentApis();mocks.request.mockResolvedValueOnce({ document: { id: '1' }, lines: [] })
+  const { aggregateApi } = stockDocumentApis(undefined, () => 'IN');mocks.request.mockResolvedValueOnce({ document: { id: '1' }, lines: [] })
   await aggregateApi.create({ ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999', reason: 'TEST', remark: null, items: [{ materialId: '2', quantity: '1' }] })
   expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/stock-documents/aggregate')
-  expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', sourceExecutionId: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
+  expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ header: { direction: 'IN', ruleCode: 'IN_RULE', sourceExecutionId: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
 })
 it('requires a selected rule before creating a stock document', async() => { const { aggregateApi } = stockDocumentApis();await expect(aggregateApi.create({ documentType: 'OTHER_RECEIPT', items: [] })).rejects.toThrow('请选择出入库单编码规则');expect(mocks.request).not.toHaveBeenCalled() })
-it('queries stock numbering rules with the fixed document category', async() => { mocks.request.mockResolvedValueOnce([]);await stockDocuments.numberingRules('STOCK_OUT');expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/stock-documents/numbering-rules', { query: { type: 'STOCK_OUT' }, scope: 'factory' }) })
+it('queries stock numbering rules with the explicit document direction', async() => { mocks.request.mockResolvedValueOnce([]);await stockDocuments.numberingRules('OUT');expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/stock-documents/numbering-rules', { query: { direction: 'OUT' }, scope: 'factory' }) })
 it('reads production allowance through the inbound document API without creating handover', async() => { mocks.request.mockResolvedValue({ remaining: '40' });await stockDocuments.productionBasis('9007199254740999');expect(mocks.request).toHaveBeenCalledWith('/api/wm/stock-documents/executions/9007199254740999/basis', { scope: 'factory' }) })
 
 it('keeps unsupported source categories as drafts without attempting approval', async() => {
@@ -60,13 +68,14 @@ it('production receipt convenience preserves the caller UUID and decimal strings
   expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/production/executions/9007199254740998/inbound', { method: 'POST', body: command, scope: 'factory' })
 })
 it('material issue approval requires production authorization for the saved draft', async() => {
-  const { s, auth } = setup();await wrapper!.setProps({ row: { id: '1', revision: '0', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', postRequestId: '11111111-2222-4333-8444-555555555555' }})
+  const { s, auth } = setup();await wrapper!.setProps({ row: { id: '1', revision: '0', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
   await s.approve();expect(mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'))).toHaveLength(0)
   auth.factoryPermissions.push('business:mes:material:issue:update');await flushPromises()
   mocks.request.mockResolvedValue({ document: { id: '1' }, lines: [] });await s.approve()
   const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'));expect(approvals).toHaveLength(1)
   expect(mocks.confirm.mock.calls.at(-1)![0]).toContain('减少所选库存')
-  expect(approvals[0]![1].body.requestId).toBe('11111111-2222-4333-8444-555555555555')
+  expect(approvals[0]![1].body.requestId).not.toBe('11111111-2222-4333-8444-555555555555')
+  expect(approvals[0]![1].body.requestId).toMatch(/^[0-9a-f-]{36}$/i)
 })
 it('keeps the safe material issue basis visible to the draft approver without exposing frozen request JSON', async() => {
   const basis = { requestId: '11111111-2222-4333-8444-555555555555', code: 'WO:M#0001 ', workorderId: '9007199254740999', outputQty: '10.000001', routingId: '7', routingNodeIds: ['11', '12'] }
@@ -78,7 +87,7 @@ it('keeps the safe material issue basis visible to the draft approver without ex
 })
 
 it('shows an unreadable material issue basis as a local error while preserving the raw document and lines', async() => {
-  const raw = { document: { id: '1', documentNo: 'QA-RAW', documentType: 'MATERIAL_ISSUE', reason: '原始依据', status: 'DRAFT', revision: '0', postRequestId: '11111111-2222-4333-8444-555555555555' }, lines: [{ id: '8', documentId: '1', materialId: '2', batchNo: '0001 ', quantity: '2.500001' }], materialIssueBasis: null, materialIssueBasisError: '冻结领料依据无法解析，请核对原记录；禁止审核' }
+  const raw = { document: { id: '1', documentNo: 'QA-RAW', documentType: 'MATERIAL_ISSUE', reason: '原始依据', status: 'DRAFT', revision: '0', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }, lines: [{ id: '8', documentId: '1', materialId: '2', batchNo: '0001 ', quantity: '2.500001' }], materialIssueBasis: null, materialIssueBasisError: '冻结领料依据无法解析，请核对原记录；禁止审核' }
   const { aggregateApi } = stockDocumentApis();mocks.request.mockResolvedValue(raw)
   const { header, items } = await aggregateApi.detail('1')
   expect(header.documentNo).toBe('QA-RAW');expect(header.reason).toBe('原始依据');expect(items).toEqual(raw.lines)
@@ -90,16 +99,16 @@ it('shows an unreadable material issue basis as a local error while preserving t
 
 it('approves an existing material issue draft with issue authority without stock permissions', async() => {
   const { s, auth } = setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
-  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', postRequestId: '11111111-2222-4333-8444-555555555555' }})
+  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
   expect(auth.hasPermission('business:wm:stock:document:create', 'factory')).toBe(false)
   expect(auth.hasPermission('business:wm:stock:document:update', 'factory')).toBe(false)
   expect(auth.hasPermission('business:wm:stock:document:post', 'factory')).toBe(false)
-  expect(s.canApprove).toBe(true);mocks.request.mockResolvedValue({ document: { id: '17' }, lines: [] });await s.approve()
-  const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'));expect(approvals).toEqual([['/api/wm/stock-documents/17/actions/approve', { method: 'POST', scope: 'factory', body: { requestId: '11111111-2222-4333-8444-555555555555', expectedRevision: '4' }}]])
+  expect(s.canApprove).toBe(true);mocks.request.mockResolvedValue({ document: { id: '17' }});await s.approve()
+  const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'));expect(approvals).toEqual([['/api/wm/stock-documents/17/actions/approve', { method: 'POST', query: { direction: 'OUT' }, scope: 'factory', body: { requestId: expect.any(String), expectedRevision: '4' }}]])
 })
 it('does not approve or cancel a material issue in a non-local factory mode', async() => {
   const { s, auth } = setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
-  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', postRequestId: '11111111-2222-4333-8444-555555555555' }})
+  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
   auth.runtimeMode = 'ERP';await flushPromises();mocks.request.mockClear()
   await s.approve();await s.cancel()
   expect(s.canApprove).toBe(false);expect(s.canCancel).toBe(false);expect(mocks.request).not.toHaveBeenCalled()
@@ -116,8 +125,39 @@ it('limits legacy issue access to material issue documents and retains distinct 
   expect(mocks.request.mock.calls[0]![1].query.documentType).toBe('MATERIAL_ISSUE')
   mocks.request.mockResolvedValueOnce({ document: { id: '44', documentType: 'MATERIAL_ISSUE' }, lines: [] })
   await aggregateApi.detail('44')
-  expect(mocks.request.mock.calls[1]).toEqual(['/api/wm/stock-documents/44', { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }])
+  expect(mocks.request.mock.calls[1]).toEqual(['/api/wm/stock-documents/44', { query: { direction: 'OUT', documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }])
   mocks.request.mockResolvedValueOnce({ id: '99', documentId: '44' })
   await stockDocuments.materialIssueLine('44', '99')
-  expect(mocks.request.mock.calls[2]).toEqual(['/api/wm/stock-documents/44/lines/99', { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }])
+  expect(mocks.request.mock.calls[2]).toEqual(['/api/wm/stock-documents/44/lines/99', { query: { direction: 'OUT', documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }])
+})
+
+it('approves a material draft without a post UUID and replays only its independent approval intent after UNKNOWN', async() => {
+  const creationId = '11111111-2222-4333-8444-555555555555'
+  const { s, auth, refresh } = setup(false)
+  auth.factoryPermissions.push('business:mes:material:issue:update')
+  let posts = 0
+  mocks.request.mockImplementation((url: string) => {
+    if (!url.endsWith('/actions/approve')) return Promise.resolve(null)
+    posts++
+    return posts === 1 ? Promise.reject(new Error('response lost')) : Promise.resolve({ document: { id: '17', status: 'POSTED' }})
+  })
+  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: creationId, postRequestId: null,
+    materialIssueBasis: { requestId: creationId, code: 'WO:RAW#0001', workorderId: '1', outputQty: '1', routingId: '2', routingNodeIds: ['3'] }}})
+  await flushPromises()
+  expect(s.canApprove).toBe(true)
+  await s.approve()
+  expect(refresh).not.toHaveBeenCalled()
+  expect(s.intent.pending.value).not.toBeNull()
+  const first = mocks.request.mock.calls.find(([url]) => url.endsWith('/actions/approve'))![1].body
+  expect(first.requestId).toMatch(/^[0-9a-f-]{36}$/i)
+  expect(first.requestId).not.toBe(creationId)
+  expect(first.expectedRevision).toBe('4')
+  expect(Object.keys(first).sort()).toEqual(['expectedRevision', 'requestId'])
+  await wrapper!.setProps({ row: { id: '17', revision: '5', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: creationId, postRequestId: null }})
+  await s.approve()
+  const approvals = mocks.request.mock.calls.filter(([url]) => url.endsWith('/actions/approve'))
+  expect(approvals).toHaveLength(2)
+  expect(approvals[1]![1].body).toEqual(first)
+  expect(refresh).toHaveBeenCalledOnce()
+  expect(s.intent.pending.value).toBeNull()
 })
