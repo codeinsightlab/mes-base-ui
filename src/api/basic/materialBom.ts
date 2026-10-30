@@ -15,7 +15,8 @@ function crud(path:string):CrudApi {
 }
 export const bomApi = crud('/api/basic/material-bom')
 export const bomItemApi = crud('/api/basic/material-bom-item')
-export const transition = (id:string, action:'publish' | 'disable', revision:string) => request<Bom>('/api/basic/material-bom/' + encodeURIComponent(id) + '/' + action, { method: 'POST', body: { revision }, scope: 'factory' })
+export const transition = (id:string, action:'publish' | 'disable' | 'enable', revision:string) => request<Bom>('/api/basic/material-bom/' + encodeURIComponent(id) + '/' + action, { method: 'POST', body: { revision }, scope: 'factory' })
+export const copyBom = (id:string, version:string, revision:string) => request<Bom>('/api/basic/material-bom/' + encodeURIComponent(id) + '/copy', { method: 'POST', body: { version, revision }, scope: 'factory' })
 export const defaultBom = (productId:string) => request<Bom | null>('/api/basic/material-bom/default', { query: { productId }, scope: 'factory' }).then(value => value ?? null)
 export const setDefaultBom = (id:string, revision:string) => request<Bom>('/api/basic/material-bom/' + encodeURIComponent(id) + '/default', { method: 'POST', body: { revision }, scope: 'factory' })
 export const structure = (id:string, quantity:string) => request<BomGraph>('/api/basic/material-bom/' + encodeURIComponent(id) + '/structure', { query: { quantity }, scope: 'factory' })

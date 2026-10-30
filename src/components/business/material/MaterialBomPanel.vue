@@ -8,7 +8,7 @@ import QuantityInput from './QuantityInput.vue'
 import { bomRatio } from '@/lib/bomRatio'
 import MaterialPicker from './MaterialPicker.vue'
 import BomVersionSelect from './BomVersionSelect.vue'
-import { bomApi, bomItemApi, setDefaultBom, structure, transition, type BomGraph } from '@/api/basic/materialBom'
+import { bomApi, bomItemApi, copyBom, setDefaultBom, structure, transition, type BomGraph } from '@/api/basic/materialBom'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
 import { useAuth } from '@/stores/auth'
@@ -21,6 +21,8 @@ const quantityValid = ref(false)
 let initialGraphPending = false
 let generation = 0
 const canUpdate = computed(() => auth.hasPermission('business:material:update', 'factory'))
+const canCreate = computed(() => auth.hasPermission('business:material:create', 'factory'))
+const canCopy = computed(() => canCreate.value && auth.hasPermission('business:material:query', 'factory'))
 const headerApi:CrudApi = { ...bomApi,
   list: q => bomApi.list({ ...q, productId: String(props.material.id) }),
   detail: async id => { const row = await bomApi.detail!(id);revision.value = String(row.revision);return row },
@@ -63,17 +65,39 @@ const itemFields:Field[] = [
   { key: 'childBomId', label: '子BOM版本', kind: 'text' },
   { key: 'sort', label: '显示顺序', kind: 'number', required: true, defaultValue: 0 }
 ]
-async function act(row:Row, action:'publish' | 'disable', refresh:() => Promise<void>) {
+async function act(row:Row, action:'publish' | 'disable' | 'enable', refresh:() => Promise<void>) {
   const current = generation
   try {
-    await ElMessageBox.confirm(action === 'publish' ? '发布后组成与用量不能直接修改，确认发布？' : '停用后不能被新业务选用，已有记录保留。确认停用？', 'BOM版本', { type: 'warning' })
+    const message = action === 'publish' ? '发布后组成与用量不能直接修改，确认发布？' : action === 'enable' ? '启用前将重新校验BOM组成，确认启用？' : '停用后不能被新业务选用，已有记录保留。确认停用？'
+    await ElMessageBox.confirm(message, 'BOM版本', { type: 'warning' })
     if (current !== generation || !canUpdate.value) return
     acting.value = true
     await refresh()
     if (current !== generation) return
     await transition(String(row.id), action, String(row.revision))
-    if (current === generation) { await refresh(); ElMessage.success(action === 'publish' ? 'BOM已发布' : 'BOM已停用') }
+    if (current === generation) { await refresh(); ElMessage.success(action === 'publish' ? 'BOM已发布' : action === 'enable' ? 'BOM已启用' : 'BOM已停用') }
   } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '操作失败') } finally { if (current === generation) acting.value = false }
+}
+async function copyVersion(row:Row, refresh:() => Promise<void>) {
+  if (acting.value || !canCopy.value) return
+  let current = generation
+  try {
+    acting.value = true
+    await refresh()
+    if (current !== generation || !canCopy.value) return
+    const result = await ElMessageBox.prompt('请输入新版本号。原版本和组件保持不变，新版本将保存为草稿。', '复制BOM版本', {
+      inputPlaceholder: '新版本号', inputValidator: value => !!value && !!value.trim() && value.length <= 32 || '请输入不超过32字符的新版本号',
+      confirmButtonText: '复制为草稿', cancelButtonText: '取消'
+    })
+    if (current !== generation || !canCopy.value) return
+    const copied = await copyBom(String(row.id), result.value.trim(), String(row.revision))
+    if (current !== generation || !canCopy.value) return
+    clearGraph()
+    current = generation
+    acting.value = true
+    await document.value?.open(copied)
+    if (current === generation) ElMessage.success('已复制为草稿，可修改后发布')
+  } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '复制失败') } finally { if (current === generation) acting.value = false }
 }
 async function makeDefault(row:Row, refresh:() => Promise<void>) {
   const current = generation
@@ -107,7 +131,7 @@ async function loadGraph(id = graphId.value) {
 }
 function clearGraph() { initialGraphPending = false;quantityValid.value = false;generation++;graphLoading.value = false;graph.value = null;graphId.value = '';error.value = '' }
 function clear() { initialGraphPending = false;quantityValid.value = false;picker.value?.cancel();materialLabels.value = {};generation++;graph.value = null;graphId.value = '';error.value = '';graphLoading.value = false;acting.value = false }
-watch(() => [auth.revision, auth.factoryId, props.material.id], clear)
+watch(() => [auth.revision, auth.factoryId, auth.factorySwitching, auth.token, auth.userId, auth.factoryPermissions.join('|'), props.material.id], clear)
 defineExpose({ hasUnsavedChanges: () => document.value?.hasUnsavedChanges() ?? false })
 onBeforeUnmount(clear)
 </script>
@@ -127,15 +151,19 @@ onBeforeUnmount(clear)
     parent-key="bomId"
     header-table-key="material:bom:versions"
     item-table-key="material:bom:components"
+    hide-item-refresh
     :header-readonly="row=>row.status!=='DRAFT'"
+    @back="clearGraph"
   >
+    <template #header-list-actions="{row}"><el-button v-if="canCopy" :disabled="acting" text type="primary" @click="copyVersion(row, async()=>{})">复制为草稿</el-button></template>
     <template #header-actions="{row,refresh,dirty}">
-      <el-button v-if="row.id" :disabled="dirty || acting" @click="refresh">刷新版本</el-button>
+      <el-button v-if="row.id && canCopy" :disabled="dirty || acting" @click="copyVersion(row,refresh)">复制为草稿</el-button>
       <el-button v-if="row.id" :disabled="dirty" @click="openGraph(String(row.id))">多阶结构与需求</el-button>
       <el-button v-if="row.id && row.status==='DRAFT' && canUpdate" :disabled="dirty || acting" type="primary" plain @click="act(row,'publish',refresh)">发布</el-button>
       <el-button v-if="row.id && row.status==='PUBLISHED' && row.defaultVersion!==true && canUpdate" :disabled="dirty || acting" @click="makeDefault(row,refresh)">设为默认</el-button>
       <el-tag v-if="row.id && row.defaultVersion===true" type="success">产品默认版本</el-tag>
       <el-button v-if="row.id && row.status==='PUBLISHED' && canUpdate" :disabled="acting" @click="act(row,'disable',refresh)">停用</el-button>
+      <el-button v-if="row.id && row.status==='DISABLED' && canUpdate" :disabled="dirty || acting" @click="act(row,'enable',refresh)">启用</el-button>
     </template>
     <template #field-baseQty="{draft,disabled}"><QuantityInput v-model="draft.baseQty" semantic="bom-ratio" show-unit :material-id="String(material.id)" :disabled="disabled" /><span class="secondary">BOM基准数量，最多六位有效小数</span></template>
     <template #field-quantity="{draft,disabled}"><QuantityInput v-model="draft.quantity" semantic="bom-ratio" show-unit :material-id="draft.materialId as string" :disabled="disabled" /><span class="secondary">用量系数允许小数，不套库存整数限制</span></template>

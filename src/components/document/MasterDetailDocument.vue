@@ -10,6 +10,7 @@ import { commandFromDraft } from '@/lib/crud'
 import type { CrudApi, Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
+const emit = defineEmits<{ back: [] }>()
 
 const props = withDefaults(defineProps<{
   creatable?: boolean;
@@ -23,6 +24,7 @@ const props = withDefaults(defineProps<{
   revisionField?: string;
   validateAggregateItems?: (items:Row[]) => string | null;
   headerTableKey?: string; itemTableKey?: string;
+  hideItemRefresh?: boolean;
   headerReadonly?: (row: Row) => boolean;
   itemsReadonly?: (row: Row) => boolean;
   itemPermissionOverrides?: Record<string, string>;
@@ -72,7 +74,7 @@ async function back() {
       await ElMessageBox.confirm('主单有未保存的修改，确认返回列表并放弃这些修改？', '未保存的修改', { confirmButtonText: '放弃修改', cancelButtonText: '继续编辑', type: 'warning' })
     } catch { return }
   }
-  if (current === generation) clear()
+  if (current === generation) { clear(); emit('back') }
 }
 async function open(row?: Row) {
   if (row ? !can('query') : props.creatable === false || !can('create')) return
@@ -198,7 +200,7 @@ onBeforeUnmount(clear)
     :initial-search="initialSearch"
   >
     <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
-    <template #actions="{ row }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button></template>
+    <template #actions="{ row }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" /></template>
   </CrudPage>
   <section v-else class="app-container">
     <PageHeader :title="title" :description="id ? '单据编号 ' + id : '新增单据'">
@@ -226,6 +228,7 @@ onBeforeUnmount(clear)
         v-else
         :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
         embedded
+        :hide-refresh="hideItemRefresh"
         :readonly="readonly || !!itemsReadonly?.(draft) || !!itemsReadonlyWhenDirty && snapshot() !== savedDraft"
         title="明细"
         :api="itemApi"

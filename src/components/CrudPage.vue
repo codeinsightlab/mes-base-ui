@@ -26,6 +26,7 @@ const ElMessageBox = usePageMessageBox()
 
 const props = withDefaults(defineProps<{
   embedded?: boolean;
+  hideRefresh?: boolean;
   managedEditing?: boolean;
   creatable?: boolean;
   beforeCreate?: () => Promise<Row | null>;
@@ -322,7 +323,7 @@ defineExpose({ load })
       <slot name="toolbar" />
       <ColumnSettings v-if="tableKey && can(props.listAction)" :controller="columnSettings" />
       <RightToolbar v-if="searchFields.length && can(props.listAction)" v-model:show-search="showSearch" @query-table="load" />
-      <el-button v-else-if="can(props.listAction)" :loading="loading" icon="Refresh" @click="load">刷新</el-button>
+      <el-button v-else-if="!hideRefresh && can(props.listAction)" :loading="loading" icon="Refresh" @click="load">刷新</el-button>
     </div>
     <el-alert
       v-if="tableKey && columnSettings.state.error && !columnSettings.state.open && can(props.listAction)"
