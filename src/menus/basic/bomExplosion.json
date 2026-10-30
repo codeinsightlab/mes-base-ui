@@ -1,0 +1,4 @@
+{
+  "id": "basic:bomExplosion", "name": "物料BOM展开", "path": "/basic/bom-explosion",
+  "component": "basic/bomExplosion/index", "permission": "business:material:query", "permissionScope": "factory", "kind": "MENU", "icon": "List", "children": []
+}

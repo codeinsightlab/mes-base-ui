@@ -147,7 +147,7 @@ onBeforeUnmount(clear)
           :api="workspaceApi"
           :fields="materialFields"
         >
-          <template #toolbar><el-button v-if="can('material','create')" type="primary" icon="Plus" @click="openEditor()">新增物料</el-button><el-button v-if="can('material','sync')" :loading="syncBusy" @click="sync('material')">同步物料</el-button></template>
+          <template #toolbar><router-link v-if="can('material','query')" to="/basic/bom-explosion">物料BOM展开</router-link><el-button v-if="can('material','create')" type="primary" icon="Plus" @click="openEditor()">新增物料</el-button><el-button v-if="can('material','sync')" :loading="syncBusy" @click="sync('material')">同步物料</el-button></template>
           <template #actions="{row}"><el-button v-if="can('material','query')" link type="primary" @click="openEditor(row)">维护</el-button><el-button v-if="can('material','query')" link @click="openBom(row)">BOM</el-button></template>
         </CrudPage>
       </div>
