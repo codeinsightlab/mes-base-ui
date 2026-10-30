@@ -77,7 +77,7 @@ npm exec eslint -- src/views/Home.vue --fix
 
 ## 物料BOM逐层展开查询
 
-从物料管理工具栏进入“物料BOM展开”，也可直接打开 `/basic/bom-explosion`。输入完整物料编码后，页面调用 `GET /api/basic/material-bom/explode`，以 `materialCode` 精确查询；首次数量为1。读取成功后复用QuantityInput维护预计产出数量，按基本单位规则校验，再按确切BOM版本重新计算。查询、版本选择和版本分页仅要求当前工厂的 `business:material:query` 权限，沿用已由服务端接受的数量；修改预计产出数量时，QuantityInput还要求单位查询权限和有效单位规则，读取失败只阻止数量重算，不阻止BOM及版本事实读取。页面是已编译的只读路由，不依赖菜单记录即可访问；中心V57新增同名菜单定义，使用 `basic/bomExplosion/index` 组件，由管理员通过现有角色授权入口分配侧栏入口，不自动扩展角色授权。
+从物料管理页面标题旁的“BOM展开查询”按钮进入，也可直接打开 `/basic/bom-explosion`。输入完整物料编码后，页面调用 `GET /api/basic/material-bom/explode`，以 `materialCode` 精确查询；首次数量为1。读取成功后复用QuantityInput维护预计产出数量，按基本单位规则校验，再按确切BOM版本重新计算。查询、版本选择和版本分页仅要求当前工厂的 `business:material:query` 权限，沿用已由服务端接受的数量；修改预计产出数量时，QuantityInput还要求单位查询权限和有效单位规则，读取失败只阻止数量重算，不阻止BOM及版本事实读取。页面是已编译的只读路由，不依赖菜单记录即可访问；中心V57新增同名菜单定义，使用 `basic/bomExplosion/index` 组件，由管理员通过现有角色授权入口分配侧栏入口，不自动扩展角色授权。
 
 查询参数为 `materialCode`、可选 `bomId`、decimal字符串 `quantity`、`versionOffset` 和 `versionLimit`（页面每页20个版本）。响应的 `material`、`selectedVersion` 和 `versions` 是物料及根版本的权威来源。根版本唯一时可由服务端确定；多个版本必须明确选择，不按默认标记、版本号或创建时间猜选。本场景通过响应中的版本事实列表提供“以此版本展开”读取动作，可分析草稿、已发布和停用版本；与BomVersionSelect仅选择已发布版本用于正式用料的语义不同，不新增第二套通用版本选择控件。
 

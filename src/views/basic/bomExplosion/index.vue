@@ -99,32 +99,33 @@ function nodeState(row: ExplosionNode) {
 </script>
 <template>
   <div class="app-container bom-explosion-page">
-    <PageHeader title="物料BOM展开" description="输入物料编码，沿明确的BOM版本递归查询至叶项，分析各路径与汇总需求。" />
+    <PageHeader title="物料BOM展开" description="查询物料的多层组成和叶料需求" />
     <QueryForm class="filter-panel" inline @submit="search">
-      <el-form-item label="物料编码"><el-input v-model="code" aria-label="完整物料编码" maxlength="64" clearable placeholder="输入完整物料code" /></el-form-item>
+      <el-form-item label="物料编码"><el-input v-model="code" aria-label="完整物料编码" maxlength="64" clearable placeholder="输入完整物料编码" /></el-form-item>
       <el-button native-type="submit" type="primary" :disabled="!allowed || loading || versionsLoading" :loading="loading">查询物料</el-button>
     </QueryForm>
-    <el-alert title="只读BOM需求分析：展开结果不证明生产、领料、库存或入库已完成。叶项表示所选BOM没有指定子BOM。" type="info" :closable="false" />
+    <p class="bom-hint">按所选BOM逐层计算结构需求；叶项表示未指定子BOM，结果不代表实际库存或生产进度。</p>
     <el-alert v-if="!allowed" title="请选择可用工厂，并确认拥有物料查询权限。" type="warning" :closable="false" />
     <el-alert v-if="error" :title="error" type="error" :closable="false">
       <el-button v-if="lastQuery" :disabled="!allowed || loading" @click="retryQuery">重试BOM查询</el-button>
     </el-alert>
-    <div v-if="material" class="table-toolbar">
-      <strong>{{ material.code }} · {{ material.name }}</strong>
-      <label for="bom-explosion-output-quantity">预计产出数量</label>
-      <QuantityInput id="bom-explosion-output-quantity" v-model="quantity" style="width:240px" :material-id="material.id" required positive show-unit aria-label="预计产出数量" :disabled="loading || versionsLoading" @validity="quantityValid=$event" />
-      <el-button :disabled="!allowed || loading || versionsLoading || !quantityValid" :loading="loading" @click="recalculate">按当前数量展开</el-button>
-    </div>
-    <div v-if="loading" role="status">正在读取BOM版本及递归需求…</div>
-    <template v-if="data">
-      <div class="table-toolbar">
+    <section v-if="material" class="panel bom-context" aria-label="当前物料与数量">
+      <div class="bom-context-main"><span class="secondary">当前物料</span><strong>{{ material.code }} · {{ material.name }}</strong></div>
+      <div class="bom-quantity"><label for="bom-explosion-output-quantity">预计产出数量</label>
+        <QuantityInput id="bom-explosion-output-quantity" v-model="quantity" class="bom-quantity-input" :material-id="material.id" required positive show-unit aria-label="预计产出数量" :disabled="loading || versionsLoading" @validity="quantityValid=$event" />
+        <el-button :disabled="!allowed || loading || versionsLoading || !quantityValid" :loading="loading" @click="recalculate">按当前数量展开</el-button>
+      </div>
+      <div v-if="data" class="bom-context-result">
         <StatusTag :label="complete ? 'BOM展开完成' : data.selectionRequired ? '待选择BOM版本' : 'BOM展开受阻'" :tone="complete ? 'success' : 'warning'" />
         <span>本次产出：<QuantityText :value="data.outputQty" /></span>
         <span v-if="data.selectedVersion">BOM：{{ data.selectedVersion.code }} · {{ data.selectedVersion.version }} · {{ data.selectedVersion.status }} · ID {{ data.selectedVersion.id }}；基数 <QuantityText :value="data.selectedVersion.baseQty" /></span>
       </div>
+    </section>
+    <div v-if="loading" role="status">正在读取BOM版本及递归需求…</div>
+    <template v-if="data">
       <el-alert v-if="!complete" title="尚未完整展开。请处理下方版本选择或阻断原因；已解析分支和叶项汇总均不能当作完整需求。" type="warning" :closable="false" />
-      <section v-if="data.selectionRequired || data.versions.total" class="panel bom-explosion-section" aria-label="BOM版本候选">
-        <div class="table-toolbar"><strong>根BOM版本</strong><span class="secondary">候选由服务端返回；选择确切版本，不按默认标记或版本号猜选。</span></div>
+      <section v-if="data.selectionRequired || data.versions.total > 1 || versionsError" class="panel bom-explosion-section" aria-label="BOM版本候选">
+        <div class="table-toolbar"><strong>选择根BOM版本</strong><span class="secondary">请选择需要展开的版本。</span></div>
         <el-alert v-if="versionsError" :title="versionsError" type="error" :closable="false">
           <el-button :disabled="!allowed || versionsLoading" @click="retryVersions">重试版本候选</el-button>
         </el-alert>
@@ -151,18 +152,18 @@ function nodeState(row: ExplosionNode) {
         <el-table :data="data.problems"><el-table-column label="路径" min-width="180"><template #default="{ row }">{{ row.path || '根节点' }}</template></el-table-column><el-table-column prop="bomId" label="BOM ID" min-width="160" /><el-table-column prop="errorCode" label="原因编码" min-width="220" /><el-table-column prop="message" label="原因" min-width="300" /></el-table>
       </section>
       <section v-if="data.items.length" class="panel bom-explosion-section" aria-label="BOM逐层需求">
-        <div class="table-toolbar"><strong>逐层需求</strong><el-button @click="expandAll">展开全部层级</el-button><el-button @click="expanded=[]">收起层级</el-button></div>
+        <div class="table-toolbar bom-section-heading"><div><strong>逐层需求</strong><div class="secondary">查看各层组件用量和累计需求</div></div><div><el-button @click="expandAll">展开全部层级</el-button><el-button @click="expanded=[]">收起层级</el-button></div></div>
         <el-table :data="data.items" row-key="path" :expand-row-keys="expanded" :tree-props="{children:'children'}" border @expand-change="toggleRow">
-          <el-table-column label="物料编码 / 名称" min-width="260"><template #default="{ row }"><CodeText :value="row.code" /><div>{{ row.name }}</div></template></el-table-column>
-          <el-table-column prop="level" label="层级" width="80" /><el-table-column prop="path" label="路径" min-width="160" />
-          <el-table-column label="组件用量" min-width="130"><template #default="{ row }"><QuantityText :value="row.componentQty" /></template></el-table-column>
-          <el-table-column label="父件基数" min-width="130"><template #default="{ row }"><QuantityText :value="row.baseQty" /></template></el-table-column>
-          <el-table-column label="累计需求" min-width="140"><template #default="{ row }"><QuantityText :value="row.quantity" /> <span v-if="row.quantity == null">待确认</span> {{ row.unitName }}</template></el-table-column>
-          <el-table-column prop="parentBomVersion" label="父BOM版本" min-width="140" /><el-table-column label="节点状态" min-width="120"><template #default="{ row }">{{ nodeState(row) }}</template></el-table-column>
+          <el-table-column label="物料编码 / 名称" min-width="220"><template #default="{ row }"><CodeText :value="row.code" /><div>{{ row.name }}</div></template></el-table-column>
+          <el-table-column prop="level" label="层级" width="60" /><el-table-column prop="path" label="路径" min-width="115" />
+          <el-table-column label="组件用量" min-width="100"><template #default="{ row }"><QuantityText :value="row.componentQty" /></template></el-table-column>
+          <el-table-column label="父件基数" min-width="100"><template #default="{ row }"><QuantityText :value="row.baseQty" /></template></el-table-column>
+          <el-table-column label="累计需求" min-width="120"><template #default="{ row }"><QuantityText :value="row.quantity" /> <span v-if="row.quantity == null">待确认</span> {{ row.unitName }}</template></el-table-column>
+          <el-table-column prop="parentBomVersion" label="父BOM版本" min-width="105" /><el-table-column label="节点状态" min-width="100"><template #default="{ row }">{{ nodeState(row) }}</template></el-table-column>
         </el-table>
       </section>
       <section class="panel bom-explosion-section" aria-label="叶项需求汇总">
-        <div class="table-toolbar"><strong>{{ complete ? '叶项需求汇总' : '已解析叶项需求（不完整）' }}</strong><span class="secondary">同物料跨分支汇总，原路径保留；数量使用服务端结果。</span></div>
+        <div class="table-toolbar bom-section-heading"><div><strong>{{ complete ? '叶项需求汇总' : '已解析叶项需求（不完整）' }}</strong><div class="secondary">相同物料合并汇总，保留来源路径</div></div></div>
         <el-table :data="data.totals" row-key="materialId" :empty-text="complete ? '没有叶项需求' : '尚无可确认的叶项汇总'">
           <el-table-column prop="code" label="物料编码" min-width="160" /><el-table-column prop="name" label="名称" min-width="160" />
           <el-table-column label="汇总需求" min-width="180"><template #default="{ row }"><QuantityText :value="row.quantity" /> {{ row.unitName }}</template></el-table-column>
@@ -177,4 +178,13 @@ function nodeState(row: ExplosionNode) {
 <style scoped>
 .bom-explosion-section { margin-top: var(--ui-space-4); padding: var(--ui-space-4); min-width: 0; }
 .bom-explosion-page > .el-alert { margin-bottom: var(--ui-space-3); }
+.bom-hint { margin: var(--ui-space-3) 0; color: var(--el-text-color-secondary); font-size: 13px; }
+.bom-context { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; padding: var(--ui-space-4); margin-bottom: var(--ui-space-4); }
+.bom-context-main { display: flex; flex-direction: column; gap: 4px; flex: 1 1 280px; min-width: 0; }
+.bom-quantity { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.bom-quantity-input { width: 200px; }
+.bom-context-result { flex: 1 0 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding-top: 12px; border-top: 1px solid var(--el-border-color-lighter); }
+.bom-section-heading { justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bom-section-heading .secondary { margin-top: 4px; font-size: 13px; }
+@media (max-width: 640px) { .bom-quantity-input { width: 100%; } .bom-quantity { width: 100%; } }
 </style>
