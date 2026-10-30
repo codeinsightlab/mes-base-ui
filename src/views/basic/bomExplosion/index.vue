@@ -154,7 +154,7 @@ function nodeState(row: ExplosionNode) {
       <section v-if="data.items.length" class="panel bom-explosion-section" aria-label="BOM逐层需求">
         <div class="table-toolbar bom-section-heading"><div><strong>逐层需求</strong><div class="secondary">查看各层组件用量和累计需求</div></div><div><el-button @click="expandAll">展开全部层级</el-button><el-button @click="expanded=[]">收起层级</el-button></div></div>
         <el-table :data="data.items" row-key="path" :expand-row-keys="expanded" :tree-props="{children:'children'}" border @expand-change="toggleRow">
-          <el-table-column label="物料编码 / 名称" min-width="220"><template #default="{ row }"><CodeText :value="row.code" /><div>{{ row.name }}</div></template></el-table-column>
+          <el-table-column label="物料编码 / 名称" min-width="220" class-name="bom-tree-material"><template #default="{ row }"><div class="bom-material-info"><CodeText :value="row.code" /><div class="bom-material-name">{{ row.name }}</div></div></template></el-table-column>
           <el-table-column prop="level" label="层级" width="60" /><el-table-column prop="path" label="路径" min-width="115" />
           <el-table-column label="组件用量" min-width="100"><template #default="{ row }"><QuantityText :value="row.componentQty" /></template></el-table-column>
           <el-table-column label="父件基数" min-width="100"><template #default="{ row }"><QuantityText :value="row.baseQty" /></template></el-table-column>
@@ -186,5 +186,11 @@ function nodeState(row: ExplosionNode) {
 .bom-context-result { flex: 1 0 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding-top: 12px; border-top: 1px solid var(--el-border-color-lighter); }
 .bom-section-heading { justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .bom-section-heading .secondary { margin-top: 4px; font-size: 13px; }
+.bom-explosion-page :deep(.bom-tree-material .cell) { display: flex; align-items: flex-start; }
+.bom-explosion-page :deep(.bom-tree-material .el-table__indent),
+.bom-explosion-page :deep(.bom-tree-material .el-table__placeholder),
+.bom-explosion-page :deep(.bom-tree-material .el-table__expand-icon) { flex: none; }
+.bom-material-info { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.bom-material-name { font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .bom-quantity-input { width: 100%; } .bom-quantity { width: 100%; } }
 </style>
