@@ -9,7 +9,6 @@ import QueryForm from '@/components/QueryForm.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
-import { quantityColumn } from '@/lib/production/quantity'
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { routeLocationKey } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -20,12 +19,15 @@ import type { StatusTone } from '@/lib/status'
 import CodeText from '@/components/CodeText.vue'
 import Pagination from '@/components/Pagination/index.vue'
 import { displayQuantity } from './quantity'
+import WorkorderCombinationPrint from '@/components/business/production/WorkorderCombinationPrint.vue'
 import WorkOrderCancellation from '@/components/business/production/WorkOrderCancellation.vue'
 import WorkorderMaterialPanel from '@/components/business/production/WorkorderMaterialPanel.vue'
+import WorkorderMaterialEditor from '@/components/business/production/WorkorderMaterialEditor.vue'
+import MaterialSelect from '@/components/business/MaterialSelect.vue'
+import { emptyMaterialDemand, materialDemandDraft, workorderMaterial } from '@/api/production/workorderMaterial'
 import WorkOrderExecutions from '@/components/business/production/WorkOrderExecutions.vue'
 import WorkOrderRoutePreview from '@/components/business/production/WorkOrderRoutePreview.vue'
 import { api, type Detail, type NumberingRuleOption, type RoutingOption, type Save } from '@/api/production/workorder'
-import { api as materials, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
 
@@ -47,18 +49,21 @@ function resizeDetails() { detailColumns.value = window.innerWidth < 600 ? 1 : 2
 onMounted(() => { resizeDetails(); window.addEventListener('resize', resizeDetails) })
 onBeforeUnmount(() => window.removeEventListener('resize', resizeDetails))
 const dialog = ref(false), drawer = ref(false), detail = ref<Detail | null>(null), editId = ref<string | null>(null)
-const productOptions = ref<MaterialVo[]>([]), routeOptions = ref<RoutingOption[]>([])
+const routeOptions = ref<RoutingOption[]>([])
 const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false)
 const routesLoading = ref(false)
+const hasPublishedRoutes = ref<boolean | null>(null)
 const originalProductId = ref('')
 const originalPlannedQty = ref('')
 const plannedQuantityValid = ref(false)
-const blank = (): Save => ({ ruleCode: '', productId: '', routingId: '', plannedQty: '', plannedStartAt: null, plannedEndAt: null, externalId: null, externalCode: null, remark: null })
+const blank = (): Save => ({ ruleCode: '', productId: '', routingId: '', plannedQty: '', plannedStartAt: null, plannedEndAt: null, externalId: null, externalCode: null, remark: null, material: emptyMaterialDemand() })
 const form = reactive<Save>(blank())
-let listAttempt = 0, detailAttempt = 0, productAttempt = 0, routeAttempt = 0, numberingAttempt = 0
+const materialEditor = ref<InstanceType<typeof WorkorderMaterialEditor> | null>(null)
+const confirmingSave = ref(false)
+let listAttempt = 0, detailAttempt = 0, routeAttempt = 0, numberingAttempt = 0
 function clear() {
-  listAttempt++; detailAttempt++; productAttempt++; routeAttempt++; numberingAttempt++
-  rows.value = []; total.value = 0; detail.value = null; productOptions.value = []; routeOptions.value = []; numberingRules.value = []; numberingRulesLoading.value = false
+  listAttempt++; detailAttempt++; routeAttempt++; numberingAttempt++
+  rows.value = []; total.value = 0; detail.value = null; routeOptions.value = []; numberingRules.value = []; numberingRulesLoading.value = false
   dialog.value = drawer.value = loading.value = busy.value = false; error.value = ''; page.value = 1; editId.value = null; Object.assign(form, blank())
 }
 watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), canExecutions.value], () => { clear(); if (can('list')) void load() }, { flush: 'sync' })
@@ -75,12 +80,8 @@ async function load() {
   loading.value = true; error.value = ''
   try { const result = await api.list({ code: code.value, status: status.value, offset: (page.value - 1) * pageSize.value, limit: pageSize.value }); if (attempt === listAttempt) { rows.value = result.items; total.value = result.total } } catch(e) { if (attempt === listAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === listAttempt) loading.value = false }
 }
-async function searchProducts(search: string) {
-  const attempt = ++productAttempt
-  try { const result = await materials.list({ name: search, status: 'ENABLED', limit: 100 }); if (attempt === productAttempt) productOptions.value = result.items } catch(e) { if (attempt === productAttempt) error.value = e instanceof Error ? e.message : '物料读取失败' }
-}
-function resetRouteOptions() { routeAttempt++; routeOptions.value = []; routesLoading.value = false }
-watch(dialog, (visible) => { if (!visible) { productAttempt++; numberingAttempt++; numberingRulesLoading.value = false; resetRouteOptions() } }, { flush: 'sync' })
+function resetRouteOptions() { hasPublishedRoutes.value = null; routeAttempt++; routeOptions.value = []; routesLoading.value = false }
+watch(dialog, (visible) => { if (!visible) { numberingAttempt++; numberingRulesLoading.value = false; resetRouteOptions() } }, { flush: 'sync' })
 async function searchRoutes(search = '', selectOnly = false) {
   const attempt = ++routeAttempt, productId = form.productId
   if (!dialog.value || !productId) { routeOptions.value = []; routesLoading.value = false; return }
@@ -89,12 +90,21 @@ async function searchRoutes(search = '', selectOnly = false) {
     const result = await api.routings(productId, search)
     if (attempt !== routeAttempt || productId !== form.productId) return
     routeOptions.value = result
+    if (!search) hasPublishedRoutes.value = result.length > 0
     if (selectOnly && result.length === 1 && !form.routingId) form.routingId = result[0]!.id
   } catch(e) { if (attempt === routeAttempt) error.value = e instanceof Error ? e.message : '工艺版本读取失败' } finally { if (attempt === routeAttempt) routesLoading.value = false }
 }
-function productChanged() { form.routingId = ''; resetRouteOptions(); void searchRoutes('', true) }
+async function productChanged(value: string) {
+  if (value === form.productId) return
+  const current = detailAttempt
+  if (materialEditor.value && !await materialEditor.value.confirmReset()) return
+  if (current !== detailAttempt || !dialog.value) return
+  const materialRevision = form.material.expectedRevision
+  form.productId = value; form.routingId = ''; form.material = { ...emptyMaterialDemand(), expectedRevision: materialRevision, adjustmentsConfirmed: true }
+  resetRouteOptions(); void searchRoutes('', true)
+}
 async function create() {
-  resetRouteOptions(); editId.value = null; plannedQuantityValid.value = false; Object.assign(form, blank()); error.value = ''; numberingRules.value = []; dialog.value = true; void searchProducts('')
+  resetRouteOptions(); editId.value = null; plannedQuantityValid.value = false; Object.assign(form, blank()); error.value = ''; numberingRules.value = []; dialog.value = true
   const attempt = ++numberingAttempt, factory = auth.factoryId, revision = auth.revision
   if (!factory || !can('create')) return
   numberingRulesLoading.value = true
@@ -115,29 +125,33 @@ watch(() => [route?.query.workorderId, auth.factoryId, auth.revision, can('query
   if (typeof id === 'string' && /^[1-9][0-9]{0,18}$/.test(id) && auth.factoryId && can('query')) void open(id)
 }, { immediate: true })
 async function edit(id: string) {
-  if (!can('update') || !can('query')) return
-  resetRouteOptions(); productAttempt++
+  if (!can('update') || !can('query') || !can('material:update')) return
+  resetRouteOptions()
   const attempt = ++detailAttempt
   busy.value = true; error.value = ''
   try {
-    const d = await api.detail(id)
+    const [d, demand] = await Promise.all([api.detail(id), workorderMaterial.get(id)])
     if (attempt !== detailAttempt) return
-    originalProductId.value = d.workorder.productId; originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; plannedQuantityValid.value = false; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty) })
-    productOptions.value = [{ id: d.workorder.productId, code: d.productCode, name: d.productName } as MaterialVo]
-    routeOptions.value = [d.routing]; dialog.value = true
+    originalProductId.value = d.workorder.productId; originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; plannedQuantityValid.value = false; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty), material: materialDemandDraft(demand) })
+    routeOptions.value = d.routing ? [d.routing] : []; hasPublishedRoutes.value = d.routing !== null; dialog.value = true
   } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function save() {
-  if (!can(editId.value ? 'update' : 'create') || busy.value) return
+  if (!can(editId.value ? 'update' : 'create') || busy.value || confirmingSave.value) return
   if (!editId.value && (!form.ruleCode || !numberingRules.value.some(rule => rule.ruleCode === form.ruleCode))) { error.value = '请选择有效的工单编码规则'; return }
-  if (!form.productId || !form.routingId || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) { error.value = '请填写产出物料、已发布默认工艺和符合单位精度的正计划数量'; return }
+  if (!form.productId || hasPublishedRoutes.value === null || (hasPublishedRoutes.value && !form.routingId) || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) { error.value = '请核对产出物料及适用工艺，填写符合单位精度的正计划数量'; return }
   const attempt = detailAttempt
+  confirmingSave.value = true
+  let valid: boolean
+  try { valid = !!materialEditor.value && await materialEditor.value.validateAndConfirm() } finally { confirmingSave.value = false }
+  if (!valid) return
+  if (attempt !== detailAttempt || !dialog.value || !can(editId.value ? 'update' : 'create')) return
   busy.value = true; error.value = ''
   try {
     const command = { ...form, plannedQty: normalizedQuantityInput(form.plannedQty) }
     if (editId.value) await api.update(editId.value, command); else await api.create(command)
     if (attempt !== detailAttempt) return
-    dialog.value = false; ElMessage.success('工单已保存，可独立创建生产执行单元'); await load()
+    dialog.value = false; ElMessage.success('工单已保存；正式投产前仍需核对用料、路径和库存依据'); await load()
   } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '保存失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function release() {
@@ -184,48 +198,51 @@ onMounted(load)
       <el-table-column label="产出物料" min-width="280"><template #default="{row}">{{ row.productCode }} · {{ row.productName }}</template></el-table-column>
       <el-table-column label="来源" width="90"><template #default="{row}">{{ row.workorder.source==='LOCAL'?'本地':row.workorder.source==='EXTERNAL'?'外部ERP':'历史待核实' }}</template></el-table-column>
       <el-table-column label="计划数量" width="105" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.workorder.plannedQty)">{{ displayQuantity(row.workorder.plannedQty) }}</span></template></el-table-column>
-      <el-table-column label="默认工艺" min-width="320"><template #default="{row}">{{ row.routingCode }} / V{{ row.routingVersion }}</template></el-table-column>
+      <el-table-column label="默认工艺" min-width="320"><template #default="{row}">{{ row.workorder.routingId ? row.routingCode + ' / V' + row.routingVersion : '无工艺，直接入库' }}</template></el-table-column>
       <el-table-column label="执行目标合计" width="120" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.allocatedTargetQty)">{{ displayQuantity(row.allocation.allocatedTargetQty) }}</span></template></el-table-column>
       <el-table-column label="未分配执行数量" width="135" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.remainingTargetQty)">{{ displayQuantity(row.allocation.remainingTargetQty) }}</span></template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="{row}"><StatusTag v-bind="orderState(row.workorder.status)" /></template></el-table-column>
       <el-table-column label="创建时间" width="190" show-overflow-tooltip><template #default="{row}">{{ row.workorder.createTime || '—' }}</template></el-table-column>
       <el-table-column label="操作" fixed="right" width="280"><template #default="{row}">
         <WorkOrderCancellation :order="row.workorder" @changed="load" />
+        <WorkorderCombinationPrint :order="row.workorder" />
         <el-button v-if="can('query')" link type="primary" @click="open(row.workorder.id)">详情 / 执行</el-button>
-        <el-button v-if="can('update') && can('query') && row.workorder.status==='DRAFT' && row.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" link @click="edit(row.workorder.id)">编辑</el-button>
+        <el-button v-if="can('update') && can('query') && can('material:update') && row.workorder.status==='DRAFT' && row.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" link @click="edit(row.workorder.id)">编辑</el-button>
         <el-button v-if="can('release') && row.workorder.status==='RELEASED' && row.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" link :disabled="busy" @click="recall(row.workorder)">退回草稿</el-button>
         <el-button v-if="can('delete') && row.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" link type="danger" @click="remove(row.workorder)">删除</el-button>
       </template></el-table-column>
     </el-table>
-    <Pagination :total="total" v-model:page="page" v-model:limit="pageSize" @pagination="load" />
-    <PageDialog v-model="dialog" :title="editId?'编辑工单':'新增工单'" width="min(760px,94vw)">
+    <Pagination v-model:page="page" v-model:limit="pageSize" :total="total" @pagination="load" />
+    <PageDialog v-model="dialog" :title="editId?'编辑工单':'新增工单'" width="min(1220px,96vw)">
       <el-form label-width="110px">
         <el-form-item v-if="!editId" label="工单编码规则" required><el-select v-model="form.ruleCode" :loading="numberingRulesLoading" :disabled="busy" placeholder="选择工单编码规则"><el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode}）`" /></el-select><span class="help-block">单号由服务端按所选规则生成。</span></el-form-item>
         <el-form-item v-else label="工单号"><span>{{ form.code }}</span></el-form-item>
-        <el-form-item label="产出物料" required><el-select v-model="form.productId" filterable remote :remote-method="searchProducts" @change="productChanged"><el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="p.code+' · '+p.name" /></el-select></el-form-item>
-        <el-form-item label="计划数量" required><QuantityInput required positive :unchanged-value="editId && form.productId === originalProductId ? originalPlannedQty : null" v-model="form.plannedQty" :material-id="form.productId" :disabled="busy" @validity="plannedQuantityValid = $event" /></el-form-item>
-        <el-form-item label="默认工艺" required><el-select v-model="form.routingId" :disabled="!form.productId" :loading="routesLoading" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" no-data-text="该物料暂无匹配的已发布工艺" filterable remote :remote-method="searchRoutes" @visible-change="(v: boolean)=>v && !routesLoading && searchRoutes()"><el-option v-for="r in routeOptions" :key="r.id" :value="r.id" :label="r.code+' / V'+r.version+' · '+r.name" /></el-select></el-form-item>
+      <el-form-item label="产出物料" required><MaterialSelect :model-value="form.productId || null" status="ENABLED" @update:model-value="productChanged($event || '')" /></el-form-item>
+        <el-form-item label="计划数量" required><QuantityInput v-model="form.plannedQty" required positive :unchanged-value="editId && form.productId === originalProductId ? originalPlannedQty : null" :material-id="form.productId" :disabled="busy" @validity="plannedQuantityValid = $event" /></el-form-item>
+        <el-form-item label="默认工艺" :required="hasPublishedRoutes !== false"><el-select v-model="form.routingId" :disabled="!form.productId" :loading="routesLoading" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" no-data-text="该物料暂无匹配的已发布工艺" filterable remote :remote-method="searchRoutes" @visible-change="(v: boolean)=>v && !routesLoading && searchRoutes()"><el-option v-for="r in routeOptions" :key="r.id" :value="r.id" :label="r.code+' / V'+r.version+' · '+r.name" /></el-select></el-form-item>
+        <p v-if="hasPublishedRoutes === false" class="help-block">当前产品无已发布适用工艺，领料后直接办理成品入库，无需报工。</p>
         <el-form-item label="计划开始"><el-date-picker v-model="form.plannedStartAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
         <el-form-item label="计划结束"><el-date-picker v-model="form.plannedEndAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
         <el-form-item label="外部标识"><el-input v-model="form.externalId" maxlength="128" readonly /></el-form-item>
         <el-form-item label="外部单号"><el-input v-model="form.externalCode" maxlength="128" readonly /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
+      <WorkorderMaterialEditor v-if="dialog" ref="materialEditor" v-model="form.material" :product-id="form.productId" :planned-qty="form.plannedQty" :disabled="busy" />
       <p class="secondary">仅草稿工单允许编辑。已下达工单需先退回草稿；存在下游记录时不能退回或删除。计划数量不能低于已分配的执行目标数量。</p>
       <template #footer><el-button @click="dialog=false">取消</el-button><el-button type="primary" :loading="busy" @click="save">保存</el-button></template>
     </PageDialog>
-    <PageDrawer @close="closeDetail" v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close>
+    <PageDrawer v-model="drawer" title="工单需求与生产执行" size="min(1680px,96vw)" destroy-on-close @close="closeDetail">
       <template v-if="detail">
         <WorkOrderCancellation history :order="detail.workorder" @changed="load();open(detail.workorder.id)" />
         <el-descriptions :column="detailColumns" border>
           <el-descriptions-item label="来源">{{ detail.workorder.source || '历史待核实：禁止新交易' }}</el-descriptions-item><el-descriptions-item label="工单">{{ detail.workorder.code }}</el-descriptions-item><el-descriptions-item label="产出物料">{{ detail.productCode }} · {{ detail.productName }}</el-descriptions-item>
-          <el-descriptions-item label="默认工艺">{{ detail.routing.code }} / V{{ detail.routing.version }}</el-descriptions-item><el-descriptions-item label="计划数量"><QuantityText :value="detail.allocation.plannedQty" /></el-descriptions-item>
+          <el-descriptions-item label="默认工艺">{{ detail.routing ? detail.routing.code + ' / V' + detail.routing.version : '无工艺，直接入库' }}</el-descriptions-item><el-descriptions-item label="计划数量"><QuantityText :value="detail.allocation.plannedQty" /></el-descriptions-item>
           <el-descriptions-item label="执行目标合计"><QuantityText :value="detail.allocation.allocatedTargetQty" /></el-descriptions-item><el-descriptions-item label="未分配执行数量"><QuantityText :value="detail.allocation.remainingTargetQty" /></el-descriptions-item>
           <el-descriptions-item label="执行单元数">{{ detail.allocation.executionCount }}</el-descriptions-item>
         </el-descriptions>
         <div class="table-toolbar"><span class="secondary">未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量。</span><el-button v-if="can('release') && detail.workorder.status==='DRAFT' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" type="primary" :loading="busy" @click="release">下达工单</el-button></div>
-        <WorkorderMaterialPanel :readonly="!['DRAFT','RELEASED'].includes(detail.workorder.status)" v-if="detail.workorder.status!=='CANCELLED' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" :key="detail.workorder.id" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" />
-        <WorkOrderRoutePreview :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" :routing-id="detail.workorder.routingId" />
+        <WorkorderMaterialPanel v-if="detail.workorder.status!=='CANCELLED' && detail.workorder.source==='LOCAL' && auth.runtimeMode==='LOCAL'" :key="detail.workorder.id" :planned-qty="String(detail.workorder.plannedQty)" :product-code="detail.productCode" :product-name="detail.productName" :readonly="!['DRAFT','RELEASED'].includes(detail.workorder.status)" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" @changed="load();open(detail.workorder.id)" />
+        <WorkOrderRoutePreview v-if="detail.routing" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" :routing-id="detail.routing.id" />
         <WorkOrderExecutions v-if="canExecutions" :key="detail.workorder.id" :workorder-id="detail.workorder.id" :product-id="detail.workorder.productId" />
         <el-alert v-else title="当前账号没有生产执行列表权限" type="info" :closable="false" />
       </template><el-empty v-else-if="!busy" description="未读取到工单" />

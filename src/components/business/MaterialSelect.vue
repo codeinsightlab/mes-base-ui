@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { api, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
 
-const props = defineProps<{ modelValue?: string | null; disabled?: boolean }>()
+const props = defineProps<{ modelValue?: string | null; disabled?: boolean; status?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 const auth = useAuth()
 const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching
@@ -26,7 +26,7 @@ async function search(value: string, more = false) {
   loading.value = true
   error.value = ''
   try {
-    const result = await api.list({ name: value, offset: more ? rows.value.length : 0, limit: 20 })
+    const result = await api.list({ keyword: value, ...(props.status ? { status: props.status } : {}), offset: more ? rows.value.length : 0, limit: 20 })
     if (current !== version) return
     rows.value = more ? [...rows.value, ...result.items] : result.items
     total.value = result.total
@@ -82,9 +82,9 @@ onBeforeUnmount(clear)
       @update:model-value="!disabled && emit('update:modelValue', $event || null)"
     >
       <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name}`" :value="row.id" />
+      <template #footer><el-button v-if="rows.length < total" link :disabled="loading || disabled" @mousedown.prevent @click="search(keyword, true)">加载更多</el-button></template>
     </el-select>
-    <el-button v-if="rows.length < total" link :disabled="loading || disabled" @click="search(keyword, true)">加载更多</el-button>
-    <el-button :disabled="disabled" v-if="error" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
+    <el-button v-if="error" :disabled="disabled" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
   </div>
 </template>
 

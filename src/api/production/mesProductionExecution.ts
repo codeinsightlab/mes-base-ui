@@ -8,7 +8,8 @@ export interface MesProductionExecutionVo {
   productId: string;
   productCode?: string | null;
   productName?: string | null;
-  routingId: string;
+  batchNo: string | null;
+  routingId: string | null;
   targetQty: string;
   status: string;
   startTime: string | null;

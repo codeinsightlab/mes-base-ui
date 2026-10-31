@@ -8,7 +8,8 @@ import QuantityText from '@/components/business/production/QuantityText.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { productionClosure as api, type ClosureSummary } from '@/api/production/productionClosure'
-const props = defineProps<{ id: string }>(), emit = defineEmits<{ changed: [] }>(), auth = useAuth()
+const props = defineProps<{ id: string; routingId?: string | null; batchNo?: string | null }>(), emit = defineEmits<{ changed: [] }>(), auth = useAuth()
+const reportingRequired = computed(() => props.routingId !== null)
 const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/inboundDocuments/index'))
 const visible = ref(false), data = ref<ClosureSummary | null>(null), loading = ref(false), loadError = ref('')
 const can = (p:string) => auth.hasPermission(p, 'factory'), readable = computed(() => can('business:mes:production:execution:query'))
@@ -40,12 +41,13 @@ function close(done:() => void) { clear();done() }
   <PageDrawer v-model="visible" title="生产数量与入库收尾" size="min(1160px,96vw)" append-to-body destroy-on-close :before-close="close">
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" />
     <div v-if="!data" v-loading="loading"><el-button v-if="loadError" @click="load">重试读取</el-button></div>
-    <ProductionReceiptAction :execution-id="id" @changed="load(); emit('changed')" />
+    <ProductionReceiptAction :execution-id="id" :batch-no="batchNo" @changed="load(); emit('changed')" />
     <section v-if="data" v-loading="loading">
-      <el-alert title="报工只登记生产事实。正常品及不良品入库审核后，系统分别核对执行与工单收尾条件；一张单据审核成功不代表整张工单已完结。" type="info" :closable="false" />
+      <el-alert :title="reportingRequired ? '报工只登记生产事实。正常品及不良品入库审核后，系统分别核对执行与工单收尾条件；一张单据审核成功不代表整张工单已完结。' : '此执行无工艺，无需工序报工。按MES已确认投入办理成品入库，全部投入入库后再核对执行及工单收尾。'" type="info" :closable="false" />
       <h3>{{ data.executionId }} · {{ executionStatusLabel(data.status) }} · {{ receiptLabel }}</h3>
       <el-descriptions :column="3" border>
-        <el-descriptions-item label="计划目标"><QuantityText :value="data.targetQty" /></el-descriptions-item><el-descriptions-item label="末道有效净产出 G"><QuantityText :value="data.effective" /></el-descriptions-item>
+        <el-descriptions-item v-if="batchNo" label="执行产出批次">{{ batchNo }}</el-descriptions-item>
+        <el-descriptions-item label="计划目标"><QuantityText :value="data.targetQty" /></el-descriptions-item><el-descriptions-item :label="reportingRequired ? '末道有效净产出 G' : '已审核成品产出'"><QuantityText :value="data.effective" /></el-descriptions-item>
         <el-descriptions-item label="正常品已入库 R"><QuantityText :value="data.receivedQty" /></el-descriptions-item><el-descriptions-item label="有效不良损失 D"><QuantityText :value="data.defectQty" /></el-descriptions-item><el-descriptions-item label="执行入库状态">{{ receiptLabel }}</el-descriptions-item>
       </el-descriptions>
       <el-alert v-if="data.orderBlockedReason" :title="'工单未完结：'+data.orderBlockedReason" type="warning" :closable="false" />

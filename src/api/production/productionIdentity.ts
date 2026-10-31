@@ -9,9 +9,9 @@ export interface ProductionIdentity {
   productCode: string;
   productName: string;
   batchNo: string | null;
-  routingId: string;
-  routingCode: string;
-  routingVersion: number;
+  routingId: string | null;
+  routingCode: string | null;
+  routingVersion: number | null;
   status: string;
   targetQty: string;
 }

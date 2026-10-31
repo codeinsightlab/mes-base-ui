@@ -26,7 +26,7 @@ async function open() {
     const data = await executionActions.path(props.executionId)
     if (ticket !== sequence) return
     const ids = new Set(data.nodes.map(n => n.id))
-    if (data.executionId !== props.executionId || !data.routingId || !data.routingVersion || data.nodes.some(n => !n.operationId) || data.edges.some(e => !ids.has(e.fromNodeId) || !ids.has(e.toNodeId)) || data.selectedNodeIds.some(id => !ids.has(id))) throw new Error('执行路径与工艺版本数据不完整，请刷新后重试')
+    if (data.executionId !== props.executionId || (data.routingId !== null && !data.routingVersion) || (data.routingId === null && (data.nodes.length > 0 || data.selectedNodeIds.length > 0)) || data.nodes.some(n => !n.operationId) || data.edges.some(e => !ids.has(e.fromNodeId) || !ids.has(e.toNodeId)) || data.selectedNodeIds.some(id => !ids.has(id))) throw new Error('执行路径与工艺版本数据不完整，请刷新后重试')
     view.value = data
   } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '执行路线读取失败' } finally { if (ticket === sequence) loading.value = false }
 }
@@ -35,7 +35,8 @@ async function open() {
   <el-button v-if="allowed" link type="primary" @click="open">实际工艺路线</el-button>
   <PageDialog v-model="visible" title="执行单元实际工艺路线" width="min(1180px,96vw)" append-to-body destroy-on-close @close="clear">
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
-    <section v-if="view" v-loading="loading">
+    <el-alert v-if="view && !view.routingId" title="此执行无工艺，无需工序报工。" type="info" :closable="false" />
+    <section v-if="view?.routingId" v-loading="loading">
       <p><strong>{{ view.executionId }}</strong> · {{ view.routingCode }} / V{{ view.routingVersion }} · 工艺版本 ID：{{ view.routingId }}</p>
       <el-alert v-if="view.pathStatus === 'UNSELECTED'" title="尚未选择实际执行路径；下图仅为该执行版本的完整工艺定义。" type="info" :closable="false" />
       <p v-else>{{ view.pathStatus === 'LOCKED' ? '已锁定的实际执行路径' : '已选择，尚未锁定的执行路径' }}；突出节点及连接表示当前已选路径。</p>

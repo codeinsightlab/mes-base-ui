@@ -38,7 +38,7 @@ export const fields: Field[] = [
     label: '实际工艺版本',
     kind: 'text',
     readonly: false,
-    required: true,
+    required: false,
     searchable: true,
     maxLength: 19
   },

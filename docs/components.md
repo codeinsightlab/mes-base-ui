@@ -19,8 +19,9 @@
 | --- | --- | --- | --- |
 | 计量单位 `UnitMeasureSelect` | [UnitMeasureSelect.vue](../src/components/business/material/UnitMeasureSelect.vue) | 单位ID、禁用状态；组件负责远程分页检索、已选项回显、错误重试和上下文失效 | [物料维护](../src/views/basic/materials/index.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
 | BOM版本 `BomVersionSelect` | [BomVersionSelect.vue](../src/components/business/material/BomVersionSelect.vue) | BOM ID、所属物料ID、禁用状态；按物料选择已发布版本，返回选中版本及revision并补查当前已选项以支持跨页回显；只显示默认标记，不自行应用默认。子BOM未选仍表示叶项 | [BOM组成](../src/components/business/material/MaterialBomPanel.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
+| 工单BOM选择 `WorkorderBomSelect` | [WorkorderBomSelect.vue](../src/components/business/material/WorkorderBomSelect.vue) | 当前产出物料、已选BOM及禁用状态；复用BomVersionSelect与默认接口，有默认已发布版本则预选，无默认由用户选择，手选/清空及已有版本不被迟到默认覆盖 | [工单创建编辑](../src/views/production/workorder/index.vue)、[用料维护](../src/components/business/production/WorkorderMaterialPanel.vue)经共享用料编辑器复用 |
 | 实物数量 `QuantityInput` | [QuantityInput.vue](../src/components/business/material/QuantityInput.vue) | 数量值、物料ID及必要输入状态；规则取自物料单位；原值不变、官方精确余量等使用已有明确契约，不能由页面伪造或自由指定精度。默认 `physical`；BOM基准/组件系数显式 `semantic="bom-ratio"`，`showUnit` 按同次读取的正式单位显示后缀；比例不使用实物余量/原值豁免参数 | [质量申报](../src/components/business/quality/DefectDeclarationPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue)、[销售订单](../src/views/sales/order/index.vue) |
-| 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态；远程检索、分页、回显及上下文保护在组件内维护 | [销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
+| 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态及可选状态筛选；按编码或名称前缀远程检索，分页、回显及上下文保护在组件内维护；分页按钮位于候选底部，保留搜索词并继续当前候选 | [工单产出物料](../src/views/production/workorder/index.vue)、[销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
 | 仓库 `WarehouseSelect` | [WarehouseSelect.vue](../src/components/business/WarehouseSelect.vue) | 仓库ID、可信来源及已有历史读取语义；保留LOCAL/EXTERNAL来源约束，不由页面另写候选算法 | [工单用料](../src/components/business/production/WorkorderMaterialPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 库存来源 `StockSourceSelect` | [StockSourceSelect.vue](../src/components/business/warehouse/StockSourceSelect.vue) | 当前物料、仓库和库存身份；选择具体库存来源，不等同于选择仓库或选择物料 | [库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 工作站 `WorkstationSelect` | [WorkstationSelect.vue](../src/components/business/WorkstationSelect.vue) | 工作站ID；共享检索、分页和回显；页面不根据设备/报工用途重复实现同义工作站选择 | [设备维护](../src/views/basic/equipment/index.vue) |
@@ -67,4 +68,8 @@
 
 ### BOM默认版本
 
-产品默认BOM版本由工单用料场景读取并决定是否预选。`BomVersionSelect`本身不自动选择默认，避免改变BOM组成中的可选子BOM语义；工单首次维护且没有已保存BOM时，`WorkorderMaterialPanel`读取默认值，仅在用户尚未改选或清空时写入未保存表单。读取失败显示错误和重试；确无默认时允许人工选择。选择器通过`selected`事件提供当前已发布BOM及revision，工单保存将该revision交由服务端复验。默认切换不改写已保存工单用料或冻结事实。
+`WorkorderBomSelect`统一工单BOM选择：物料有默认已发布版本时预选；没有默认时必须由用户选择，不私选唯一、最新或第一条。已有工单保留已关联版本，默认变化不覆盖它；默认读取失败显示错误和重试，不能当作“没有默认”。用户改选/清空、产品和工厂上下文变化会使迟到默认响应失效。
+
+该组件复用`BomVersionSelect`的候选分页及回显和`defaultBom`接口，不另建版本体系。创建/编辑工单与详情用料维护共用`WorkorderMaterialEditor`；它调用服务端`direct-components`读取直接组件和数量，产量变化只重算未调整的BOM行，保留人工调整及新增行并在保存前确认。标准数量仍由服务端保存时复验，客户端不自行复制BOM公式。
+
+BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分析仍可读取各状态版本；这两种语义不套用工单默认选择策略。

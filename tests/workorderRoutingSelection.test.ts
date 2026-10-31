@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ElMessageBox } from 'element-plus'
 import type { Order } from '../src/api/production/workorder'
 import { createPinia } from 'pinia'
+import { defineComponent } from 'vue'
 import ElementPlus from 'element-plus'
 import WorkOrders from '../src/views/production/workorder/index.vue'
 import { useAuth } from '../src/stores/auth'
@@ -10,7 +11,7 @@ const confirmed = Object.assign('confirm' as const, { value: '', action: 'confir
 const { list, routings, materials, recall, numberingRules } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn(), recall: vi.fn(), numberingRules: vi.fn() }))
 vi.mock('../src/api/production/workorder', () => ({ api: { list, routings, recall, numberingRules }}))
 vi.mock('../src/api/basic/material', () => ({ api: { list: materials }}))
-type State = { create: () => void; form: { productId: string; routingId: string }; productChanged: () => void; searchRoutes: (s?: string) => Promise<void>; routeOptions: { id: string }[]; routesLoading: boolean; dialog: boolean }
+type State = { create: () => void; form: { productId: string; routingId: string }; productChanged: (value: string) => Promise<void>; searchRoutes: (s?: string) => Promise<void>; routeOptions: { id: string }[]; routesLoading: boolean; dialog: boolean; hasPublishedRoutes: boolean | null }
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
@@ -19,7 +20,7 @@ beforeEach(() => {
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
 async function setup() {
   const pinia = createPinia(), auth = useAuth(pinia); auth.factoryId = 'A'; auth.factoryPermissions = ['workorder:list', 'workorder:create', 'workorder:query']
-  wrapper = mount(WorkOrders, { global: { plugins: [pinia, ElementPlus] }}); await flushPromises()
+  wrapper = mount(WorkOrders, { global: { plugins: [pinia, ElementPlus], stubs: { WorkorderMaterialEditor: defineComponent({ setup(_, { expose }) { expose({ confirmReset: async() => true }); return () => null } }) }}}); await flushPromises()
   const state = wrapper.vm as unknown as State; state.create(); await flushPromises(); return { state, auth }
 }
 it('requires a product before choosing its published routes without restricting the output material type', async() => {
@@ -32,12 +33,12 @@ it('requires a product before choosing its published routes without restricting 
 })
 it('clears the old selected route immediately and ignores responses from the previous product', async() => {
   const { state } = await setup()
-  let release!: (v: unknown) => void
-  routings.mockImplementationOnce(() => new Promise(r => { release = r })).mockResolvedValueOnce([{ id: '202' }])
+  let release!: (v: unknown) => void, next!: (v: unknown) => void
+  routings.mockImplementationOnce(() => new Promise(r => { release = r })).mockImplementationOnce(() => new Promise(r => { next = r }))
   state.form.productId = '101'; const pending = state.searchRoutes(); state.form.routingId = '201'
-  state.form.productId = '102'; state.productChanged()
+  await state.productChanged('102')
   expect(state.form.routingId).toBe(''); expect(state.routeOptions).toEqual([])
-  await flushPromises(); release([{ id: '201' }]); await pending
+  next([{ id: '202' }]); await flushPromises(); release([{ id: '201' }]); await pending
   expect(state.routeOptions).toEqual([{ id: '202' }]); expect(state.routesLoading).toBe(false)
 })
 it.each(['close', 'factory', 'permission'])('rejects a late route response after %s', async(change) => {
@@ -54,13 +55,27 @@ it.each(['close', 'factory', 'permission'])('rejects a late route response after
 it('queries on product selection, auto-selects the only match, and leaves multiple matches unselected', async() => {
   const { state } = await setup()
   routings.mockResolvedValueOnce([{ id: '201' }]).mockResolvedValueOnce([{ id: '301' }, { id: '302' }])
-  state.form.productId = '101'; state.productChanged()
+  await state.productChanged('101')
   expect(routings).toHaveBeenLastCalledWith('101', '')
   await flushPromises(); expect(state.form.routingId).toBe('201')
-  state.form.productId = '102'; state.productChanged(); expect(state.form.routingId).toBe('')
+  await state.productChanged('102'); expect(state.form.routingId).toBe('')
   await flushPromises(); expect(state.form.routingId).toBe(''); expect(state.routeOptions).toHaveLength(2)
   routings.mockResolvedValueOnce([{ id: '301' }]); await state.searchRoutes('关键字')
   expect(state.form.routingId).toBe('')
+})
+
+it('recognizes no-routing only after a successful unfiltered product lookup', async() => {
+  const { state } = await setup()
+  await state.productChanged('101');await flushPromises()
+  expect(state.hasPublishedRoutes).toBe(false)
+  expect(state.form.routingId).toBe('')
+  routings.mockResolvedValueOnce([{ id: '201' }]);await state.productChanged('102');await flushPromises()
+  expect(state.hasPublishedRoutes).toBe(true)
+  routings.mockResolvedValueOnce([]);await state.searchRoutes('无匹配的过滤词')
+  expect(state.hasPublishedRoutes).toBe(true)
+  expect(state.form.routingId).toBe('201')
+  routings.mockRejectedValueOnce(new Error('工艺查询失败'));await state.productChanged('103');await flushPromises()
+  expect(state.hasPublishedRoutes).toBeNull()
 })
 
 it('returns a local released workorder to draft through the formal action and preserves its revision', async() => {

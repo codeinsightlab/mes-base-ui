@@ -11,7 +11,7 @@ import type { WmInventoryVo } from '@/api/wm/wmInventory'
 import { useAuth } from '@/stores/auth'
 import { useClosureCommand } from '@/composables/useClosureCommand'
 import { usePageMessageBox } from '@/lib/pageMessageBox'
-const props = defineProps<{ executionId: string }>()
+const props = defineProps<{ executionId: string; batchNo?: string | null }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), messageBox = usePageMessageBox()
 const allowed = computed(() => auth.runtimeMode === 'LOCAL' && auth.hasPermission(p + ':create', 'factory') && auth.hasPermission(p + ':post', 'factory'))
@@ -62,7 +62,8 @@ async function close(done?: () => void) {
     <el-alert v-if="error || intent.error.value" :title="error || intent.error.value" type="error" :closable="false" />
     <el-button :loading="loading" :disabled="intent.busy.value" @click="load">刷新入库依据</el-button>
     <div v-if="basis">
-      <p>执行 {{ executionId }} · 有效产出 <QuantityText :value="basis.effective" /> · 已入库 <QuantityText :value="basis.received" /> · 可入库 <QuantityText :value="basis.remaining" /></p>
+      <p v-if="batchNo">本次执行产出批次：{{ batchNo }}</p>
+      <p>执行 {{ executionId }} · {{ basis.reportingRequired ? '有效产出' : '正式领料确认量' }} <QuantityText :value="basis.effective" /> · 已入库 <QuantityText :value="basis.received" /> · 可入库 <QuantityText :value="basis.remaining" /></p>
       <el-alert v-if="basis.blockedReason" :title="basis.blockedReason" type="warning" :closable="false" />
       <el-form label-position="top" :disabled="intent.busy.value || !!intent.pending.value">
         <el-form-item label="LOCAL入库仓库"><WarehouseSelect v-model="warehouseId" source="LOCAL" /></el-form-item>

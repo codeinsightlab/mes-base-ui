@@ -9,7 +9,7 @@ const semantics: Partial<Record<StockDocumentType, { origin: string;basis: strin
   OUTSOURCE_RECEIPT: { origin: '外协厂加工完成', basis: '委外单、委外发料记录', approvalAvailable: false }, MATERIAL_RETURN_RECEIPT: { origin: '生产领料后退回', basis: '原领料单、工单', approvalAvailable: false },
   REWORK_RECEIPT: { origin: '返工完成并检验合格', basis: '原不良记录、返工任务及检验依据', approvalAvailable: false }, SALES_RETURN_RECEIPT: { origin: '客户退回产品', basis: '销售出库单、退货单', approvalAvailable: false },
   DEFECT_RECEIPT: { origin: '不良品转入不良品仓', basis: '原不良记录、处置流水', approvalAvailable: true }, SCRAP_RECEIPT: { origin: '不良品转入报废品仓', basis: '原不良记录、处置流水', approvalAvailable: true },
-  OTHER_RECEIPT: { origin: '盘盈、期初等特殊业务', basis: '原因及实物、审批或调整依据', approvalAvailable: true }, MATERIAL_ISSUE: { origin: '工单生产投入', basis: '工单、已发布BOM、实际路径及精确库存来源', approvalAvailable: true },
+  OTHER_RECEIPT: { origin: '盘盈、期初等特殊业务', basis: '原因及实物、审批或调整依据', approvalAvailable: true }, MATERIAL_ISSUE: { origin: '材料领用', basis: '材料、库存及数量；MES关联由扫码领料入口生成', approvalAvailable: true },
   OTHER_ISSUE: { origin: '其他库存发出', basis: '原因及实物、审批或调整依据', approvalAvailable: true }
 }
 export const stockDocumentPurpose = (value:unknown) => typeof value === 'string' && Object.hasOwn(semantics, value)
@@ -19,11 +19,11 @@ export interface Header extends Row {
   id: string; documentNo: string; direction: StockDocumentDirection; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED';
   reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionId: string | null; postRequestId: string | null; createRequestId?: string | null
 }
-export interface Line extends Row { id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
+export interface Line extends Row { demandLineId?: string | null; id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
 export interface MaterialIssueBasis { requestId: string;code: string;workorderId: string;outputQty: string;routingId: string;routingNodeIds: string[] }
-export interface ProductionInputBasis {
+export interface ProductionInputBasis { combinationId: string | null; allocations: import('@/api/production/productionCombination').Allocation[];
   requestId: string;inputKind: string;sourceMode: string;executionId: string;workorderId: string;workorderCode: string;
-  outputQty: string;issueQty: string;materialId: string;materialCode: string;warehouseId: string;unitId: string;batchNo: string;
+  outputQty: string;issueQty: string | null;materialId: string | null;materialCode: string | null;warehouseId: string | null;unitId: string | null;batchNo: string | null;
   bomId: string | null;bomBaseQty: string | null;bomComponentQty: string | null;pathRevision: string | null;
   routingNodeIds: string[];businessOccurredAt: string | null;confirmedAt: string | null;stockApplied: boolean | null;voidOperationId: string | null;
   voidResultStatus: string | null;pathError: string | null
@@ -35,7 +35,7 @@ export interface MaterialIssueVoidResult {
   documentId: string;documentStatus: string;productionInputStatus: string | null;voidOperationId: string | null;
   voidResultStatus: string | null;voidRequestedAt: string | null;voidFinishedAt: string | null;message: string | null
 }
-export interface ProductionBasis { executionId: string;productId: string;effective: string;received: string;remaining: string;canReceive: boolean;blockedReason: string | null }
+export interface ProductionBasis { reportingRequired: boolean; executionId: string;productId: string;effective: string;received: string;remaining: string;canReceive: boolean;blockedReason: string | null }
 export interface CancellationBasis { workorderId: string;productId: string;status: string;handedOver: string;accepted: string;manuallyReceived: string;remaining: string }
 const root = (direction: StockDocumentDirection = 'OUT') => '/api/wm/' + (direction === 'IN' ? 'inbound-documents' : 'outbound-documents')
 const path = (id:string, direction: StockDocumentDirection = 'OUT') => root(direction) + '/' + encodeURIComponent(id)
@@ -54,6 +54,7 @@ export const stockDocuments = {
   approve: (id:string, body:ApprovalIntent, direction:StockDocumentDirection = 'OUT') => request<Detail>(path(id, direction) + '/actions/approve', { method: 'POST', body, scope: 'factory' }),
   cancel: (id:string, expectedRevision:string, direction:StockDocumentDirection = 'OUT') => request<Detail>(path(id, direction) + '/actions/cancel', { method: 'POST', body: { expectedRevision }, scope: 'factory' }),
   voidMaterialIssue: (id:string, reconcile = false) => request<MaterialIssueVoidResult>(path(id) + '/actions/' + (reconcile ? 'reconcile-void' : 'void'), { method: 'POST', scope: 'factory' }),
+  approveProduction: (id:string, body:ApprovalIntent) => request<Detail>('/api/production/inbound-documents/' + encodeURIComponent(id) + '/actions/approve', { method: 'POST', body, scope: 'factory' }),
   receiveProduction: (id:string, body:ProductionReceiptCommand) => request<Detail>('/api/production/executions/' + encodeURIComponent(id) + '/inbound', { method: 'POST', body, scope: 'factory' }),
   productionBasis: (id:string) => request<ProductionBasis>(root('IN') + '/executions/' + encodeURIComponent(id) + '/basis', { scope: 'factory' }),
   basis: (id:string) => request<CancellationBasis>(root('IN') + '/cancelled-workorders/' + encodeURIComponent(id) + '/basis', { scope: 'factory' })

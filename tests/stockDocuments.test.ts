@@ -67,15 +67,12 @@ it('production receipt convenience preserves the caller UUID and decimal strings
   await stockDocuments.receiveProduction('9007199254740998', command)
   expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/production/executions/9007199254740998/inbound', { method: 'POST', body: command, scope: 'factory' })
 })
-it('material issue approval requires production authorization for the saved draft', async() => {
-  const { s, auth } = setup();await wrapper!.setProps({ row: { id: '1', revision: '0', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
-  await s.approve();expect(mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'))).toHaveLength(0)
-  auth.factoryPermissions.push('business:mes:material:issue:update');await flushPromises()
-  mocks.request.mockResolvedValue({ document: { id: '1' }, lines: [] });await s.approve()
-  const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'));expect(approvals).toHaveLength(1)
-  expect(mocks.confirm.mock.calls.at(-1)![0]).toContain('减少所选库存')
-  expect(approvals[0]![1].body.requestId).not.toBe('11111111-2222-4333-8444-555555555555')
-  expect(approvals[0]![1].body.requestId).toMatch(/^[0-9a-f-]{36}$/i)
+it('ordinary material issue approval uses warehouse authority and creates an independent approval intent', async() => {
+  const { s } = setup();mocks.request.mockResolvedValue(null)
+  await wrapper!.setProps({ row: { id: '1', revision: '0', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
+  await s.approve()
+  const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'))
+  expect(approvals).toHaveLength(1);expect(approvals[0]![1].body.requestId).not.toBe('11111111-2222-4333-8444-555555555555')
 })
 it('keeps the safe material issue basis visible to the draft approver without exposing frozen request JSON', async() => {
   const basis = { requestId: '11111111-2222-4333-8444-555555555555', code: 'WO:M#0001 ', workorderId: '9007199254740999', outputQty: '10.000001', routingId: '7', routingNodeIds: ['11', '12'] }
@@ -97,14 +94,10 @@ it('shows an unreadable material issue basis as a local error while preserving t
   mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
 })
 
-it('approves an existing material issue draft with issue authority without stock permissions', async() => {
+it('MES issue authority cannot approve an ordinary warehouse material issue', async() => {
   const { s, auth } = setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
-  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
-  expect(auth.hasPermission('business:wm:stock:document:create', 'factory')).toBe(false)
-  expect(auth.hasPermission('business:wm:stock:document:update', 'factory')).toBe(false)
-  expect(auth.hasPermission('business:wm:stock:document:post', 'factory')).toBe(false)
-  expect(s.canApprove).toBe(true);mocks.request.mockResolvedValue({ document: { id: '17' }});await s.approve()
-  const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'));expect(approvals).toEqual([['/api/wm/outbound-documents/17/actions/approve', { method: 'POST', scope: 'factory', body: { requestId: expect.any(String), expectedRevision: '4' }}]])
+  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE' }})
+  expect(s.canApprove).toBe(false);mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
 })
 it('does not approve or cancel a material issue in a non-local factory mode', async() => {
   const { s, auth } = setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
@@ -133,7 +126,7 @@ it('limits legacy issue access to material issue documents and retains distinct 
 
 it('approves a material draft without a post UUID and replays only its independent approval intent after UNKNOWN', async() => {
   const creationId = '11111111-2222-4333-8444-555555555555'
-  const { s, auth, refresh } = setup(false)
+  const { s, auth, refresh } = setup()
   auth.factoryPermissions.push('business:mes:material:issue:update')
   let posts = 0
   mocks.request.mockImplementation((url: string) => {
@@ -141,8 +134,7 @@ it('approves a material draft without a post UUID and replays only its independe
     posts++
     return posts === 1 ? Promise.reject(new Error('response lost')) : Promise.resolve({ document: { id: '17', status: 'POSTED' }})
   })
-  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: creationId, postRequestId: null,
-    materialIssueBasis: { requestId: creationId, code: 'WO:RAW#0001', workorderId: '1', outputQty: '1', routingId: '2', routingNodeIds: ['3'] }}})
+  await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: creationId, postRequestId: null }})
   await flushPromises()
   expect(s.canApprove).toBe(true)
   await s.approve()

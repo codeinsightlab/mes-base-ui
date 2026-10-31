@@ -2,8 +2,8 @@
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import PageDialog from '@/components/page/PageDialog.vue'
 
-import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
+import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { displayQuantity } from '@/lib/production/quantity'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
@@ -13,43 +13,17 @@ import ProductionExecutionSelect from '@/components/business/production/Producti
 import { useRoute, useRouter } from 'vue-router'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
-import WorkOrderSelect from '@/components/business/production/WorkOrderSelect.vue'
-import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
-import { productionInput as productionInputApi, type Calculation, type Preview } from '@/api/production/productionInput'
-import { api as workorders } from '@/api/production/workorder'
 import { stockDocumentApis, stockDocumentPermission as p, stockDocuments, type NumberingRuleOption, type StockDocumentDirection, type StockDocumentTypeOption } from '@/api/wm/stockDocuments'
 import { useAuth } from '@/stores/auth'
 import { request } from '@/lib/request'
 import type { StockAction } from '@/api/wm/localStock'
 import type { ProductionInputBasis } from '@/api/wm/stockDocuments'
-import { ApiError } from '@/lib/request'
 import type { Field, Row } from '@/lib/crud'
 const route = useRoute(), router = useRouter()
 const props = defineProps<{ direction: StockDocumentDirection }>()
 const direction = computed(() => props.direction)
 const transferPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockTransfers/index'))
 const typeOptions = ref<StockDocumentTypeOption[]>([]), typeOptionsError = ref('')
-const manualIssueVisible = ref(false), manualWorkorderId = ref<string | null>(null), manualWarehouseId = ref<string | null>(null)
-const manualMaterialId = ref<string | null>(null), manualStockId = ref<string | null>(null), manualOutputQty = ref('')
-const manualOutputProductId = ref<string | null>(null), manualQuantityValid = ref(false), manualCalculation = ref<Calculation | null>(null)
-const manualPreview = ref<Preview | null>(null), manualSelectedNodes = ref<string[]>([]), manualNextNode = ref('')
-type ManualIssueRequest = { header: Record<string, unknown>; items: Record<string, unknown>[]; productionIssue: Record<string, unknown> }
-const manualNumber = ref<NumberingRuleOption | null>(null), manualPending = ref<ManualIssueRequest | null>(null)
-const manualError = ref(''), manualBusy = ref(false)
-const manualPathCandidates = computed(() => {
-  const graph = manualPreview.value?.definition
-  if (!graph) return []
-  const last = graph.nodes.find(node => node.id === manualSelectedNodes.value.at(-1))
-  return graph.nodes.filter(node => !manualSelectedNodes.value.includes(node.id!)
-    && (last ? graph.edges.some(edge => edge.fromNodeCode === last.nodeCode && edge.toNodeCode === node.nodeCode)
-      : !graph.edges.some(edge => edge.toNodeCode === node.nodeCode)))
-})
-const manualPathComplete = computed(() => {
-  const graph = manualPreview.value?.definition
-  const last = graph?.nodes.find(node => node.id === manualSelectedNodes.value.at(-1))
-  return !!graph && !!last && !graph.edges.some(edge => edge.fromNodeCode === last.nodeCode)
-    && graph.nodes.filter(node => node.isKey).every(node => manualSelectedNodes.value.includes(node.id!))
-})
 const pendingDocument = ref<string | null>(null)
 const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false), numberingRulesError = ref('')
 const selectedNumberRule = ref<NumberingRuleOption | null>(null)
@@ -124,13 +98,7 @@ const initialSearch = computed<Record<string, string>>((): Record<string, string
   ...(typeof route.query.documentType === 'string' && typeOptions.value.some(t => t.value === route.query.documentType)
     ? { documentType: route.query.documentType } : {}) }))
 const action = ref<StockAction | null>(null), actionVisible = ref(false), actionError = ref('')
-let linkAttempt = 0, typeAttempt = 0, manualAttempt = 0
-const manualRecoveryKey = () => 'mes-stock-manual-issue-pending:' + auth.username + ':' + auth.factoryId
-function clearManualCalculation() { manualAttempt++;manualCalculation.value = null;manualPreview.value = null;manualSelectedNodes.value = [];manualNextNode.value = '';manualError.value = '' }
-function restoreManualPending() {
-  if (!auth.factoryId) return
-  try { const raw = sessionStorage.getItem(manualRecoveryKey());manualPending.value = raw ? JSON.parse(raw) as ManualIssueRequest : null } catch { manualError.value = '待核对的领料请求无法读取；请联系管理员，不要另建同一笔领料。' }
-}
+let linkAttempt = 0, typeAttempt = 0
 async function loadTypes() {
   const attempt = ++typeAttempt, factory = auth.factoryId, revision = auth.revision
   typeOptionsError.value = ''
@@ -164,16 +132,15 @@ watch(() => [route.query.documentId, route.query.requestId], openLinkedDocument)
 watch(() => route.query.documentType, () => { if (!route.query.documentId) void document.value?.back() })
 let generation = 0, numberingAttempt = 0
 function reset() { linkAttempt++;lineAttempt++; directDocumentId.value = ''; directLines.value = []; directBasis.value = null; lineId.value = ''; selectedLine.value = null; lineError.value = ''; lineLoading.value = false; originalLines.clear();pendingDocument.value = null;generation++;numberingAttempt++;numberingRules.value = [];selectedNumberRule.value = null;numberingRulesLoading.value = false;numberingRulesError.value = '';action.value = null;actionVisible.value = false;actionError.value = '' }
-watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { reset();clearManualCalculation();manualWorkorderId.value = null;manualWarehouseId.value = null;manualMaterialId.value = null;manualStockId.value = null;manualOutputQty.value = '';manualOutputProductId.value = null;manualNumber.value = null;manualIssueVisible.value = false;restoreManualPending();void loadTypes() })
+watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { reset();void loadTypes() })
 onBeforeUnmount(reset)
-onBeforeUnmount(clearManualCalculation)
 async function showAction(id:unknown) {
   if (!id || !auth.hasPermission('business:wm:stock:action:query', 'factory')) return
   const g = ++generation;action.value = null;actionError.value = '';actionVisible.value = true
   try { const result = await request<StockAction>('/api/wm/wm-stock-action/' + encodeURIComponent(String(id)), { scope: 'factory' });if (g === generation)action.value = result } catch(e) { if (g === generation)actionError.value = e instanceof Error ? e.message : '动作读取失败' }
 }
 const manualDocumentTypes = computed(() => typeOptions.value.filter(t => t.enabled && t.approvalAvailable
-  && t.value !== 'MATERIAL_ISSUE' && !t.value.startsWith('TRANSFER_')))
+  && !t.value.startsWith('TRANSFER_')))
 const ruleCodeVisibility: Field['showWhen'] = Object.freeze({
   key: 'isNew',
   value: 'Y'
@@ -201,92 +168,6 @@ async function loadNumberingRules(documentType: unknown, draft?: Row) {
       preview: rule.preview, available: true, issue: null }]
     if (draft && !draft.id) draft.ruleCode = rule.ruleCode
   } catch(e) { if (attempt === numberingAttempt) numberingRulesError.value = e instanceof Error ? e.message : '编码规则读取失败' } finally { if (attempt === numberingAttempt) numberingRulesLoading.value = false }
-}
-function openManualIssue() {
-  if (direction.value !== 'OUT' || !auth.hasPermission(p + ':create', 'factory') || auth.runtimeMode !== 'LOCAL') return
-  restoreManualPending()
-  manualError.value = ''
-  manualIssueVisible.value = true
-  if (manualPending.value) return
-  void loadManualIssueRule()
-}
-async function loadManualIssueRule() {
-  const attempt = ++manualAttempt, factory = auth.factoryId, revision = auth.revision
-  manualBusy.value = true;manualError.value = '';manualNumber.value = null
-  try {
-    const options = await stockDocuments.numberingRules('OUT')
-    if (attempt !== manualAttempt || factory !== auth.factoryId || revision !== auth.revision) return
-    const rule = options.find(option => option.typeKey === 'MATERIAL_ISSUE')
-    if (!rule?.available || rule.ruleCode !== 'MATERIAL_ISSUE') throw new Error(rule?.issue || '当前工厂未启用生产领料专属出库编码规则')
-    manualNumber.value = rule
-  } catch(error) { if (attempt === manualAttempt) manualError.value = error instanceof Error ? error.message : '领料编码规则读取失败' } finally { if (attempt === manualAttempt) manualBusy.value = false }
-}
-async function chooseManualWorkorder(value: string | null | undefined) {
-  const id = value ?? null
-  manualWorkorderId.value = id;manualOutputProductId.value = null;manualWarehouseId.value = null;manualMaterialId.value = null;manualStockId.value = null;manualOutputQty.value = '';clearManualCalculation()
-  if (!id) return
-  const attempt = ++manualAttempt, factory = auth.factoryId, revision = auth.revision
-  manualBusy.value = true;manualError.value = ''
-  try {
-    const detail = await workorders.detail(id)
-    if (attempt !== manualAttempt || factory !== auth.factoryId || revision !== auth.revision) return
-    if (detail.workorder.source !== 'LOCAL' || detail.workorder.status !== 'RELEASED') throw new Error('仅能选择当前LOCAL已下达工单')
-    manualOutputProductId.value = detail.workorder.productId
-    manualPreview.value = null
-  } catch(error) { if (attempt === manualAttempt) manualError.value = error instanceof Error ? error.message : '工单读取失败' } finally { if (attempt === manualAttempt) manualBusy.value = false }
-}
-async function calculateManualIssue() {
-  if (!manualWorkorderId.value || !manualWarehouseId.value || !manualMaterialId.value || !manualStockId.value
-      || !manualQuantityValid.value || !positiveQuantity(normalizedQuantityInput(manualOutputQty.value))
-      || manualBusy.value || manualPending.value) return
-  clearManualCalculation()
-  const attempt = ++manualAttempt, factory = auth.factoryId, revision = auth.revision
-  manualBusy.value = true;manualError.value = ''
-  try {
-    const result = await productionInputApi.manualCalculate({ workorderId: manualWorkorderId.value,
-      stockReference: manualStockId.value, outputQty: normalizedQuantityInput(manualOutputQty.value) })
-    if (attempt !== manualAttempt || factory !== auth.factoryId || revision !== auth.revision) return
-    if (result.calculation.sourceMode !== 'LOCAL_ONLY') throw new Error('当前数据来源不支持LOCAL领料')
-    manualCalculation.value = result.calculation
-    const preview = await productionInputApi.manualPreview(result.code, manualWorkorderId.value)
-    if (attempt !== manualAttempt || factory !== auth.factoryId || revision !== auth.revision) return
-    manualPreview.value = preview
-    manualSelectedNodes.value = preview.actual ? [...preview.actual.selectedNodeIds] : []
-  } catch(error) { if (attempt === manualAttempt) manualError.value = error instanceof Error ? error.message : '领料计算或路径读取失败' } finally { if (attempt === manualAttempt) manualBusy.value = false }
-}
-watch([manualOutputQty, manualWarehouseId, manualMaterialId, manualStockId], clearManualCalculation)
-async function saveManualIssue() {
-  if (manualBusy.value || !auth.hasPermission(p + ':create', 'factory') || auth.runtimeMode !== 'LOCAL') return
-  let frozen = manualPending.value
-  if (!frozen) {
-    const calculation = manualCalculation.value, preview = manualPreview.value, rule = manualNumber.value
-    if (!calculation || !preview || !manualPathComplete.value || !rule?.available || rule.ruleCode !== 'MATERIAL_ISSUE') return
-    frozen = {
-      header: { direction: 'OUT', documentType: 'MATERIAL_ISSUE', reason: '正式生产领料出库', remark: null,
-        sourceWorkorderId: manualWorkorderId.value, sourceExecutionId: null, ruleCode: 'MATERIAL_ISSUE', expectedRevision: null },
-      items: [{ id: null, stockId: calculation.stock.reference, materialId: calculation.stock.materialId,
-        warehouseId: calculation.stock.warehouseId, unitId: calculation.stock.unitId, batchNo: calculation.stock.lotCode,
-        binCode: calculation.stock.binCode, quantity: calculation.issueQty, remark: null }],
-      productionIssue: { requestId: crypto.randomUUID(), outputQty: calculation.outputQty,
-        routingId: preview.definition.routing.id, routingNodeIds: [...manualSelectedNodes.value],
-        inputKind: 'PRODUCTION_INPUT', calculationKey: calculation.calculationKey }
-    }
-    manualPending.value = frozen
-  }
-  const storageKey = manualRecoveryKey(), factory = auth.factoryId, revision = auth.revision
-  sessionStorage.setItem(storageKey, JSON.stringify(frozen));manualBusy.value = true;manualError.value = ''
-  try {
-    const result = await stockDocuments.createAggregate(frozen)
-    if (factory !== auth.factoryId || revision !== auth.revision) return
-    sessionStorage.removeItem(storageKey);manualPending.value = null;manualIssueVisible.value = false
-    await router.replace({ path: route.path, query: { ...route.query, direction: 'OUT', documentId: result.document.id }})
-  } catch(error) {
-    if (factory !== auth.factoryId || revision !== auth.revision) return
-    if (error instanceof ApiError && ['BAD_REQUEST', 'PRODUCTION_INPUT_STALE', 'BUSINESS_SOURCE_CONFLICT'].includes(error.code)) {
-      sessionStorage.removeItem(storageKey);manualPending.value = null
-    }
-    manualError.value = error instanceof Error ? error.message : '保存结果未取得，请使用相同冻结请求重试。'
-  } finally { if (factory === auth.factoryId && revision === auth.revision) manualBusy.value = false }
 }
 function documentTypeChanged(draft: Row) { draft.sourceExecutionId = null;draft.ruleCode = null;void loadNumberingRules(draft.documentType, draft) }
 const documentTitle = computed(() => direction.value === 'IN' ? '入库单' : '出库单')
@@ -322,8 +203,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
   <div class="stock-documents">
     <router-link v-if="transferPath" :to="transferPath">办理库存调拨</router-link>
     <el-alert v-if="typeOptionsError" :title="typeOptionsError" type="error" :closable="false" />
-    <el-alert :title="direction==='IN'?'新建入库单先保存草稿，审核通过后才增加库存。未接入来源的类型禁止审核。':'新建出库单先保存草稿，审核通过后才扣减库存。生产领料需依据工单BOM、单位及实际路径。'" type="info" :closable="false" />
-    <el-button v-if="direction==='OUT' && auth.runtimeMode==='LOCAL' && auth.hasPermission(p+':create','factory')" type="primary" plain @click="openManualIssue">新增生产领料草稿</el-button>
+    <el-alert :title="direction==='IN'?'新建入库单先保存草稿，审核通过后才增加库存。未接入来源的类型禁止审核。':'新建出库单先保存草稿，审核通过后才扣减库存。通用出库不产生生产投入；生产领料请使用 MES 扫码入口。'" type="info" :closable="false" />
     <router-link v-if="direction==='OUT' && productionInputPath && auth.hasPermission('business:mes:material:issue:update','factory')" :to="productionInputPath">扫码投产并领料</router-link>
     <section v-if="!canStockList && !canStockQuery && !issueListOnly && !issueQueryOnly && (canIssueLines || canIssueLine)">
       <h3>读取生产领料明细</h3>
@@ -391,45 +271,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
         </el-descriptions>
       </template>
     </MasterDetailDocument>
-    <PageDialog v-model="manualIssueVisible" title="新增生产领料草稿" width="880px" append-to-body>
-      <el-alert title="本入口只保存统一出库单草稿；不审核、不扣库存、不生成生产投入。保存时将冻结同一生产计算、来源、数量和路径请求。" type="info" :closable="false" />
-      <el-alert v-if="manualError" :title="manualError" type="error" :closable="false" />
-      <div v-if="manualPending" class="panel">
-        <p>存在待核对领料请求 {{ manualPending.productionIssue.requestId }}，工单 {{ manualPending.header.sourceWorkorderId }}。</p>
-        <p>只能重放冻结的相同聚合请求，不能修改或另建替代请求。</p>
-        <el-button type="primary" :loading="manualBusy" @click="saveManualIssue">使用原请求重试</el-button>
-      </div>
-      <template v-else>
-        <el-descriptions v-if="manualNumber" :column="1" border>
-          <el-descriptions-item label="出库规则 key">{{ manualNumber.typeKey }} / {{ manualNumber.ruleCode }}</el-descriptions-item>
-          <el-descriptions-item label="规则前缀 / 编号预览">{{ manualNumber.prefix }} / {{ manualNumber.preview }}</el-descriptions-item>
-        </el-descriptions>
-        <el-form label-position="top" class="manual-issue-form">
-          <el-form-item label="LOCAL已下达工单" required><WorkOrderSelect :model-value="manualWorkorderId" source="LOCAL" status="RELEASED" :disabled="manualBusy" @update:model-value="chooseManualWorkorder" /></el-form-item>
-          <el-form-item label="BOM组件物料" required><MaterialSelect v-model="manualMaterialId" :disabled="manualBusy||!manualWorkorderId" /></el-form-item>
-          <el-form-item label="LOCAL仓库" required><WarehouseSelect v-model="manualWarehouseId" source="LOCAL" :disabled="manualBusy||!manualWorkorderId" /></el-form-item>
-          <el-form-item label="精确库存来源" required><StockSourceSelect v-model="manualStockId" :material-id="manualMaterialId" :warehouse-id="manualWarehouseId" :disabled="manualBusy||!manualMaterialId||!manualWarehouseId" :receipt="false" /></el-form-item>
-          <el-form-item label="本次预计成品产出量" required><QuantityInput v-model="manualOutputQty" :material-id="manualOutputProductId" required positive :disabled="manualBusy||!manualOutputProductId" @validity="manualQuantityValid=$event" /></el-form-item>
-        </el-form>
-        <el-button :disabled="manualBusy||!manualQuantityValid||!manualStockId||!manualNumber?.available" :loading="manualBusy" @click="calculateManualIssue">计算 BOM 领料量并读取路径</el-button>
-        <el-descriptions v-if="manualCalculation" :column="1" border>
-          <el-descriptions-item label="工单 / BOM 校验">{{ manualCalculation.order.workorderCode }} · {{ manualCalculation.order.status }}</el-descriptions-item>
-          <el-descriptions-item label="产出数量">{{ displayQuantity(manualCalculation.outputQty) }} {{ manualCalculation.order.outputUnitCode }}</el-descriptions-item>
-          <el-descriptions-item label="领料数量">{{ displayQuantity(manualCalculation.issueQty) }} {{ manualCalculation.stock.unitCode }}</el-descriptions-item>
-          <el-descriptions-item label="库存来源">{{ manualCalculation.stock.warehouseCode }} / {{ manualCalculation.stock.lotCode }} · 可用 {{ displayQuantity(manualCalculation.stock.availableQty) }}</el-descriptions-item>
-        </el-descriptions>
-        <template v-if="manualPreview">
-          <h3>{{ manualPreview.actual ? `既有执行 ${manualPreview.actual.executionId} · ${manualPreview.actual.executionStatus}` : '首次生产领料选择完整工艺路径' }}</h3>
-          <p>{{ manualPreview.definition.routing.code }} / V{{ manualPreview.definition.routing.version }} · {{ manualPreview.definition.routing.name }}</p>
-          <RoutingGraphPreview :nodes="manualPreview.definition.nodes" :edges="manualPreview.definition.edges" :selected-node-ids="manualSelectedNodes" />
-          <el-select v-if="!manualPreview.actual" v-model="manualNextNode" placeholder="选择起点或下一相邻工序" :disabled="manualBusy"><el-option v-for="node in manualPathCandidates" :key="node.id" :value="node.id!" :label="node.nodeCode+' · '+node.operationName" /></el-select>
-          <el-button v-if="!manualPreview.actual" :disabled="!manualNextNode||manualBusy" @click="manualSelectedNodes.push(manualNextNode);manualNextNode=''">加入路径</el-button>
-          <el-button v-if="!manualPreview.actual" :disabled="!manualSelectedNodes.length||manualBusy" @click="manualSelectedNodes.pop()">撤回末节点</el-button>
-          <ol><li v-for="id in manualSelectedNodes" :key="id">{{ manualPreview.definition.nodes.find(node=>node.id===id)?.nodeCode }} · {{ manualPreview.definition.nodes.find(node=>node.id===id)?.operationName }}</li></ol>
-        </template>
-      </template>
-      <template #footer><el-button @click="manualIssueVisible=false">关闭</el-button><el-button v-if="!manualPending" type="primary" :loading="manualBusy" :disabled="manualBusy||!manualCalculation||!manualPathComplete||!manualNumber?.available" @click="saveManualIssue">保存统一领料出库草稿</el-button></template>
-    </PageDialog>
+
     <PageDialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
       <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" />
       <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{ action.id }}</el-descriptions-item><el-descriptions-item label="审核UUID">{{ action.operationId||'—' }}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{ action.documentLineId||'—' }}</el-descriptions-item><el-descriptions-item label="业务来源">{{ action.sourceType }} / {{ action.sourceId }}</el-descriptions-item><el-descriptions-item label="库存来源">{{ action.stockId }}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{ action.batchNo }} / {{ action.binCode }}</el-descriptions-item><el-descriptions-item label="变动量">{{ displayQuantity(action.quantityDelta) }}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{ displayQuantity(action.quantityBefore) }} / {{ displayQuantity(action.quantityAfter) }}</el-descriptions-item><el-descriptions-item label="操作人">{{ action.operatorUserId }}</el-descriptions-item><el-descriptions-item label="原因">{{ action.reason }}</el-descriptions-item></el-descriptions>

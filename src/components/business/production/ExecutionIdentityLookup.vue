@@ -70,7 +70,7 @@ function open() {
   <PageDialog v-model="visible" title="生产执行身份查询" width="min(640px, 94vw)" append-to-body :before-close="close">
     <QueryForm @submit="resolve()">
       <el-form-item label="执行身份码">
-        <el-input v-model="code" placeholder="工单号:品号#批次号，例如 WO001:P001#LOT001" maxlength="2048" :disabled="loading" />
+        <el-input v-model="code" placeholder="扫描已领料的材料组合二维码" maxlength="2048" :disabled="loading" />
       </el-form-item>
       <el-button native-type="submit" type="primary" :loading="loading" :disabled="!code || !allowed">查询</el-button>
       <CodeScanner v-model="code" button-label="图片识别 / 录入" :disabled="loading || !allowed || !visible" :context-key="auth.factoryId + ':' + auth.revision" @confirm="(value,method)=>resolve(method)" />
@@ -83,7 +83,7 @@ function open() {
       <el-descriptions-item label="工单">{{ result.workorderCode }}（{{ result.workorderId }}）</el-descriptions-item>
       <el-descriptions-item label="产出产品">{{ result.productCode }} · {{ result.productName }}</el-descriptions-item>
       <el-descriptions-item label="生产批次">{{ result.batchNo || '未记录' }}</el-descriptions-item>
-      <el-descriptions-item label="工艺版本">{{ result.routingCode }} / V{{ result.routingVersion }}（{{ result.routingId }}）</el-descriptions-item>
+      <el-descriptions-item label="工艺版本">{{ result.routingId ? result.routingCode + ' / V' + result.routingVersion + '（' + result.routingId + '）' : '无工艺，直接入库' }}</el-descriptions-item>
       <el-descriptions-item label="执行状态">{{ executionStatusLabel(result.status) }}</el-descriptions-item>
       <el-descriptions-item label="计划执行数量"><QuantityText :value="result.targetQty" /></el-descriptions-item>
     </el-descriptions>

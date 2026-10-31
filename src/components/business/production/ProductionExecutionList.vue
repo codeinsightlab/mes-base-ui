@@ -67,7 +67,7 @@ const fixed = computed(() => props.workorderId ? { workorderId: props.workorderI
     <template #field-routingId="{ draft }"><ExecutionRoutingSelect v-model="(draft.routingId as string | null)" :workorder-id="(draft.workorderId as string | null)" :disabled="draft.status !== 'READY'" /></template>
     <template #toolbar><el-button v-if="auth.hasPermission('business:mes:material:issue:update', 'factory')" @click="router.push('/production/productionInput')">正式领料创建执行</el-button><ExecutionIdentityLookup /></template>
     <template #cell-status="{row}">{{ executionStatusLabel(String(row.status)) }}<el-tag v-if="row.workorderStatus==='CANCELLED'" type="danger">所属工单已作废</el-tag></template>
-    <template #cell-routingId="{row}"><span :title="'工艺版本 ID：'+row.routingId">{{ row.routingCode || '工艺名称未记录' }} / V{{ row.routingVersion ?? '未记录' }} · {{ row.routingName || '名称未记录' }}</span></template>
+    <template #cell-routingId="{row}"><span :title="'工艺版本 ID：'+row.routingId">{{ row.routingId ? (row.routingCode || '工艺名称未记录') + ' / V' + (row.routingVersion ?? '未记录') + ' · ' + (row.routingName || '名称未记录') : '无工艺，直接入库' }}</span></template>
     <template #cell-createBy="{row}"><span :title="'用户 ID：'+row.createBy">{{ row.createByName || (row.createBy ? '用户 '+row.createBy+'（名称未记录）' : '—') }}</span></template>
     <template #cell-updateBy="{row}"><span :title="'用户 ID：'+row.updateBy">{{ row.updateByName || (row.updateBy ? '用户 '+row.updateBy+'（名称未记录）' : '—') }}</span></template>
     <template #actions="{ row }">
@@ -96,7 +96,7 @@ const fixed = computed(() => props.workorderId ? { workorderId: props.workorderI
           </section>
           <section v-if="canQuery" class="execution-actions-group" aria-label="生产闭环">
             <h3>生产闭环</h3>
-            <ProductionClosurePanel :id="String(row.id)" @changed="changed" />
+            <ProductionClosurePanel :id="String(row.id)" :routing-id="row.routingId" :batch-no="row.batchNo" @changed="changed" />
           </section>
         </div>
       </el-popover>

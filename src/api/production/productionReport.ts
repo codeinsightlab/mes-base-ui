@@ -3,11 +3,11 @@ export const reportPermissions = { quantity: 'business:production:report:quantit
 export interface NodeQuantity { executionId: string; routingNodeId: string; operationId: string; code: string; name: string | null; sequenceNo: number; inputQty: string; reportedQty: string; defectQty: string; effectiveOutputQty: string; availableQty: string; qualityIntegrated: boolean; directDefectQty: string; returnedQty: string; netDefectQty: string; propagatedLossQty: string; historicalOverrunQty: string; rawEffectiveOutputQty: string; rawAvailableQty: string; unverifiedDefectQty: string; historicalConflict: boolean; positiveReportBlockReason?: string | null }
 export interface ExecutionQuantity {
   productId: string | null;
-  confirmedInputQty: string; reservedInputQty: string; productionInputQty: string; routingLabel?: string | null; executionId: string; workorderId: string; routingId: string; targetQty: string; pathStatus: string; writable: boolean; boundary: string | null; nodes: NodeQuantity[] }
+  confirmedInputQty: string; reservedInputQty: string; productionInputQty: string; routingLabel?: string | null; executionId: string; workorderId: string; routingId: string | null; targetQty: string; pathStatus: string | null; writable: boolean; boundary: string | null; nodes: NodeQuantity[] }
 export interface Ledger { id: string; executionId: string; routingNodeId: string; recordType: 'REPORT' | 'ADJUSTMENT'; quantityDelta: string; referenceReportId: string | null; operatorUserId: string; recordedBy: string; operatorName?: string | null; recordedByName?: string | null; reportTime: string; workstationId: string | null; reason: string; createTime: string }
 export interface Detail { record: Ledger; originalEffectiveQty: string }
 export interface Page<T> { items: T[]; total: number; offset: number; limit: number }
-export interface ExecutionSummary { confirmedInputQty: string; reservedInputQty: string; productionInputQty: string; routingLabel?: string | null; executionId: string; workorderId: string; routingId: string; targetQty: string; pathStatus: string; lastNodeReportedQty: string }
+export interface ExecutionSummary { confirmedInputQty: string; reservedInputQty: string; productionInputQty: string; routingLabel?: string | null; executionId: string; workorderId: string; routingId: string | null; targetQty: string; pathStatus: string | null; lastNodeReportedQty: string | null }
 export interface HistoricalUser { id: string; name: string }
 export interface Supplement { requestId: string; executionId: string; routingNodeId: string; quantity: string; operatorUserId: string; reportTime: string; workstationId: string | null; reason: string }
 const root = '/api/production'

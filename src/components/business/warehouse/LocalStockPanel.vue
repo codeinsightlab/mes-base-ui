@@ -12,6 +12,7 @@ import { ApiError } from '@/lib/request'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { api, type WmInventoryVo } from '@/api/wm/wmInventory'
+import { stockDocuments, type Line } from '@/api/wm/stockDocuments'
 import { localStock, stockOperations, type StockOperation, type StockCommand, type StockAction } from '@/api/wm/localStock'
 const ElMessageBox = usePageMessageBox()
 
@@ -20,7 +21,9 @@ const router = useRouter()
 const auth = useAuth(), visible = ref(false), stockId = ref(''), stock = ref<WmInventoryVo | null>(null)
 const operation = ref<StockOperation>('receipt'), error = ref(''), busy = ref(false), loading = ref(false)
 const rows = ref<StockAction[]>([]), total = ref(0), offset = ref(0)
-const form = reactive({ quantity: '', reason: '', documentId: '' })
+const form = reactive({ quantity: '', reason: '', documentId: '', documentLineId: '' })
+const issueLines = ref<Line[]>([]), issueLineError = ref(''), issueLinesLoading = ref(false)
+const canReadIssueLines = computed(() => auth.hasPermission('business:wm:stock:document:query', 'factory') || auth.hasPermission('business:mes:material:issue:item:list', 'factory'))
 const quantityValid = ref(false)
 const settlementQuantity = computed(() => {
   if (!stock.value) return null
@@ -34,9 +37,9 @@ const options = computed(() => (pending.value || auth.runtimeMode === 'LOCAL' &&
 const inboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/inboundDocuments/index'))
 const outboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/outboundDocuments/index'))
 const readable = computed(() => auth.hasPermission('business:wm:stock:action:list', 'factory'))
-let generation = 0, attempt = 0, uncertain = false
+let generation = 0, attempt = 0, issueLineAttempt = 0, uncertain = false
 const key = () => `mes-stock-pending:${auth.username}:${auth.factoryId}:${stockId.value}`
-function clear() { generation++; attempt++; stock.value = null; rows.value = []; total.value = offset.value = 0; error.value = ''; busy.value = loading.value = false; pending.value = null; quantityValid.value = false; uncertain = false; Object.assign(form, { quantity: '', reason: '', documentId: '' }) }
+function clear() { issueLines.value = [];issueLineError.value = '';issueLinesLoading.value = false;generation++; attempt++; stock.value = null; rows.value = []; total.value = offset.value = 0; error.value = ''; busy.value = loading.value = false; pending.value = null; quantityValid.value = false; uncertain = false; Object.assign(form, { quantity: '', reason: '', documentId: '', documentLineId: '' }) }
 async function load() {
   const scope = generation, ticket = ++attempt; loading.value = true; error.value = ''
   try {
@@ -60,24 +63,37 @@ async function submit() {
     const nonzero = positiveQuantity(quantity.replace(/^-/, ''))
     const directionValid = operation.value === 'correction' ? nonzero : operation.value === 'opening' ? /^\d{1,14}(?:\.\d{1,6})?$/.test(quantity) : positiveQuantity(quantity)
     if (!quantityValid.value || !directionValid || !form.reason.trim() || operation.value === 'return' && !form.documentId) { error.value = '请填写符合物料单位精度及操作方向的数量、业务原因及原领料出库单ID'; return }
-    pending.value = { operation: operation.value, command: { requestId: crypto.randomUUID(), stockId: stockId.value, quantity, expectedQuantity: stock.value.quantity, expectedAvailable: stock.value.availableQuantity ?? stock.value.quantity, reason: form.reason, documentId: operation.value === 'return' ? form.documentId : null }}
+    pending.value = { operation: operation.value, command: { requestId: crypto.randomUUID(), stockId: stockId.value, quantity, expectedQuantity: stock.value.quantity, expectedAvailable: stock.value.availableQuantity ?? stock.value.quantity, reason: form.reason, documentId: operation.value === 'return' ? form.documentId : null, documentLineId: operation.value === 'return' ? form.documentLineId || null : null }}
     sessionStorage.setItem(key(), JSON.stringify(pending.value))
   }
   const scope = generation, storageKey = key(); busy.value = true; error.value = ''
   try {
     await localStock.execute(pending.value.operation, pending.value.command)
     if (scope !== generation) return
-    sessionStorage.removeItem(storageKey); pending.value = null; uncertain = false; Object.assign(form, { quantity: '', reason: '', documentId: '' }); offset.value = 0; emit('changed'); await load()
+    sessionStorage.removeItem(storageKey); pending.value = null; uncertain = false; Object.assign(form, { quantity: '', reason: '', documentId: '', documentLineId: '' }); offset.value = 0; emit('changed'); await load()
   } catch(e) {
     if (scope !== generation) return
     error.value = e instanceof Error ? e.message : '结果未知，请使用原请求重查'
     if (!uncertain && e instanceof ApiError && e.status >= 400 && e.status < 500) { sessionStorage.removeItem(storageKey); pending.value = null } else uncertain = true
   } finally { if (scope === generation) busy.value = false }
 }
+async function readIssueLines() {
+  if (!canReadIssueLines.value || !form.documentId || pending.value || issueLinesLoading.value) return
+  const scope = generation, documentId = form.documentId, ticket = ++issueLineAttempt
+  issueLinesLoading.value = true;issueLineError.value = '';issueLines.value = [];form.documentLineId = ''
+  try {
+    const lines = await stockDocuments.materialIssueLines(documentId)
+    if (scope !== generation || documentId !== form.documentId || ticket !== issueLineAttempt) return
+    issueLines.value = lines.filter(line => line.stockId === stockId.value)
+    if (issueLines.value.length === 1) form.documentLineId = issueLines.value[0]!.id
+    if (!issueLines.value.length) issueLineError.value = '原单据没有当前库存来源的领料明细'
+  } catch(e) { if (scope === generation && documentId === form.documentId && ticket === issueLineAttempt) issueLineError.value = e instanceof Error ? e.message : '领料明细读取失败' } finally { if (scope === generation && documentId === form.documentId && ticket === issueLineAttempt) issueLinesLoading.value = false }
+}
+watch(() => form.documentId, () => { issueLineAttempt++;issueLines.value = [];form.documentLineId = '';issueLineError.value = '';issueLinesLoading.value = false })
 async function beforeClose(done: () => void) {
   if (busy.value) return
   const scope = generation
-  if (form.quantity || form.reason || pending.value) { try { await ElMessageBox.confirm(pending.value ? '原请求已保留，下次打开可核实。关闭面板？' : '放弃未提交的库存操作？', '关闭确认') } catch { return } }
+  if (form.quantity || form.reason || form.documentId || pending.value) { try { await ElMessageBox.confirm(pending.value ? '原请求已保留，下次打开可核实。关闭面板？' : '放弃未提交的库存操作？', '关闭确认') } catch { return } }
   if (scope !== generation) return
   clear(); done()
 }
@@ -107,7 +123,12 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
       <el-alert v-if="pending" :title="'原请求已冻结：' + pending.command.requestId + '，请使用原请求核实结果'" type="warning" :closable="false" />
       <el-form v-if="options.length" label-width="110px" :disabled="busy || !!pending">
         <el-form-item label="业务动作"><el-select v-model="operation"><el-option v-for="o in options" :key="o.value" :value="o.value" :label="o.label" /></el-select></el-form-item>
-        <el-form-item v-if="operation === 'return'" label="原领料单ID"><el-input v-model="form.documentId" placeholder="统一出库单 ID" /></el-form-item>
+        <el-form-item v-if="operation === 'return'" label="原领料单"><el-input v-model="form.documentId" placeholder="统一出库单 ID" /><el-button v-if="canReadIssueLines" :loading="issueLinesLoading" @click="readIssueLines">读取原领料明细</el-button></el-form-item>
+        <el-form-item v-if="operation === 'return'" label="原领料明细">
+          <el-select v-if="issueLines.length" v-model="form.documentLineId" placeholder="选择当前库存对应的原明细"><el-option v-for="line in issueLines" :key="line.id" :value="line.id" :label="`第 ${line.lineNo} 行 · 批次 ${line.batchNo ?? '未分批'} · 原领用 ${line.quantity}`" /></el-select>
+          <el-input v-else v-model="form.documentLineId" placeholder="多行单据需填写明细 ID；单行单据可留空" />
+          <el-alert v-if="issueLineError" :title="issueLineError" type="error" :closable="false" />
+        </el-form-item>
         <el-form-item label="数量增减量"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" required :disabled="busy || !!pending" placeholder="盘亏填写正数；业务纠错使用有符号增减量" @validity="quantityValid = $event" /></el-form-item>
         <el-form-item label="依据 / 凭据"><el-input v-model="form.reason" type="textarea" maxlength="500" placeholder="期初依据、入库来源、外部凭据或调整原因" /></el-form-item>
       </el-form>

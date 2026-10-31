@@ -106,11 +106,11 @@ async function submit(recover = false) {
     <el-alert v-if="!allowed" title="当前账号没有正式生产报工权限，或尚未选择工厂" type="warning" :closable="false" />
     <template v-else>
       <QueryForm class="filter-panel reporting-scan" label-position="top" @submit="locate()">
-        <el-form-item label="执行身份码"><el-input v-model="code" placeholder="工单号:品号#批次号，例如 WO001:P001#LOT001" maxlength="2048" clearable aria-label="执行身份码" aria-describedby="reporting-scan-help" /></el-form-item>
+        <el-form-item label="执行身份码"><el-input v-model="code" placeholder="扫描已领料的材料组合二维码" maxlength="2048" clearable aria-label="执行身份码" aria-describedby="reporting-scan-help" /></el-form-item>
         <el-button native-type="submit" type="primary" :loading="loading" :disabled="busy">定位执行</el-button>
         <CodeScanner v-model="code" :disabled="loading || busy || !allowed" :context-key="auth.factoryId + ':' + auth.revision" @confirm="locate" />
       </QueryForm>
-      <p id="reporting-scan-help" class="secondary">扫码格式为“工单号:品号#批次号”，例如 WO001:P001#LOT001。</p>
+      <p id="reporting-scan-help" class="secondary">使用已完成首次 MES 领料的组合二维码定位生产执行。</p>
       <el-alert v-if="error" :title="error" type="error" :closable="false" role="alert" />
       <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${result.quantityDelta}，时间 ${result.reportTime}`" type="success" :closable="false" />
       <el-alert v-if="recoveryError" :title="recoveryError" type="error" :closable="false" role="alert" />
@@ -129,10 +129,10 @@ async function submit(recover = false) {
           <el-descriptions-item label="产出物料">{{ context.identity.productCode }} · {{ context.identity.productName }}</el-descriptions-item>
           <el-descriptions-item label="生产批次">{{ context.identity.batchNo || '未记录' }}</el-descriptions-item>
           <el-descriptions-item label="目标数量"><QuantityText :value="context.identity.targetQty" /></el-descriptions-item>
-          <el-descriptions-item label="实际工艺">{{ context.quantities.routingLabel || context.identity.routingCode + ' / V' + context.identity.routingVersion }} · {{ context.quantities.pathStatus }}</el-descriptions-item>
+          <el-descriptions-item label="实际工艺">{{ context.identity.routingId ? (context.quantities.routingLabel || context.identity.routingCode + ' / V' + context.identity.routingVersion) + ' · ' + context.quantities.pathStatus : '无工艺，无需工序报工' }}</el-descriptions-item>
         </el-descriptions>
         <el-alert v-if="context.quantities.pathStatus !== 'LOCKED'" title="实际路径尚未锁定，不能正式报工。请在生产执行完成选路与领料确认。" type="warning" :closable="false" />
-        <el-collapse v-if="context.quantities.pathStatus !== 'UNSELECTED'"><el-collapse-item title="查看本次实际执行路径" name="path"><p class="secondary">突出节点与连线是本次已选路径，其余节点仅为同版本工艺定义参考。</p><RoutingGraphPreview :nodes="graphNodes" :edges="graphEdges" :selected-node-ids="context.path.selectedNodeIds" /></el-collapse-item></el-collapse>
+        <el-collapse v-if="context.identity.routingId && context.quantities.pathStatus !== 'UNSELECTED'"><el-collapse-item title="查看本次实际执行路径" name="path"><p class="secondary">突出节点与连线是本次已选路径，其余节点仅为同版本工艺定义参考。</p><RoutingGraphPreview :nodes="graphNodes" :edges="graphEdges" :selected-node-ids="context.path.selectedNodeIds" /></el-collapse-item></el-collapse>
         <div class="table-toolbar"><strong>实际路径工序</strong><el-switch v-model="showAll" active-text="查看其他节点状态" /></div>
         <el-alert v-if="qualityPending" :title="qualityPending" type="warning" :closable="false" />
         <el-table :data="visibleNodes" row-key="routingNodeId">
@@ -149,7 +149,7 @@ async function submit(recover = false) {
         <el-form class="report-form" label-position="top" @submit.prevent="submit()">
           <el-form-item label="本次报工工序"><el-select v-model="selectedId" :disabled="busy || !!pending" placeholder="选择可报工序"><el-option v-for="n in nodes" :key="n.routingNodeId" :value="n.routingNodeId" :label="n.code + ' · ' + (n.name || '工序名称未记录') + (n.reason ? '（' + n.reason + '）' : '')" :disabled="n.status !== 'AVAILABLE'" /></el-select></el-form-item>
           <p v-if="selected">上游输入 <QuantityText :value="selected.inputQty" /> · 已报 <QuantityText :value="selected.reportedQty" /> · 不良 <QuantityText :value="selected.defectQty" /> · 可流转 <QuantityText :value="selected.effectiveOutputQty" /> · 剩余 <QuantityText :value="selected.availableQty" /></p>
-          <el-form-item label="本次完成数量"><QuantityInput required positive v-model="quantity" :material-id="context.identity.productId" :disabled="busy || !!pending" @validity="quantityValid = $event" /></el-form-item>
+          <el-form-item label="本次完成数量"><QuantityInput v-model="quantity" required positive :material-id="context.identity.productId" :disabled="busy || !!pending" @validity="quantityValid = $event" /></el-form-item>
           <el-button type="primary" size="large" :loading="busy" :disabled="!!pending || !!recoveryError || selected?.status !== 'AVAILABLE'" @click="submit()">确认报工</el-button>
         </el-form>
         <el-collapse v-if="context && selected && auth.hasPermission('business:quality:defect:create', 'factory')"><el-collapse-item title="申报本工序不良" name="defect"><DefectDeclarationPanel :execution-id="context.identity.executionId" :node-id="selected.routingNodeId" /></el-collapse-item></el-collapse>

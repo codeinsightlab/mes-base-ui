@@ -1,7 +1,7 @@
 import { request } from '@/lib/request'
 import type { MesProductionExecutionVo } from './mesProductionExecution'
-export interface PathView { routingCode: string; routingName: string; routingVersion: number;
-  executionId: string; executionStatus: string; routingId: string | null; pathStatus: string; revision: number;
+export interface PathView { routingCode: string | null; routingName: string | null; routingVersion: number | null;
+  executionId: string; executionStatus: string; routingId: string | null; pathStatus: string | null; revision: number;
   selectedAt: string | null; lockedAt: string | null; selectedNodeIds: string[];
   nodes: { id: string; nodeCode: string; operationName: string | null; operationId: string; operationCode: string | null; required: boolean }[];
   edges: { fromNodeId: string; toNodeId: string }[]

@@ -20,3 +20,8 @@ export const copyBom = (id:string, version:string, revision:string) => request<B
 export const defaultBom = (productId:string) => request<Bom | null>('/api/basic/material-bom/default', { query: { productId }, scope: 'factory' }).then(value => value ?? null)
 export const setDefaultBom = (id:string, revision:string) => request<Bom>('/api/basic/material-bom/' + encodeURIComponent(id) + '/default', { method: 'POST', body: { revision }, scope: 'factory' })
 export const structure = (id:string, quantity:string) => request<BomGraph>('/api/basic/material-bom/' + encodeURIComponent(id) + '/structure', { query: { quantity }, scope: 'factory' })
+
+export interface DirectComponent { lineId: string; materialId: string; unitId: string; componentQty: string; baseQty: string; quantity: string }
+export function directComponents(bomId: string, quantity: string) {
+  return request<{ version: Bom; items: DirectComponent[] }>('/api/basic/material-bom/' + encodeURIComponent(bomId) + '/direct-components', { query: { quantity }, scope: 'factory' })
+}

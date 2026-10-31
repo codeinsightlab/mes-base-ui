@@ -10,7 +10,7 @@ const auth = useAuth(), open = ref(false), busy = ref(false), error = ref(''), v
 let generation = 0
 let changedPending = false
 const can = (action: string) => auth.hasPermission('business:mes:production:execution:' + (['start', 'select-path'].includes(action) ? 'update' : action), 'factory')
-const editable = computed(() => view.value?.executionStatus === 'READY' && view.value.pathStatus !== 'LOCKED' && can('select-path'))
+const editable = computed(() => !!view.value?.routingId && view.value.executionStatus === 'READY' && view.value.pathStatus !== 'LOCKED' && can('select-path'))
 const candidates = computed(() => {
   const v = view.value; if (!v) return []
   return v.nodes.filter(n => !selected.value.includes(n.id) && (selected.value.length ? v.edges.some(e => e.fromNodeId === selected.value.at(-1) && e.toNodeId === n.id) : !v.edges.some(e => e.toNodeId === n.id)))
@@ -38,7 +38,8 @@ function add() { if (next.value && editable.value && !busy.value) { selected.val
   <el-button v-if="can('query')" text @click="load">路径与开工</el-button>
   <PageDialog v-model="open" title="执行路径与开工" width="680px" append-to-body destroy-on-close @closed="closed">
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
-    <section v-if="view" v-loading="busy">
+    <el-alert v-if="view && !view.routingId" title="此执行无工艺，无需选择路径或开工；领料后可直接办理成品入库。" type="info" :closable="false" />
+    <section v-if="view?.routingId" v-loading="busy">
       <p>执行状态：{{ view.executionStatus }} · 路径：{{ view.pathStatus === 'LOCKED' ? '已锁定' : view.pathStatus === 'SELECTED' ? '已选择，待领料确认' : '未选择' }}</p>
       <ol aria-label="路径节点顺序"><li v-for="(id, index) in selected" :key="id">{{ index + 1 }}. {{ view.nodes.find(n => n.id === id)?.nodeCode }} · {{ view.nodes.find(n => n.id === id)?.operationName || '历史工序名称未记录' }}</li></ol>
       <template v-if="editable">

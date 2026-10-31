@@ -14,7 +14,7 @@ export function configureRequests(provider: () => RequestContext, on401: () => v
   unauthenticated = on401
   factorySelectionRequired = onFactorySelection
 }
-export class ApiError extends Error { constructor(public code: string, message: string, public requestId = '', public status = 0) { super(message) } }
+export class ApiError extends Error { constructor(public code: string, message: string, public requestId = '', public status = 0, public maximumQty?: string) { super(message) } }
 export interface RequestOptions { timeoutMs?: number; signal?: AbortSignal; method?: string; body?: unknown; query?: Record<string, string | number>; scope?: PermissionScope; public?: boolean; parseResponse?: (text: string) => unknown }
 async function send<T>(path: string, options: RequestOptions, consume: (response: Response, read: <R>(operation: () => Promise<R>) => Promise<R>) => Promise<T>): Promise<T> {
   if (!path.startsWith('/api/') && path !== '/health') throw new ApiError('INVALID_PATH', '请求路径无效')
@@ -54,12 +54,15 @@ async function send<T>(path: string, options: RequestOptions, consume: (response
     response = await read(() => fetch(path + query, { method: options.method ?? 'GET', headers, body: options.body === undefined ? undefined : multipart ? options.body as FormData : JSON.stringify(options.body), signal, credentials: 'same-origin' }))
     assertCurrent(snapshot)
     if (!response.ok) {
-      let error: { errorCode?: string; message?: string; requestId?: string } = {}
+      let error: { errorCode?: string; message?: string; requestId?: string; maximumQty?: string } = {}
       try { error = await read(() => response!.json()) } catch(failure) { if (!(failure instanceof SyntaxError)) throw failure }
       assertCurrent(snapshot)
       if (response.status === 401 && !options.public) unauthenticated()
       if (response.status === 422 && error.errorCode === 'FACTORY_SELECTION_REQUIRED' && !options.public) factorySelectionRequired()
       const businessMessages: Record<string, string> = {
+        PRODUCTION_COMBINATION_CLOSED: '该组合的执行已结束，不能再次领料',
+        PRODUCTION_COMBINATION_BUDGET: '需求或库存规模超过本次组合计算范围，请缩小范围后重试',
+        PRODUCTION_COMBINATION_STOCK_CHANGED: '库存已变化，请重新读取当前可领数量后确认',
         STOCK_DOCUMENT_SOURCE_PENDING: '来源业务尚未接通或关联依据不完整，禁止审核',
         QUALITY_DATA_INVALID: '当前记录暂不能处理，请先核对处置记录',
         WORKORDER_INVALID: '工单、批次数量、工艺引用或完整路径不符合规则',
@@ -82,7 +85,7 @@ async function send<T>(path: string, options: RequestOptions, consume: (response
         ERP_ROUTING_NOT_CONFIGURED: '暂未配置工艺路线 ERP 同步数据来源'
       }
       const messages: Record<number, string> = { 400: '输入不符合要求，请检查字段', 401: '登录已失效，请重新登录', 403: '当前范围没有此操作权限', 404: '资源不存在或不在当前范围', 409: '数据冲突，请刷新后重试', 422: '当前操作不可执行' }
-      throw new ApiError(error.errorCode ?? 'HTTP_ERROR', businessMessages[error.errorCode ?? ''] ?? (error.errorCode === 'FACTORY_SELECTION_REQUIRED' ? '当前工厂不可用，请重新选择工厂' : error.errorCode === 'SESSION_REVOCATION_PENDING' ? '账号变更已保存，会话撤销正在重试；请勿重复提交' : error.errorCode === 'ERP_SYNC_NOT_CONFIGURED' ? '暂未配置 ERP 同步数据来源' : (error.errorCode === 'BUSINESS_REJECTED' || error.errorCode === 'PRODUCTION_CLOSURE_BLOCKED' || error.errorCode === 'REPORT_QUANTITY_CONFLICT' || error.errorCode === 'QUALITY_ATTRIBUTION_REQUIRED') ? error.message : undefined) ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status)
+      throw new ApiError(error.errorCode ?? 'HTTP_ERROR', businessMessages[error.errorCode ?? ''] ?? (error.errorCode === 'FACTORY_SELECTION_REQUIRED' ? '当前工厂不可用，请重新选择工厂' : error.errorCode === 'SESSION_REVOCATION_PENDING' ? '账号变更已保存，会话撤销正在重试；请勿重复提交' : error.errorCode === 'ERP_SYNC_NOT_CONFIGURED' ? '暂未配置 ERP 同步数据来源' : (error.errorCode === 'BUSINESS_REJECTED' || error.errorCode === 'PRODUCTION_CLOSURE_BLOCKED' || error.errorCode === 'REPORT_QUANTITY_CONFLICT' || error.errorCode === 'QUALITY_ATTRIBUTION_REQUIRED') ? error.message : undefined) ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status, error.maximumQty)
     }
     const result = await consume(response, read)
     assertCurrent(snapshot)

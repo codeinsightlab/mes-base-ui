@@ -1,7 +1,8 @@
 import { request } from '@/lib/request'
 import type { RoutingDetail } from './routing'
+import { materialDemandBody, type MaterialDemandSave } from './workorderMaterial'
 export interface Order {
-  id: string; source?: 'LOCAL' | 'EXTERNAL' | null; code: string; productId: string; routingId: string; plannedQty: string | number
+  id: string; source?: 'LOCAL' | 'EXTERNAL' | null; code: string; productId: string; routingId: string | null; plannedQty: string | number
   status: 'DRAFT' | 'RELEASED' | 'CANCELLED' | 'COMPLETED'; plannedStartAt: string | null; plannedEndAt: string | null
   createTime: string | null
   externalId: string | null; externalCode: string | null; remark: string | null; revision: number
@@ -9,17 +10,17 @@ export interface Order {
 export interface RoutingOption { id: string; code: string; name: string; version: number; status: string }
 export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
 export interface Allocation { workorderId: string; plannedQty: string; allocatedTargetQty: string; remainingTargetQty: string; excessTargetQty: string; executionCount: number }
-export interface Detail { workorder: Order; productCode: string; productName: string; routing: RoutingOption; allocation: Allocation }
+export interface Detail { workorder: Order; productCode: string; productName: string; routing: RoutingOption | null; allocation: Allocation }
 export interface Save {
-  code?: string; ruleCode?: string; productId: string; routingId: string; plannedQty: string; revision?: number
+  code?: string; ruleCode?: string; productId: string; routingId: string | null; plannedQty: string; revision?: number
   plannedStartAt: string | null; plannedEndAt: string | null; externalId: string | null
-  externalCode: string | null; remark: string | null
+  externalCode: string | null; remark: string | null; material: MaterialDemandSave
 }
 export function saveBody(input: Save, creating = false): Save {
   return {
-    ...(input.code ? { code: input.code } : {}), ...(creating && input.ruleCode ? { ruleCode: input.ruleCode } : {}), productId: input.productId, routingId: input.routingId, plannedQty: input.plannedQty,
+    ...(input.code ? { code: input.code } : {}), ...(creating && input.ruleCode ? { ruleCode: input.ruleCode } : {}), productId: input.productId, routingId: input.routingId || null, plannedQty: input.plannedQty,
     plannedStartAt: input.plannedStartAt, plannedEndAt: input.plannedEndAt, externalId: input.externalId,
-    externalCode: input.externalCode, remark: input.remark, revision: input.revision
+    externalCode: input.externalCode, remark: input.remark, revision: input.revision, material: materialDemandBody(input.material)
   }
 }
 // Preserve this contract's DECIMAL quantity lexemes before JavaScript can round them.

@@ -10,6 +10,7 @@ import CrudPage from '../src/components/CrudPage.vue'
 const wo = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), release: vi.fn(), remove: vi.fn(), routings: vi.fn(), numberingRules: vi.fn(), allocation: vi.fn(), graph: vi.fn() }))
 const executions = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), delids: vi.fn() }))
 vi.mock('../src/api/production/workorder', () => ({ api: wo }))
+vi.mock('../src/api/basic/materialBom', () => ({ defaultBom: vi.fn().mockResolvedValue({ id: '10', productId: '1', status: 'PUBLISHED' }), bomApi: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }), detail: vi.fn().mockResolvedValue({ id: '10', productId: '1', status: 'PUBLISHED' }) }, directComponents: vi.fn().mockResolvedValue({ version: { id: '10', productId: '1', unitId: '4', revision: '1' }, items: [{ lineId: '100', materialId: '2', unitId: '4', baseQty: '1', componentQty: '2', quantity: '2000.020000' }] }), structure: vi.fn().mockRejectedValue(new Error('分析未配置')) }))
 vi.mock('../src/api/production/mesProductionExecution', () => ({ api: executions }))
 vi.mock('../src/api/basic/material', () => ({ api: { list: vi.fn().mockResolvedValue({ items: [{ id: '1', code: 'P1', name: '产品一' }] }), detail: vi.fn().mockResolvedValue({ unitId: '4' }) }}))
 vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn().mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 2 }) }}))
@@ -70,10 +71,11 @@ describe('single active execution chain', () => {
   it('opens a demand form with no batch array or path step and saves the exact demand', async() => {
     const c = setup(['workorder:list', 'workorder:create']), w = mount(WorkOrder, { global: c.global })
     await flushPromises(); await w.findAll('button').find(b => b.text() === '新增工单')!.trigger('click'); await flushPromises()
-    const state = w.vm as unknown as { form: Record<string, unknown>; save: () => Promise<void> }
+    const state = w.vm as unknown as { form: Record<string, unknown>; productChanged: (id: string) => Promise<void>; save: () => Promise<void> }
     expect(state.form).not.toHaveProperty('batches')
     expect(document.body.textContent).not.toContain('添加批次')
-    Object.assign(state.form, { code: 'WO_NEW', ruleCode: 'WO_RULE', productId: '1', routingId: '1', plannedQty: '1000.01' }); await flushPromises()
+    await state.productChanged('1'); await flushPromises()
+    Object.assign(state.form, { code: 'WO_NEW', ruleCode: 'WO_RULE', routingId: '1', plannedQty: '1000.01' }); await flushPromises()
     state.form.plannedQty = '1000.001'; await flushPromises(); await state.save(); expect(wo.create).not.toHaveBeenCalled()
     state.form.plannedQty = '1000.01'; await flushPromises()
     wo.create.mockResolvedValue(detail()); await state.save(); await flushPromises()

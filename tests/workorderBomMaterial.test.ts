@@ -1,157 +1,89 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
+import { defineComponent, watch } from 'vue'
+import ElementPlus, { ElMessageBox } from 'element-plus'
+import Editor from '../src/components/business/production/WorkorderMaterialEditor.vue'
+import BomSelect from '../src/components/business/material/WorkorderBomSelect.vue'
 import Panel from '../src/components/business/production/WorkorderMaterialPanel.vue'
-import BomVersionSelect from '../src/components/business/material/BomVersionSelect.vue'
+import { emptyMaterialDemand, type MaterialDemandSave } from '../src/api/production/workorderMaterial'
 import { useAuth } from '../src/stores/auth'
-const { get, save, detail, list, defaultBom } = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), detail: vi.fn(), list: vi.fn(), defaultBom: vi.fn() }))
-vi.mock('../src/api/production/workorderMaterial', () => ({ workorderMaterial: { get, save }}))
-vi.mock('../src/api/basic/materialBom', () => ({ bomApi: { detail, list }, defaultBom }))
-const basis = { id: '1', bomId: '10', bomBaseQty: '1', bomComponentQty: '2.5', materialId: '2', unitId: '3', outputUnitId: '4', totalRequiredQty: '250', plannedQty: '100', warehouseIds: '["7"]', workCenter: '钻孔', revision: '2', status: 'ENABLED', frozenAt: null }
+const calls = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), direct: vi.fn(), defaultBom: vi.fn(), structure: vi.fn() }))
+vi.mock('../src/api/production/workorderMaterial', async original => ({ ...await original<typeof import('../src/api/production/workorderMaterial')>(), workorderMaterial: { get: calls.get, save: calls.save }}))
+vi.mock('../src/api/basic/materialBom', () => ({ defaultBom: calls.defaultBom, directComponents: calls.direct, structure: calls.structure }))
+const Quantity = defineComponent({ name: 'QuantityInput', props: ['modelValue', 'materialId'], emits: ['validity', 'update:modelValue'], setup(props, { emit }) { watch(() => props.modelValue, value => emit('validity', !!value && Number(value) > 0), { immediate: true }); return () => null } })
 let wrapper: ReturnType<typeof mount>
-beforeEach(() => { vi.resetAllMocks(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); get.mockResolvedValue(basis); detail.mockResolvedValue({ id: '10', code: 'BOM-A', version: '2', productId: '8', status: 'PUBLISHED', revision: '3' }); list.mockResolvedValue({ items: [], total: 0 }); defaultBom.mockResolvedValue(null) })
-afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
-async function setup(stubBomSelector = true) {
-  const pinia = createPinia(), auth = useAuth(pinia); auth.factoryId = 'A'; auth.factoryPermissions = ['workorder:query', 'workorder:material:update', 'business:material:query', 'business:material:list']
-  const stubs = { MaterialSelect: true, WarehouseSelect: true, UnitMeasureSelect: true, ...(stubBomSelector ? { BomVersionSelect: true } : {}) }
-  wrapper = mount(Panel, { props: { workorderId: '1', productId: '8' }, global: { plugins: [pinia, ElementPlus], stubs }})
-  await flushPromises(); return { auth, state: wrapper.vm as unknown as { editing: boolean; form: { bomId: string | null }; bom: { id: string; status: string } | null; selectedBom: { id: string; revision: string } | null; defaultError: string; defaultResolved: boolean; edit: () => void; save: () => Promise<void> }}
+const bom = { id: '10', productId: '8', unitId: '1', revision: '3', status: 'PUBLISHED' }
+const components = (quantity: string) => ({ version: bom, items: [
+  { lineId: '101', materialId: '2', unitId: '1', componentQty: '2', baseQty: '1', quantity: quantity === '2' ? '4' : '2' },
+  { lineId: '102', materialId: '3', unitId: '1', componentQty: '3', baseQty: '1', quantity: quantity === '2' ? '6' : '3' }
+] })
+const stubs = { BomVersionSelect: true, MaterialSelect: true, UnitMeasureSelect: true, WarehouseSelect: true, QuantityInput: Quantity }
+beforeEach(() => { vi.resetAllMocks(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); calls.defaultBom.mockResolvedValue(bom); calls.direct.mockImplementation((_, quantity) => Promise.resolve(components(quantity))); calls.structure.mockRejectedValue(new Error('分析读取失败')) })
+afterEach(() => { wrapper?.unmount(); vi.restoreAllMocks(); document.body.innerHTML = '' })
+function authState() { const pinia = createPinia(), auth = useAuth(pinia); auth.factoryId = 'A'; auth.factoryPermissions = ['workorder:query', 'workorder:material:update', 'business:material:query', 'business:material:list']; return { pinia, auth } }
+async function setup(draft = emptyMaterialDemand()) {
+  const { pinia, auth } = authState()
+  wrapper = mount(Editor, { props: { modelValue: draft, productId: '8', plannedQty: '1', 'onUpdate:modelValue': value => { void wrapper.setProps({ modelValue: value }) } }, global: { plugins: [pinia, ElementPlus], stubs }})
+  await flushPromises()
+  return { auth, state: wrapper.vm as unknown as { updateRow: (index: number, value: object) => void; add: () => void; validateAndConfirm: () => Promise<boolean> }}
 }
-it('uses an explicit BOM version and sends no competing manual ratio', async() => {
-  const { state } = await setup(); expect(wrapper.text()).toContain('BOM-A · 2'); expect(wrapper.text()).toContain('首次正式领料前可调整')
-  state.editing = true; state.form.bomId = null; await state.save(); expect(save).not.toHaveBeenCalled()
-  state.form.bomId = '11'; state.selectedBom = { id: '11', code: 'BOM-B', version: '1', productId: '8', status: 'PUBLISHED', revision: '9' } as never; save.mockResolvedValue({ ...basis, bomId: '11' }); await state.save()
-  expect(save).toHaveBeenCalledWith('1', { bomId: '11', warehouseIds: ['7'], workCenter: '钻孔', enabled: true, expectedRevision: '2', expectedBomRevision: '9' })
-  expect(save.mock.calls[0]![1]).not.toHaveProperty('totalRequiredQty'); expect(save.mock.calls[0]![1]).not.toHaveProperty('materialId')
-})
-it('keeps the raw basis readable when the BOM name request fails', async() => {
-  detail.mockRejectedValue(new Error('版本读取失败')); await setup()
-  expect(wrapper.text()).toContain('版本读取失败'); expect(wrapper.text()).toContain('2.5'); expect(wrapper.text()).toContain('250')
-})
-it('prevents editing a basis fixed by successful input', async() => {
-  get.mockResolvedValue({ ...basis, frozenAt: '2026-10-23T10:00:00' }); const { state } = await setup()
-  const button = wrapper.findAll('button').find(b => b.text() === '选择BOM与领料范围')!
-  expect(button.attributes('disabled')).toBeDefined(); state.form.bomId = '11'; await state.save(); expect(save).not.toHaveBeenCalled()
-})
-it('does not restore another factory basis after a late request', async() => {
-  let release!: (v: unknown) => void; get.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
-  const { auth } = await setup(); get.mockResolvedValueOnce(null); auth.factoryId = 'B'; await flushPromises(); release(basis); await flushPromises()
-  expect(wrapper.text()).toContain('尚未选择BOM'); expect(wrapper.text()).not.toContain('250')
-})
-
-it('preselects a product default only in the unsaved first-maintenance form', async() => {
-  get.mockResolvedValue(null)
-  const productDefault = { id: '20', code: 'BOM-DEFAULT', version: '3', productId: '8', status: 'PUBLISHED', revision: '6', defaultVersion: true }
-  defaultBom.mockResolvedValue(productDefault)
-  detail.mockResolvedValue(productDefault)
-  const { state } = await setup(false)
-  state.edit(); await flushPromises()
-  expect(state.form.bomId).toBe('20')
-  expect(state.selectedBom).toMatchObject({ id: '20', revision: '6' })
-  expect(save).not.toHaveBeenCalled()
-})
-
-it('keeps default lookup failures distinct from a product with no default', async() => {
-  get.mockResolvedValue(null)
-  defaultBom.mockRejectedValue(new Error('默认读取不可用'))
-  const { state } = await setup()
-  state.edit(); await flushPromises()
-  expect(state.defaultError).toBe('默认读取不可用')
-  expect(state.defaultResolved).toBe(false)
-  expect(state.form.bomId).toBeNull()
-})
-
-it('preserves a manual BOM choice when the default lookup returns late', async() => {
-  get.mockResolvedValue(null)
-  let resolveDefault!: (value: unknown) => void
-  defaultBom.mockReturnValue(new Promise(resolve => { resolveDefault = resolve }))
-  const manualBom = { id: '21', code: 'BOM-MANUAL', version: '2', productId: '8', status: 'PUBLISHED', revision: '11', defaultVersion: false }
-  detail.mockResolvedValue(manualBom)
-  const { state } = await setup(false)
-  state.edit(); await flushPromises()
-  const selector = wrapper.findComponent(BomVersionSelect)
-  selector.vm.$emit('update:modelValue', manualBom.id)
-  selector.vm.$emit('selected', manualBom)
-  await flushPromises()
-  resolveDefault({ id: '20', code: 'BOM-DEFAULT', version: '3', productId: '8', status: 'PUBLISHED', revision: '6', defaultVersion: true })
-  await flushPromises()
-  expect(state.form.bomId).toBe(manualBom.id)
-  expect(state.selectedBom).toMatchObject({ id: manualBom.id, revision: manualBom.revision })
-})
-
-it('preserves an explicit clear when the default lookup returns late', async() => {
-  get.mockResolvedValue(null)
-  let resolveDefault!: (value: unknown) => void
-  defaultBom.mockReturnValue(new Promise(resolve => { resolveDefault = resolve }))
-  const manualBom = { id: '21', code: 'BOM-MANUAL', version: '2', productId: '8', status: 'PUBLISHED', revision: '11', defaultVersion: false }
-  detail.mockResolvedValue(manualBom)
-  const { state } = await setup(false)
-  state.edit(); await flushPromises()
-  const selector = wrapper.findComponent(BomVersionSelect)
-  selector.vm.$emit('update:modelValue', manualBom.id)
-  selector.vm.$emit('selected', manualBom)
-  await flushPromises()
-  selector.vm.$emit('update:modelValue', null)
-  selector.vm.$emit('selected', null)
-  await flushPromises()
-  resolveDefault({ id: '20', code: 'BOM-DEFAULT', version: '3', productId: '8', status: 'PUBLISHED', revision: '6', defaultVersion: true })
-  await flushPromises()
-  expect(state.form.bomId).toBeNull()
-  expect(state.selectedBom).toBeNull()
-})
-
-it('keeps the selected BOM after the saved BOM detail arrives late and saves its revision', async() => {
-  const saved = { id: '10', code: 'BOM-A', version: '2', productId: '8', status: 'PUBLISHED', revision: '3' }
-  const replacement = { id: '21', code: 'BOM-B', version: '4', productId: '8', status: 'PUBLISHED', revision: '11' }
-  const releaseSaved: Array<(value: unknown) => void> = []
-  detail.mockImplementation((id: string) => id === saved.id
-    ? new Promise(resolve => { releaseSaved.push(resolve) })
-    : Promise.resolve(replacement))
-  list.mockResolvedValue({ items: [saved, replacement], total: 2 })
-  save.mockResolvedValue({ ...basis, bomId: replacement.id })
-  const { state } = await setup(false)
-  state.edit()
-  await flushPromises()
-
-  const selector = wrapper.findComponent(BomVersionSelect)
-  await selector.find('.el-select__wrapper').trigger('click')
-  await flushPromises()
-  const option = [...document.body.querySelectorAll('.el-select-dropdown__item')]
-    .find(item => item.textContent?.includes('BOM-B'))
-  expect(option).toBeDefined()
-  option!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await flushPromises()
-  expect(state.form.bomId).toBe(replacement.id)
-  expect(state.selectedBom).toMatchObject({ id: replacement.id, revision: replacement.revision })
-
-  releaseSaved.forEach(resolve => resolve(saved))
-  await flushPromises()
-  expect(state.bom).toMatchObject({ id: saved.id, status: saved.status })
-  expect(state.selectedBom).toMatchObject({ id: replacement.id, revision: replacement.revision })
-  await state.save()
-  expect(save).toHaveBeenCalledWith('1', expect.objectContaining({ bomId: replacement.id, expectedBomRevision: replacement.revision }))
-})
-
-it('shows the saved BOM code, version, and disabled status as historical detail', async() => {
-  get.mockResolvedValue({ ...basis, bomId: '10' })
-  detail.mockResolvedValue({ id: '10', code: 'BOM-A', version: '2', productId: '8', status: 'DISABLED', revision: '3' })
+const draft = () => (wrapper.props() as { modelValue: MaterialDemandSave }).modelValue
+it('selects the published default and fills every direct component from the server quantity', async() => {
   await setup()
-  expect(wrapper.text()).toContain('BOM-A · 2 · 已停用')
-  expect(wrapper.text()).not.toContain('BOM版本名称读取失败')
+  expect(draft().bomId).toBe('10'); expect(draft().expectedBomRevision).toBe('3')
+  expect(draft().items.map(row => [row.materialId, row.totalRequiredQty, row.bomItemId])).toEqual([['2', '2', '101'], ['3', '3', '102']])
+  expect(calls.structure).not.toHaveBeenCalled(); expect(calls.save).not.toHaveBeenCalled()
 })
-
-it('re-resolves the current published version when reopening the editor', async() => {
-  const selected = { id: '10', code: 'BOM-A', version: '2', productId: '8', status: 'PUBLISHED', revision: '3' }
-  list.mockResolvedValue({ items: [selected], total: 1 })
-  detail.mockResolvedValue(selected)
-  save.mockResolvedValue({ ...basis })
-  const { state } = await setup(false)
-  state.edit(); await flushPromises()
-  expect(state.selectedBom).toMatchObject({ id: selected.id, revision: selected.revision })
-  await state.save()
-  state.edit(); await flushPromises()
-  expect(state.selectedBom).toMatchObject({ id: selected.id, revision: selected.revision })
-  await state.save()
-  expect(save).toHaveBeenCalledTimes(2)
+it('requires an explicit version when the product has no default', async() => {
+  calls.defaultBom.mockResolvedValue(null); await setup()
+  expect(draft().bomId).toBeNull(); expect(draft().items).toEqual([]); expect(calls.direct).not.toHaveBeenCalled()
+})
+it('recalculates untouched BOM rows and retains adjusted and added quantities', async() => {
+  const { state } = await setup()
+  state.updateRow(0, { totalRequiredQty: '17', manuallyAdjusted: true }); await flushPromises()
+  state.add(); await flushPromises(); state.updateRow(2, { materialId: '4', unitId: '1', totalRequiredQty: '9' }); await flushPromises()
+  await wrapper.setProps({ plannedQty: '2' }); await flushPromises()
+  expect(draft().items.map(row => row.totalRequiredQty)).toEqual(['17', '6', '9'])
+  expect(draft().items[0]?.standardRequiredQty).toBe('4')
+  expect(wrapper.text()).toContain('产量已变化')
+  vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+  expect(await state.validateAndConfirm()).toBe(true); expect(draft().adjustmentsConfirmed).toBe(true)
+})
+it('allows confirmation cancellation without silently resetting manual quantities', async() => {
+  const { state } = await setup(); state.updateRow(0, { totalRequiredQty: '17', manuallyAdjusted: true }); await flushPromises()
+  await wrapper.setProps({ plannedQty: '2' }); await flushPromises()
+  vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+  expect(await state.validateAndConfirm()).toBe(false); expect(draft().items[0]?.totalRequiredQty).toBe('17'); expect(draft().adjustmentsConfirmed).toBe(false)
+})
+it('does not replace an existing workorder version with the current default', async() => {
+  await setup({ ...emptyMaterialDemand(), bomId: '10', expectedBomRevision: '3' })
+  expect(calls.defaultBom).not.toHaveBeenCalled(); expect(draft().bomId).toBe('10')
+})
+it('rejects late component results and clears the old material document after switching factory', async() => {
+  let release!: (value: unknown) => void
+  calls.direct.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+  const { auth } = await setup(); auth.factoryId = 'B'; await flushPromises(); release(components('1')); await flushPromises()
+  expect(draft().items).toEqual([]); expect(draft().bomId).toBeNull()
+})
+it('keeps a user version selection when default lookup returns late', async() => {
+  let release!: (value: unknown) => void; calls.defaultBom.mockReturnValue(new Promise(resolve => { release = resolve }))
+  const { pinia } = authState()
+  wrapper = mount(BomSelect, { props: { modelValue: null, materialId: '8' }, global: { plugins: [pinia, ElementPlus], stubs }}); await flushPromises()
+  wrapper.findComponent({ name: 'BomVersionSelect' }).vm.$emit('update:modelValue', '11'); await flushPromises()
+  release(bom); await flushPromises(); expect(wrapper.emitted('update:modelValue')).toEqual([['11']])
+})
+it('shows default lookup failure separately from no default', async() => {
+  calls.defaultBom.mockRejectedValue(new Error('默认读取不可用')); await setup()
+  expect(wrapper.text()).toContain('默认读取不可用'); expect(draft().bomId).toBeNull(); expect(calls.direct).not.toHaveBeenCalled()
+})
+it('keeps saved material facts visible when the auxiliary recursive view fails', async() => {
+  calls.get.mockResolvedValue({ workorderId: '1', bomId: '10', revision: '2', frozenAt: null, items: [{ id: '9', materialId: '2', unitId: '1', totalRequiredQty: '250', standardRequiredQty: '200', manuallyAdjusted: true }] })
+  const { pinia } = authState(); wrapper = mount(Panel, { props: { workorderId: '1', productId: '8', plannedQty: '100' }, global: { plugins: [pinia, ElementPlus], stubs }}); await flushPromises()
+  expect(wrapper.text()).toContain('250'); expect(wrapper.text()).toContain('人工新增'); expect(wrapper.text()).toContain('分析读取失败')
+})
+it('prevents editing a basis frozen by formal input', async() => {
+  calls.get.mockResolvedValue({ workorderId: '1', bomId: null, revision: '2', frozenAt: '2026-10-30T10:00:00', items: [] })
+  const { pinia } = authState(); wrapper = mount(Panel, { props: { workorderId: '1', productId: '8' }, global: { plugins: [pinia, ElementPlus], stubs }}); await flushPromises()
+  expect(wrapper.findAll('button').find(button => button.text() === '维护工单用料')?.attributes('disabled')).toBeDefined()
 })

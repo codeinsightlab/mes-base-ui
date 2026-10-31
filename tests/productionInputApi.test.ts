@@ -1,23 +1,19 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-
 const request = vi.hoisted(() => vi.fn())
-vi.mock('../src/lib/request', () => ({ request }))
-
+vi.mock('../src/lib/request', () => ({ request, requestBlob: request }))
 import { productionInput } from '../src/api/production/productionInput'
-
+import { productionCombination } from '../src/api/production/productionCombination'
 beforeEach(() => request.mockReset())
-
-it('loads numbering rules by the explicit OUT direction in the current factory scope', async() => {
-  await productionInput.numberingRules()
-  expect(request).toHaveBeenCalledExactlyOnceWith('/api/wm/outbound-documents/numbering-rules', {
-    scope: 'factory'
-  })
+it('keeps a confirmed set quantity and UUID in the MES command', async() => {
+  const command = { requestId: 'r', code: 'COMB:A:1', outputQty: '50', routingId: '1', routingNodeIds: ['11'], calculationKey: 'key' }
+  await productionInput.submit(command)
+  expect(request).toHaveBeenCalledExactlyOnceWith('/api/production/input', { method: 'POST', body: command, scope: 'factory' })
 })
-
-it('keeps the selected rule code in a production input command request snapshot', async() => {
-  const command = { requestId: 'request-1', ruleCode: 'OUT_RULE' }
-  await productionInput.draft(command as never)
-  expect(request).toHaveBeenCalledExactlyOnceWith('/api/production/input/drafts', {
-    method: 'POST', body: command, scope: 'factory'
-  })
+it('omits an absent quantity so the server supplies the current maximum', async() => {
+  await productionCombination.calculate('COMB:A:1')
+  expect(request).toHaveBeenCalledExactlyOnceWith('/api/production/combinations/calculate', { query: { code: 'COMB:A:1' }, scope: 'factory' })
+})
+it('generates in the selected factory without an inventory reservation parameter', async() => {
+  await productionCombination.generate('1', '80')
+  expect(request).toHaveBeenCalledExactlyOnceWith('/api/production/combinations', { method: 'POST', body: { workorderId: '1', quantity: '80' }, scope: 'factory' })
 })
