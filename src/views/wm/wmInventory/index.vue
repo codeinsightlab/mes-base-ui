@@ -4,6 +4,8 @@ import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import CrudPage from '@/components/CrudPage.vue'
 import LocalStockPanel from '@/components/business/warehouse/LocalStockPanel.vue'
+import QuantityText from '@/components/business/production/QuantityText.vue'
+import DateText from '@/components/DateText.vue'
 import { useAuth } from '@/stores/auth'
 const stockPanel = ref<InstanceType<typeof LocalStockPanel> | null>(null)
 const auth = useAuth()
@@ -156,6 +158,10 @@ const fields: Field[] = [
       <WarehouseSelect source="LOCAL" :model-value="draft.warehouseId ? String(draft.warehouseId) : null" @update:model-value="draft.warehouseId = $event" />
     </template>
     <template #cell-warehouseSource="{row}">{{ row.warehouseSource==='LOCAL'?'本地':row.warehouseSource==='EXTERNAL'?'外部ERP（库存仅参考）':'历史待核实' }}</template>
+    <template #cell-quantity="{row}"><QuantityText :value="row.quantity" /></template>
+    <template #cell-availableQuantity="{row}"><QuantityText :value="row.availableQuantity" /></template>
+    <template #cell-createTime="{row}"><DateText :value="row.createTime" /></template>
+    <template #cell-updateTime="{row}"><DateText :value="row.updateTime" /></template>
     <template #toolbar>
       <span class="secondary">外部镜像仅供参考，不作为正式库存交易依据。</span>
       <SyncButton v-if="auth.runtimeMode==='ERP'" permission="business:wm:inventory:sync" scope="factory" :run="sync" @completed="page?.load()" />

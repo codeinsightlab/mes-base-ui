@@ -4,6 +4,7 @@ import { quantityInput } from './quantity'
 import { quantityRuleRevision } from './quantityRuleInvalidation'
 
 export interface QuantityRule {
+  unitId?: string
   unitName?: string
   mustBeWholeNumber: boolean
   quantityPrecision: number
@@ -34,7 +35,7 @@ export function loadQuantityRule(materialId: string, factoryId: string, revision
     if (!Number.isInteger(precision) || precision < 0 || precision > 6 || (whole !== 0 && whole !== 1)) {
       throw new Error('计量单位数量精度配置无效')
     }
-    return { mustBeWholeNumber: whole === 1, quantityPrecision: precision, unitName: unit.name }
+    return { unitId: material.unitId, mustBeWholeNumber: whole === 1, quantityPrecision: precision, unitName: unit.name }
   })()
   if (ruleCache.size >= 256) ruleCache.delete(ruleCache.keys().next().value!)
   const entry = { expiresAt: now + QUANTITY_RULE_TTL_MS, request }
