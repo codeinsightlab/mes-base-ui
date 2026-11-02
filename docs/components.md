@@ -39,7 +39,7 @@
 | --- | --- | --- | --- |
 | 扫码/人工输入 `CodeScanner` | [CodeScanner.vue](../src/components/scanner/CodeScanner.vue) | 统一输入和确认事件、输入方式及上下文失效。生产标识解析与定位使用正式productionScan接口，调用方不复制扫码规则。图片识别辅助位于同目录qrImage.ts | [现场报工](../src/views/production/productionReporting/index.vue)、[质量申报](../src/components/business/quality/DefectDeclarationPanel.vue) |
 | 数量展示 `QuantityText` | [QuantityText.vue](../src/components/business/production/QuantityText.vue) | 数量格式使用公共quantity规则；保留原值精度和待确认语义，不能由页面各写toFixed或将null当0 | [工单进度](../src/components/WorkOrderProgress.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
-| 日期展示 `DateText` | [DateText.vue](../src/components/DateText.vue) | 列表统一显示本地日期 `YYMMDD`；悬停 title 保留完整本地日期时间，不改写源值或接口格式 | [库存管理](../src/views/wm/wmInventory/index.vue)、[LOCAL库存流水](../src/components/business/warehouse/LocalStockPanel.vue) |
+| 日期时间展示 `DateTimeText` | [DateTimeText.vue](../src/components/DateTimeText.vue) | 列表统一显示 `YYYY-MM-DD HH:mm:ss` 本地时间；不改写源值或接口格式 | [库存管理](../src/views/wm/wmInventory/index.vue)、[LOCAL库存流水](../src/components/business/warehouse/LocalStockPanel.vue) |
 | 编码/ID展示 `CodeText` | [CodeText.vue](../src/components/CodeText.vue) | 保留原字符串、完整值title和统一等宽展示，不把大整数ID转Number | [工单](../src/views/production/workorder/index.vue)、[公共列表](../src/components/CrudPage.vue) |
 
 状态、范围、HTTP方法及指标的纯视觉展示沿用[设计规范的公共实现](UI_DESIGN_SYSTEM.md#页面结构与公共实现)，不在业务页面另建配色或状态语义。

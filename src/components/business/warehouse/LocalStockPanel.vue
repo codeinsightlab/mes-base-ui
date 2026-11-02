@@ -11,7 +11,7 @@ import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
-import DateText from '@/components/DateText.vue'
+import DateTimeText from '@/components/DateTimeText.vue'
 import { loadQuantityRule, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { api as unitMeasureApi } from '@/api/basic/unitMeasure'
 import { api, type WmInventoryVo } from '@/api/wm/wmInventory'
@@ -181,7 +181,7 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
         <el-table-column label="实存变化" min-width="180"><template #default="{row}"><QuantityText :value="row.quantityDelta" /> {{ actionUnitNames[row.unitId] || '单位待确认' }}<div class="secondary"><QuantityText :value="row.quantityBefore" /> → <QuantityText :value="row.quantityAfter" /></div></template></el-table-column>
         <el-table-column label="可用变化" min-width="180"><template #default="{row}"><QuantityText :value="row.availableDelta" /> {{ actionUnitNames[row.unitId] || '单位待确认' }}<div class="secondary"><QuantityText :value="row.availableBefore" /> → <QuantityText :value="row.availableAfter" /></div></template></el-table-column>
         <el-table-column show-overflow-tooltip prop="batchNo" label="批次" min-width="130" /><el-table-column show-overflow-tooltip prop="binCode" label="库位" min-width="100" />
-        <el-table-column show-overflow-tooltip prop="sourceId" label="来源单据" min-width="130" /><el-table-column label="业务时间" width="105"><template #default="{row}"><DateText :value="row.occurredAt" /></template></el-table-column>
+        <el-table-column show-overflow-tooltip prop="sourceId" label="来源单据" min-width="130" /><el-table-column label="业务时间" min-width="180"><template #default="{row}"><DateTimeText :value="row.occurredAt" /></template></el-table-column>
         <el-table-column type="expand" width="48"><template #default="{row}"><dl class="action-details"><dt>业务依据</dt><dd>{{ row.reason }}</dd><dt>操作者</dt><dd>{{ row.operatorUserId }}</dd><dt>请求 UUID</dt><dd><code>{{ row.id }}</code></dd><dt>原动作</dt><dd><code>{{ row.referenceActionId || '—' }}</code></dd></dl></template></el-table-column>
       </el-table>
       <div v-if="readable" class="table-toolbar"><el-button :disabled="offset === 0 || loading" @click="offset -= 20; load()">上一页</el-button><span>{{ offset + 1 }} / {{ total }}</span><el-button :disabled="offset + 20 >= total || loading" @click="offset += 20; load()">下一页</el-button></div>
