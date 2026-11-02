@@ -48,6 +48,7 @@
 
 | 通用内容 / 组件 | 权威源码 | 规则边界 / 使用位置 |
 | --- | --- | --- |
+| 表单必填与长度校验 | [formValidation.ts](../src/lib/formValidation.ts) | 用于表单字段的必填、最大长度及按顺序返回首个错误；输入组件自己的业务校验仍由对应组件负责 |
 | 字典选择 `DictSelect` | [DictSelect.vue](../src/components/DictSelect.vue) | 以字典code和值驱动，复用公共字典读取及错误状态；例如系统用户表单。不要用于替代有独立业务API的单位或物料选择 |
 | 字典值展示 `DictTag` | [DictTag/index.vue](../src/components/DictTag/index.vue) | 共享字典值/标签与状态展示；通过systemPlugin全局注册，不能因页面没有显式import判为未使用 |
 | 树选择 `Treeselect` | [Treeselect/index.vue](../src/components/Treeselect/index.vue) | 统一树控件适配；系统用户、菜单和部门页面提供各自真实树数据，控件不决定业务授权 |

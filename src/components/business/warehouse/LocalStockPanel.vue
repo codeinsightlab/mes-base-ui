@@ -12,6 +12,7 @@ import { ApiError } from '@/lib/request'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { formatQuantity } from '@/lib/quantity'
+import { firstValidationError, requiredFieldError, textLengthError } from '@/lib/formValidation'
 import DateTimeText from '@/components/DateTimeText.vue'
 import { loadQuantityRule, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { api as unitMeasureApi } from '@/api/basic/unitMeasure'
@@ -93,7 +94,15 @@ async function submit() {
     const quantity = normalizedQuantityInput(form.quantity)
     const nonzero = positiveQuantity(quantity.replace(/^-/, ''))
     const directionValid = selectedOperation === 'correction' ? nonzero : selectedOperation === 'opening' ? /^\d{1,14}(?:\.\d{1,6})?$/.test(quantity) : positiveQuantity(quantity)
-    if (!quantityValid.value || !directionValid || !form.reason.trim() || selectedOperation === 'return' && !form.documentId) { error.value = '请填写符合物料单位精度及操作方向的数量、业务原因及原领料出库单ID'; return }
+    const validationError = firstValidationError([
+      requiredFieldError(form.quantity, '数量'),
+      quantityValid.value ? null : '数量不符合当前物料单位精度规则',
+      directionValid ? null : '数量不符合当前操作方向',
+      requiredFieldError(form.reason, '业务原因'),
+      textLengthError(form.reason, '业务原因', { max: 500 }),
+      selectedOperation === 'return' ? requiredFieldError(form.documentId, '原领料出库单ID') : null
+    ])
+    if (validationError) { error.value = validationError; return }
     pending.value = { operation: selectedOperation, command: { requestId: crypto.randomUUID(), stockId: stockId.value, quantity, expectedQuantity: stock.value.quantity, expectedAvailable: stock.value.availableQuantity ?? stock.value.quantity, reason: form.reason, documentId: selectedOperation === 'return' ? form.documentId : null, documentLineId: selectedOperation === 'return' ? form.documentLineId || null : null }}
     sessionStorage.setItem(key(), JSON.stringify(pending.value))
   }
