@@ -382,7 +382,7 @@ defineExpose({ load })
         <template #default="{row}">
           <el-button v-if="!readonly && !managedEditing && (!editableRow || editableRow(row)) && (can('update') || editorAccess)" text type="primary" @click="open(row)">编辑</el-button>
           <el-button v-if="!readonly && (!editableRow || editableRow(row)) && can('delete')" text type="danger" @click="remove(row)">删除</el-button>
-          <slot name="actions" :row="row" />
+          <slot name="actions" :row="row" :refresh="load" />
         </template>
       </el-table-column>
     </el-table>

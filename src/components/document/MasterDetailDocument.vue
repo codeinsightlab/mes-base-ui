@@ -18,6 +18,7 @@ const props = withDefaults(defineProps<{
   title: string; headerApi: Omit<CrudApi,'create'|'update'> & { create(body:unknown):Promise<Row>; update(id:string,body:unknown):Promise<Row> }; itemApi: CrudApi;
   aggregateApi?: { detail(id:string):Promise<{header:Row;items:Row[]}>; create(body:unknown):Promise<{header:Row;items:Row[]}>; update(id:string,body:unknown):Promise<{header:Row;items:Row[]}> };
   headerFields: Field[]; itemFields: Field[];
+  headerActionColumnWidth?: number;
   headerPermission: string; itemPermission: string; parentKey: string;
   headerPermissionOverrides?: Record<string, string>;
   initialSearch?: Record<string, string>;
@@ -31,7 +32,7 @@ const props = withDefaults(defineProps<{
   itemsReadonlyWhenDirty?: boolean;
   itemVersionField?: string;
   itemBeforeCreate?: () => Promise<Row | null>;
-}>(), { creatable: true, deletable: true })
+}>(), { creatable: true, deletable: true, headerActionColumnWidth: 180 })
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
 const draft = reactive<Row>({})
@@ -196,11 +197,12 @@ onBeforeUnmount(clear)
     list-action="list"
     detail-action="query"
     managed-editing
+    :action-column-width="headerActionColumnWidth"
     :table-key="headerTableKey"
     :initial-search="initialSearch"
   >
     <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
-    <template #actions="{ row }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" /></template>
+    <template #actions="{ row, refresh }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" :refresh="refresh" /></template>
   </CrudPage>
   <section v-else class="app-container">
     <PageHeader :title="title" :description="id ? '单据编号 ' + id : '新增单据'">

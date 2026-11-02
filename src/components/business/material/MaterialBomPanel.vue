@@ -29,6 +29,9 @@ const headerApi:CrudApi = { ...bomApi,
   create: async body => { const row = await bomApi.create({ ...body as Row, productId: props.material.id, baseQty: bomRatio((body as Row).baseQty) });revision.value = String(row.revision);return row },
   update: async(id, body) => { const row = await bomApi.update(id, { ...body as Row, revision: revision.value, baseQty: bomRatio((body as Row).baseQty) });revision.value = String(row.revision);return row }
 }
+async function refreshBomAfterItemMutation() {
+  await document.value?.refresh()
+}
 const picker = ref<InstanceType<typeof MaterialPicker> | null>(null)
 const materialLabels = ref<Record<string, string>>({})
 async function chooseComponent() {
@@ -38,10 +41,10 @@ async function chooseComponent() {
   return { materialId: selected.id, specification: selected.specification, unitName: props.unitNames[String(selected.unitId)] ?? String(selected.unitId) }
 }
 const itemApi:CrudApi = { ...bomItemApi,
-  create: async body => { const result = await bomItemApi.create({ ...body as Row, quantity: bomRatio((body as Row).quantity) });clearGraph();return result },
-  update: async(id, body) => { const row = body as Row;const result = await bomItemApi.update(id, { materialId: row.materialId, quantity: bomRatio(row.quantity), childBomId: row.childBomId, sort: row.sort });clearGraph();return result },
-  remove: async id => { await bomItemApi.remove(id);clearGraph() },
-  delids: async ids => { await bomItemApi.delids!(ids);clearGraph() },
+  create: async body => { const result = await bomItemApi.create({ ...body as Row, quantity: bomRatio((body as Row).quantity) });await refreshBomAfterItemMutation();clearGraph();return result },
+  update: async(id, body) => { const row = body as Row;const result = await bomItemApi.update(id, { materialId: row.materialId, quantity: bomRatio(row.quantity), childBomId: row.childBomId, sort: row.sort });await refreshBomAfterItemMutation();clearGraph();return result },
+  remove: async id => { await bomItemApi.remove(id);await refreshBomAfterItemMutation();clearGraph() },
+  delids: async ids => { await bomItemApi.delids!(ids);await refreshBomAfterItemMutation();clearGraph() },
   list: async query => {
     const result = await bomItemApi.list(query)
     for (const row of result.items) if (row.materialCode && row.materialName) materialLabels.value[String(row.materialId)] = String(row.materialCode) + ' · ' + String(row.materialName)
@@ -49,12 +52,12 @@ const itemApi:CrudApi = { ...bomItemApi,
   } }
 
 const headerFields:Field[] = [
-  { key: 'code', label: 'BOM编码', kind: 'text', required: true, maxLength: 64, searchable: true },
-  { key: 'version', label: '版本', kind: 'text', required: true, maxLength: 32, searchable: true },
-  { key: 'defaultVersion', label: '产品默认版本', kind: 'text', readonly: true, format: value => value ? '默认' : '—' },
-  { key: 'baseQty', label: '基准产出数量（物料基本单位）', kind: 'decimal', required: true, format: v => formatQuantity(v as string) },
-  { key: 'status', label: '状态', kind: 'select', readonly: true, options: [{ value: 'DRAFT', label: '草稿' }, { value: 'PUBLISHED', label: '已发布' }, { value: 'DISABLED', label: '停用' }] },
-  { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 }
+  { key: 'code', label: 'BOM编码', kind: 'text', required: true, maxLength: 64, searchable: true, columnMinWidth: 145 },
+  { key: 'version', label: '版本', kind: 'text', required: true, maxLength: 32, searchable: true, columnMinWidth: 78 },
+  { key: 'defaultVersion', label: '默认版本', kind: 'text', readonly: true, format: value => value ? '默认' : '—', columnMinWidth: 90 },
+  { key: 'baseQty', label: '产出基准', kind: 'decimal', required: true, format: v => formatQuantity(v as string), columnMinWidth: 95 },
+  { key: 'status', label: '状态', kind: 'select', readonly: true, options: [{ value: 'DRAFT', label: '草稿' }, { value: 'PUBLISHED', label: '已发布' }, { value: 'DISABLED', label: '停用' }], columnMinWidth: 82 },
+  { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500, columnMinWidth: 110 }
 ]
 const itemFields:Field[] = [
   { key: 'bomId', label: '所属BOM', kind: 'text', required: true },
@@ -74,7 +77,10 @@ async function act(row:Row, action:'publish' | 'disable' | 'enable', refresh:() 
     acting.value = true
     await refresh()
     if (current !== generation) return
-    await transition(String(row.id), action, String(row.revision))
+    const latest = await bomApi.detail!(String(row.id))
+    if (action === 'publish' && latest.status !== 'DRAFT' || action === 'disable' && latest.status !== 'PUBLISHED' || action === 'enable' && latest.status !== 'DISABLED')
+      throw new Error('BOM状态已变化，请刷新列表后重试')
+    await transition(String(row.id), action, String(latest.revision))
     if (current === generation) { await refresh(); ElMessage.success(action === 'publish' ? 'BOM已发布' : action === 'enable' ? 'BOM已启用' : 'BOM已停用') }
   } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '操作失败') } finally { if (current === generation) acting.value = false }
 }
@@ -90,7 +96,8 @@ async function copyVersion(row:Row, refresh:() => Promise<void>) {
       confirmButtonText: '复制为草稿', cancelButtonText: '取消'
     })
     if (current !== generation || !canCopy.value) return
-    const copied = await copyBom(String(row.id), result.value.trim(), String(row.revision))
+    const latest = await bomApi.detail!(String(row.id))
+    const copied = await copyBom(String(row.id), result.value.trim(), String(latest.revision))
     if (current !== generation || !canCopy.value) return
     clearGraph()
     current = generation
@@ -108,7 +115,10 @@ async function makeDefault(row:Row, refresh:() => Promise<void>) {
     acting.value = true
     await refresh()
     if (current !== generation) return
-    await setDefaultBom(String(row.id), String(row.revision))
+    const latest = await bomApi.detail!(String(row.id))
+    if (latest.status !== 'PUBLISHED' || latest.defaultVersion === true)
+      throw new Error('BOM默认状态已变化，请刷新列表后重试')
+    await setDefaultBom(String(row.id), String(latest.revision))
     if (current === generation) { await refresh(); ElMessage.success('产品默认BOM版本已更新') }
   } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '设置默认版本失败') } finally { if (current === generation) acting.value = false }
 }
@@ -130,7 +140,7 @@ async function loadGraph(id = graphId.value) {
   try { const result = await structure(id, bomRatio(quantity.value));if (current === generation) graph.value = result } catch(e) { if (current === generation) error.value = e instanceof Error ? e.message : '组成计算失败' } finally { if (current === generation) graphLoading.value = false }
 }
 function clearGraph() { initialGraphPending = false;quantityValid.value = false;generation++;graphLoading.value = false;graph.value = null;graphId.value = '';error.value = '' }
-function clear() { initialGraphPending = false;quantityValid.value = false;picker.value?.cancel();materialLabels.value = {};generation++;graph.value = null;graphId.value = '';error.value = '';graphLoading.value = false;acting.value = false }
+function clear() { initialGraphPending = false;quantityValid.value = false;picker.value?.cancel();materialLabels.value = {};revision.value = '';generation++;graph.value = null;graphId.value = '';error.value = '';graphLoading.value = false;acting.value = false }
 watch(() => [auth.revision, auth.factoryId, auth.factorySwitching, auth.token, auth.userId, auth.factoryPermissions.join('|'), props.material.id], clear)
 defineExpose({ hasUnsavedChanges: () => document.value?.hasUnsavedChanges() ?? false })
 onBeforeUnmount(clear)
@@ -145,6 +155,7 @@ onBeforeUnmount(clear)
     :item-before-create="chooseComponent"
     :header-fields="headerFields"
     :item-fields="itemFields"
+    :header-action-column-width="340"
     header-permission="business:material"
     item-permission="business:material"
     :item-permission-overrides="{create:'business:material:update',update:'business:material:update',delete:'business:material:update'}"
@@ -153,14 +164,18 @@ onBeforeUnmount(clear)
     item-table-key="material:bom:components"
     hide-item-refresh
     :header-readonly="row=>row.status!=='DRAFT'"
+    items-readonly-when-dirty
     @back="clearGraph"
   >
-    <template #header-list-actions="{row}"><el-button v-if="canCopy" :disabled="acting" text type="primary" @click="copyVersion(row, async()=>{})">复制为草稿</el-button></template>
+    <template #header-list-actions="{row,refresh}">
+      <span class="bom-list-actions">
+        <el-button v-if="canCopy" :disabled="acting" text type="primary" @click="copyVersion(row,refresh)">复制为草稿</el-button>
+        <el-button v-if="row.status==='DRAFT' && canUpdate" :disabled="acting" text type="primary" @click="act(row,'publish',refresh)">发布</el-button>
+        <el-button v-if="row.status==='PUBLISHED' && row.defaultVersion!==true && canUpdate" :disabled="acting" text type="primary" @click="makeDefault(row,refresh)">设为默认</el-button>
+      </span>
+    </template>
     <template #header-actions="{row,refresh,dirty}">
-      <el-button v-if="row.id && canCopy" :disabled="dirty || acting" @click="copyVersion(row,refresh)">复制为草稿</el-button>
       <el-button v-if="row.id" :disabled="dirty" @click="openGraph(String(row.id))">多阶结构与需求</el-button>
-      <el-button v-if="row.id && row.status==='DRAFT' && canUpdate" :disabled="dirty || acting" type="primary" plain @click="act(row,'publish',refresh)">发布</el-button>
-      <el-button v-if="row.id && row.status==='PUBLISHED' && row.defaultVersion!==true && canUpdate" :disabled="dirty || acting" @click="makeDefault(row,refresh)">设为默认</el-button>
       <el-tag v-if="row.id && row.defaultVersion===true" type="success">产品默认版本</el-tag>
       <el-button v-if="row.id && row.status==='PUBLISHED' && canUpdate" :disabled="acting" @click="act(row,'disable',refresh)">停用</el-button>
       <el-button v-if="row.id && row.status==='DISABLED' && canUpdate" :disabled="dirty || acting" @click="act(row,'enable',refresh)">启用</el-button>
@@ -180,4 +195,4 @@ onBeforeUnmount(clear)
     </template>
   </section>
 </template>
-<style scoped>.graph-panel {margin:16px;padding:16px}.graph-panel .table-toolbar{gap:12px;flex-wrap:wrap}h3{font-size:14px;margin:18px 0 10px}</style>
+<style scoped>.bom-list-actions{display:inline-flex;align-items:center;gap:2px;white-space:nowrap}.graph-panel {margin:16px;padding:16px}.graph-panel .table-toolbar{gap:12px;flex-wrap:wrap}h3{font-size:14px;margin:18px 0 10px}</style>
