@@ -132,7 +132,7 @@ async function submit() {
         </template>
       </template>
       <el-result v-if="result" :icon="result.stockApplied ? 'success' : 'warning'" :title="result.stockApplied ? '领料成功' : '该笔领料已撤销'">
-        <template #sub-title>执行 {{ result.executionId }} · 累计正式投入 {{ result.confirmedInputQty }} · 出库单 {{ result.documentId }}</template>
+        <template #sub-title>执行 {{ result.executionId }} · 累计正式投入 <QuantityText :value="result.confirmedInputQty" /> · 出库单 {{ result.documentId }}</template>
         <template #extra><el-button @click="query()">读取下一次可领数量</el-button></template>
       </el-result>
     </template>

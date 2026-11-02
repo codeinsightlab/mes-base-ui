@@ -3,14 +3,13 @@ import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import { productionPlanApi } from '@/api/production/plan'
-import { displayQuantity } from '@/lib/production/quantity'
+import { formatQuantity } from '@/lib/quantity'
 import type { Field, Row } from '@/lib/crud'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 
 const statusOptions = [{ label: '草稿', value: 'DRAFT', tone: 'info' as const }]
 const statusLabel = (value: unknown) => statusOptions.find(option => option.value === value)?.label
   ?? (value == null || value === '' ? '状态待确认' : `未知状态（${String(value)}）`)
-const quantityLabel = (value: unknown) => displayQuantity(typeof value === 'string' || typeof value === 'number' ? value : null)
 
 const headerFields: Field[] = [
   { key: 'planNo', label: '计划编号', kind: 'text', readonly: true, columnMinWidth: 220 },
@@ -20,7 +19,7 @@ const headerFields: Field[] = [
 ]
 const itemFields: Field[] = [
   { key: 'materialId', label: '产品', kind: 'text', required: true },
-  { key: 'plannedQty', label: '计划数量', kind: 'decimal', format: quantityLabel, required: true },
+  { key: 'plannedQty', label: '计划数量', kind: 'decimal', format: value => formatQuantity(value), required: true },
   { key: 'plannedStartAt', label: '计划开始', kind: 'datetime' },
   { key: 'plannedEndAt', label: '计划完成', kind: 'datetime' },
   { key: 'priority', label: '优先级', kind: 'number' },

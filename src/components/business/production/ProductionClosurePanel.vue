@@ -5,6 +5,7 @@ import PageDrawer from '@/components/page/PageDrawer.vue'
 import { executionStatusLabel } from '@/lib/production/executionState'
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import { formatQuantity } from '@/lib/quantity'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { productionClosure as api, type ClosureSummary } from '@/api/production/productionClosure'
@@ -52,7 +53,7 @@ function close(done:() => void) { clear();done() }
       </el-descriptions>
       <el-alert v-if="data.orderBlockedReason" :title="'工单未完结：'+data.orderBlockedReason" type="warning" :closable="false" />
       <el-alert v-if="data.blockedReason" :title="data.blockedReason" type="warning" :closable="false" />
-      <el-alert v-if="data.completion" :title="'入库收尾记录：'+data.completion.id+'；完工时有效产出 '+data.completion.effectiveQty+'，完工时已入库 '+data.completion.inboundQty" type="success" :closable="false" />
+      <el-alert v-if="data.completion" :title="'入库收尾记录：'+data.completion.id+'；完工时有效产出 '+formatQuantity(data.completion.effectiveQty)+'，完工时已入库 '+formatQuantity(data.completion.inboundQty)" type="success" :closable="false" />
       <div class="table-toolbar"><el-button :disabled="rechecking||loading" @click="load">刷新入库数量</el-button><el-button v-if="canRecheck" :loading="rechecking" :disabled="loading" @click="recheck">{{ data.status==='FULLY_RECEIVED'?'复查工单收尾':'复查入库收尾' }}</el-button><router-link v-if="inboundPath&&data.status!=='FULLY_RECEIVED'" :to="{path:inboundPath,query:{executionId:id}}">办理入库单</router-link></div>
       <el-alert v-if="recheckMessage" :title="recheckMessage" type="info" :closable="false" />
     </section>

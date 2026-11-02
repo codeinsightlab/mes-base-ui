@@ -8,6 +8,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { api, type WmInventoryVo } from '@/api/wm/wmInventory'
 import { api as materials } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
+import { formatQuantity } from '@/lib/quantity'
 const ElMessageBox = usePageMessageBox()
 
 const props = defineProps<{ modelValue?: string | null;materialId?: string | null;warehouseId?: string | null;disabled?: boolean;receipt?: boolean }>()
@@ -44,7 +45,7 @@ onBeforeUnmount(clear)
 <template>
   <div><el-select :model-value="modelValue" :disabled="disabled||!allowed" :loading="loading" placeholder="选择确切库存来源" clearable @visible-change="(v:boolean)=>v&&load()" @update:model-value="selected">
          <el-option v-if="modelValue&&!rows.some(r=>r.id===modelValue)" :value="modelValue" :label="'库存 '+modelValue" />
-         <el-option v-for="r in rows" :key="r.id" :value="r.id" :label="`${r.id} · ${r.batchNo||'无批次'} / ${r.binCode||'无库位'} · 可用 ${r.availableQuantity??r.quantity}`" />
+         <el-option v-for="r in rows" :key="r.id" :value="r.id" :label="`${r.id} · ${r.batchNo||'无批次'} / ${r.binCode||'无库位'} · 可用 ${formatQuantity(r.availableQuantity??r.quantity)}`" />
        </el-select>
     <el-button v-if="rows.length<total" link :disabled="loading" @click="load(true)">加载更多</el-button>
     <el-button v-if="receipt&&allowed&&auth.hasPermission('business:wm:inventory:create','factory')" link :disabled="disabled" @click="creating=true">建立零余额来源</el-button>

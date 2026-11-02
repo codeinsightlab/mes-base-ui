@@ -4,7 +4,7 @@ import PageDrawer from '@/components/page/PageDrawer.vue'
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { warehouseAcceptance as api, type AcceptanceFact } from '@/api/wm/warehouseAcceptance'
-import { quantityColumn } from '@/lib/production/quantity'
+import { quantityColumn } from '@/lib/quantity'
 const props = defineProps<{ receiptId: string }>(), auth = useAuth(), visible = ref(false), rows = ref<AcceptanceFact[]>([]), total = ref(0), offset = ref(0), error = ref(''), loading = ref(false)
 let generation = 0
 function clear() { generation++;visible.value = false;rows.value = [];total.value = offset.value = 0;error.value = '';loading.value = false }

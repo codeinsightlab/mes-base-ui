@@ -5,6 +5,7 @@ import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import { formatQuantity } from '@/lib/quantity'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { stockDocuments, stockDocumentPermission as p, type ProductionBasis, type ProductionReceiptCommand } from '@/api/wm/stockDocuments'
 import type { WmInventoryVo } from '@/api/wm/wmInventory'
@@ -73,7 +74,7 @@ async function close(done?: () => void) {
         <el-form-item label="入库原因 / 实物依据"><el-input v-model="reason" type="textarea" maxlength="500" /></el-form-item>
       </el-form>
     </div>
-    <el-alert v-if="intent.pending.value" :title="'原请求 '+intent.pending.value.requestId+'，数量 '+intent.pending.value.quantity+'。结果待确认，只能使用原请求核对。'" type="warning" :closable="false" />
+    <el-alert v-if="intent.pending.value" :title="'原请求 '+intent.pending.value.requestId+'，数量 '+formatQuantity(intent.pending.value.quantity)+'。结果待确认，只能使用原请求核对。'" type="warning" :closable="false" />
     <template #footer><el-button @click="close()">关闭</el-button><el-button type="primary" :loading="intent.busy.value" :disabled="!intent.pending.value && (!basis?.canReceive || !stockId || loading)" @click="submit">{{ intent.pending.value ? '核对原入库请求' : '确认新增并审核' }}</el-button></template>
   </PageDialog>
 </template>

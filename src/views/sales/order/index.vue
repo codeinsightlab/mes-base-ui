@@ -4,7 +4,7 @@ import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import { salesOrderApi } from '@/api/sales/order'
-import { displayQuantity } from '@/lib/production/quantity'
+import { formatQuantity } from '@/lib/quantity'
 import type { Field, Row } from '@/lib/crud'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 
@@ -15,7 +15,6 @@ const sourceOptions = [
 ]
 const statusLabel = (value: unknown) => statusOptions.find(option => option.value === value)?.label
   ?? (value == null || value === '' ? '状态待确认' : `未知状态（${String(value)}）`)
-const quantityLabel = (value: unknown) => displayQuantity(typeof value === 'string' || typeof value === 'number' ? value : null)
 
 const headerFields: Field[] = [
   { key: 'orderNo', label: '订单编号', kind: 'text', readonly: true, searchable: true, columnMinWidth: 220 },
@@ -27,7 +26,7 @@ const headerFields: Field[] = [
 ]
 const itemFields: Field[] = [
   { key: 'materialId', label: '产品', kind: 'text', required: true },
-  { key: 'orderedQty', label: '订购数量', kind: 'decimal', format: quantityLabel, required: true },
+  { key: 'orderedQty', label: '订购数量', kind: 'decimal', format: value => formatQuantity(value), required: true },
   { key: 'requiredDate', label: '要求交期', kind: 'date' },
   { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 }
 ]

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import QueryForm from '@/components/QueryForm.vue'
 
-import { quantityColumn } from '@/lib/production/quantity'
+import { quantityColumn } from '@/lib/quantity'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'

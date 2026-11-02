@@ -6,6 +6,7 @@ import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import QuantityText from '@/components/business/production/QuantityText.vue'
 import { ApiError } from '@/lib/request'
 import { stockTransfers, transferView, transferCommand, type TransferCommand } from '@/api/wm/stockTransfers'
 import { stockDocumentPermission as p, type ApprovalIntent } from '@/api/wm/stockDocuments'
@@ -160,7 +161,7 @@ onBeforeUnmount(clear)
           <el-table-column label="源批次 / 基本单位" min-width="150"><template #default="{row}">{{ row.sourceStockId ? row.batchNo ?? '无批次' : '未选来源' }} / {{ row.unitId ?? '未选来源' }}</template></el-table-column>
           <el-table-column label="目标仓库 / 库位" min-width="240"><template #default="{row}"><template v-if="writable"><WarehouseSelect v-model="row.targetWarehouseId" source="LOCAL" @update:model-value="targetWarehouseChanged(row)" /><el-input v-model="row.targetBinCode" :disabled="!!row.targetStockId" maxlength="64" placeholder="目标库位（可选）" /></template><span v-else>{{ row.targetWarehouseId }} / {{ row.targetBinCode || '无库位' }}</span></template></el-table-column>
           <el-table-column label="已有目标库存（可选）" min-width="240"><template #default="{row}"><template v-if="writable"><StockSourceSelect v-model="row.targetStockId" :material-id="row.materialId" :warehouse-id="row.targetWarehouseId" :disabled="!row.sourceStockId" @selected="stock=>targetSelected(row,stock)" /><span class="secondary">留空时保存自动解析目标身份；无需手工预建零库存。</span></template><span v-else>{{ row.targetStockId }}</span></template></el-table-column>
-          <el-table-column label="数量（基本单位）" min-width="160"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" :material-id="row.materialId" required positive @validity="validities.set(row,$event)" /><span v-else>{{ row.quantity }}</span></template></el-table-column>
+          <el-table-column label="数量（基本单位）" min-width="160"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" :material-id="row.materialId" required positive @validity="validities.set(row,$event)" /><QuantityText v-else :value="row.quantity" /></template></el-table-column>
           <el-table-column label="备注" min-width="160"><template #default="{row}"><el-input v-if="writable" v-model="row.remark" maxlength="500" /><span v-else>{{ row.remark }}</span></template></el-table-column>
           <el-table-column v-if="writable" label="操作" width="80"><template #default="{$index}"><el-button link type="danger" :disabled="saving" @click="remove($index)">移除</el-button></template></el-table-column>
         </el-table>

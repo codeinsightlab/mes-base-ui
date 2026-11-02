@@ -4,7 +4,7 @@ import QueryForm from '@/components/QueryForm.vue'
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
-import { quantityColumn } from '@/lib/production/quantity'
+import { formatQuantity, quantityColumn } from '@/lib/quantity'
 import { executionStatusLabel } from '@/lib/production/executionState'
 import DefectDeclarationPanel from '@/components/business/quality/DefectDeclarationPanel.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -112,12 +112,12 @@ async function submit(recover = false) {
       </QueryForm>
       <p id="reporting-scan-help" class="secondary">使用已完成首次 MES 领料的组合二维码定位生产执行。</p>
       <el-alert v-if="error" :title="error" type="error" :closable="false" role="alert" />
-      <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${result.quantityDelta}，时间 ${result.reportTime}`" type="success" :closable="false" />
+      <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${formatQuantity(result.quantityDelta)}，时间 ${result.reportTime}`" type="success" :closable="false" />
       <el-alert v-if="recoveryError" :title="recoveryError" type="error" :closable="false" role="alert" />
       <el-button v-if="recoveryError" :disabled="busy" @click="restore">重新读取原报工请求</el-button>
       <section v-if="pending" class="panel" aria-label="待确认报工请求">
         <strong>{{ result ? '报工已成功，恢复记录待清理' : '报工结果待确认' }}</strong>
-        <p>执行 {{ pending.executionId }} · 工序 {{ pending.routingNodeId }} · 数量 {{ pending.reportQty }}</p>
+        <p>执行 {{ pending.executionId }} · 工序 {{ pending.routingNodeId }} · 数量 {{ formatQuantity(pending.reportQty) }}</p>
         <p>原请求 {{ pending.requestId }}</p>
         <p class="secondary">请核对原请求后人工重试；同一工厂待确认请求解决前不能新增报工。重新定位和离页会保留原请求，本标签页关闭后不保证恢复。</p>
         <el-button type="primary" :loading="busy" :disabled="!!recoveryError" @click="retryPending">{{ result ? '按原请求核对／清理记录' : '按原请求确认／重试报工' }}</el-button>

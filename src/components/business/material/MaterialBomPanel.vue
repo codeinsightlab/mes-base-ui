@@ -10,7 +10,7 @@ import MaterialPicker from './MaterialPicker.vue'
 import BomVersionSelect from './BomVersionSelect.vue'
 import { bomApi, bomItemApi, copyBom, setDefaultBom, structure, transition, type BomGraph } from '@/api/basic/materialBom'
 import type { CrudApi, Field, Row } from '@/lib/crud'
-import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
+import { formatQuantity, quantityColumn } from '@/lib/quantity'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
 
@@ -52,7 +52,7 @@ const headerFields:Field[] = [
   { key: 'code', label: 'BOM编码', kind: 'text', required: true, maxLength: 64, searchable: true },
   { key: 'version', label: '版本', kind: 'text', required: true, maxLength: 32, searchable: true },
   { key: 'defaultVersion', label: '产品默认版本', kind: 'text', readonly: true, format: value => value ? '默认' : '—' },
-  { key: 'baseQty', label: '基准产出数量（物料基本单位）', kind: 'decimal', required: true, format: v => displayQuantity(v as string) },
+  { key: 'baseQty', label: '基准产出数量（物料基本单位）', kind: 'decimal', required: true, format: v => formatQuantity(v as string) },
   { key: 'status', label: '状态', kind: 'select', readonly: true, options: [{ value: 'DRAFT', label: '草稿' }, { value: 'PUBLISHED', label: '已发布' }, { value: 'DISABLED', label: '停用' }] },
   { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 }
 ]
@@ -61,7 +61,7 @@ const itemFields:Field[] = [
   { key: 'materialId', label: '组件物料', kind: 'text', required: true, columnMinWidth: 220, format: value => materialLabels.value[String(value)] ?? String(value) },
   { key: 'specification', label: '规格型号', kind: 'text', readonly: true, columnMinWidth: 150 },
   { key: 'unitName', label: '基本单位', kind: 'text', readonly: true, columnMinWidth: 110 },
-  { key: 'quantity', label: '标准用量（组件基本单位）', kind: 'decimal', required: true, format: v => displayQuantity(v as string) },
+  { key: 'quantity', label: '标准用量（组件基本单位）', kind: 'decimal', required: true, format: v => formatQuantity(v as string) },
   { key: 'childBomId', label: '子BOM版本', kind: 'text' },
   { key: 'sort', label: '显示顺序', kind: 'number', required: true, defaultValue: 0 }
 ]

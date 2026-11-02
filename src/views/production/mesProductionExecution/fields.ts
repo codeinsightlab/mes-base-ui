@@ -1,5 +1,5 @@
 import { executionStatusOptions } from '@/lib/production/executionState'
-import { displayQuantity } from '@/lib/production/quantity'
+import { formatQuantity } from '@/lib/quantity'
 import type { Field } from '@/lib/crud'
 
 export const fields: Field[] = [
@@ -47,7 +47,7 @@ export const fields: Field[] = [
     label: '计划执行数量',
     kind: 'decimal',
     fractionDigits: 2,
-    format: value => displayQuantity(typeof value === 'string' || typeof value === 'number' ? value : null),
+    format: value => formatQuantity(typeof value === 'string' || typeof value === 'number' ? value : null),
     readonly: false,
     required: true,
     searchable: false,

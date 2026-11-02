@@ -18,7 +18,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import type { StatusTone } from '@/lib/status'
 import CodeText from '@/components/CodeText.vue'
 import Pagination from '@/components/Pagination/index.vue'
-import { displayQuantity } from './quantity'
+import { formatQuantity } from '@/lib/quantity'
 import WorkorderCombinationPrint from '@/components/business/production/WorkorderCombinationPrint.vue'
 import WorkOrderCancellation from '@/components/business/production/WorkOrderCancellation.vue'
 import WorkorderMaterialPanel from '@/components/business/production/WorkorderMaterialPanel.vue'
@@ -197,10 +197,10 @@ onMounted(load)
       <el-table-column label="工单号" width="160"><template #default="{row}"><CodeText :value="row.workorder.code" /><el-tag v-if="row.erpExtraMissing" type="warning" size="small" title="该工单扩展记录缺失，详情和修改仍需通过完整性校验">扩展记录缺失</el-tag></template></el-table-column>
       <el-table-column label="产出物料" min-width="280"><template #default="{row}">{{ row.productCode }} · {{ row.productName }}</template></el-table-column>
       <el-table-column label="来源" width="90"><template #default="{row}">{{ row.workorder.source==='LOCAL'?'本地':row.workorder.source==='EXTERNAL'?'外部ERP':'历史待核实' }}</template></el-table-column>
-      <el-table-column label="计划数量" width="105" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.workorder.plannedQty)">{{ displayQuantity(row.workorder.plannedQty) }}</span></template></el-table-column>
+      <el-table-column label="计划数量" width="105" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.workorder.plannedQty)">{{ formatQuantity(row.workorder.plannedQty) }}</span></template></el-table-column>
       <el-table-column label="默认工艺" min-width="320"><template #default="{row}">{{ row.workorder.routingId ? row.routingCode + ' / V' + row.routingVersion : '无工艺，直接入库' }}</template></el-table-column>
-      <el-table-column label="执行目标合计" width="120" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.allocatedTargetQty)">{{ displayQuantity(row.allocation.allocatedTargetQty) }}</span></template></el-table-column>
-      <el-table-column label="未分配执行数量" width="135" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.remainingTargetQty)">{{ displayQuantity(row.allocation.remainingTargetQty) }}</span></template></el-table-column>
+      <el-table-column label="执行目标合计" width="120" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.allocatedTargetQty)">{{ formatQuantity(row.allocation.allocatedTargetQty) }}</span></template></el-table-column>
+      <el-table-column label="未分配执行数量" width="135" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.remainingTargetQty)">{{ formatQuantity(row.allocation.remainingTargetQty) }}</span></template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="{row}"><StatusTag v-bind="orderState(row.workorder.status)" /></template></el-table-column>
       <el-table-column label="创建时间" width="190" show-overflow-tooltip><template #default="{row}">{{ row.workorder.createTime || '—' }}</template></el-table-column>
       <el-table-column label="操作" fixed="right" width="280"><template #default="{row}">

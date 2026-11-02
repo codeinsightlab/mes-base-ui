@@ -1,6 +1,6 @@
 import { api as materialApi } from '@/api/basic/material'
 import { api as unitMeasureApi } from '@/api/basic/unitMeasure'
-import { quantityInput } from './quantity'
+import { normalizeQuantity } from '@/lib/quantity'
 import { quantityRuleRevision } from './quantityRuleInvalidation'
 
 export interface QuantityRule {
@@ -47,7 +47,7 @@ export function loadQuantityRule(materialId: string, factoryId: string, revision
 export function quantityInputError(value: string, rule: QuantityRule | null): string | null {
   if (!rule) return '正在读取物料单位规则，请稍候'
   if (!/^-?\d{1,14}(?:\.\d*)?$/.test(value)) return '请输入有效的十进制数量'
-  const fraction = quantityInput(value).split('.')[1] ?? ''
+  const fraction = normalizeQuantity(value).split('.')[1] ?? ''
   if (fraction.length > 6) return '数量最多支持六位小数'
   if (rule.mustBeWholeNumber && /[1-9]/.test(fraction)) return '该计量单位只允许整数数量'
   if (fraction.length > rule.quantityPrecision && /[1-9]/.test(fraction.slice(rule.quantityPrecision))) {
@@ -56,7 +56,7 @@ export function quantityInputError(value: string, rule: QuantityRule | null): st
   return null
 }
 
-export { quantityInput as normalizedQuantityInput } from './quantity'
+export { normalizeQuantity as normalizedQuantityInput } from '@/lib/quantity'
 
 export function positiveQuantity(value: string): boolean {
   if (!/^\d{1,14}(?:\.\d+)?$/.test(value)) return false

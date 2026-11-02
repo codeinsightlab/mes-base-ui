@@ -12,6 +12,7 @@ const auth = useAuth()
 const rule = ref<QuantityRule | null>(null)
 const loading = ref(false)
 const error = ref('')
+const touched = ref(false)
 const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching
   && auth.hasPermission('business:material:query', 'factory')
   && auth.hasPermission('business:unit:measure:query', 'factory'))
@@ -33,6 +34,7 @@ const unitError = computed(() => props.showUnit && rule.value && !rule.value.uni
 const inputDisabled = computed(() => props.disabled || !props.materialId || !allowed.value || loading.value || !rule.value || !!unitError.value)
 let generation = 0
 let expiry: ReturnType<typeof setTimeout> | undefined
+let lastUserValue: string | undefined
 
 async function refreshRule() {
   const ticket = ++generation
@@ -60,11 +62,21 @@ async function refreshRule() {
   }
 }
 function update(value: string) {
+  lastUserValue = value
   emit('update:modelValue', value)
+  touched.value = true
 }
 function normalize() {
+  touched.value = true
   if (props.modelValue != null) emit('update:modelValue', normalizedQuantityInput(String(props.modelValue)))
 }
+watch(() => props.modelValue, (value, previous) => {
+  if ((value == null || value === '') && previous != null && previous !== '') {
+    if (lastUserValue !== '') touched.value = false
+    lastUserValue = undefined
+  }
+}, { flush: 'sync' })
+watch(() => props.materialId, () => { touched.value = false }, { flush: 'sync' })
 watch(() => [props.materialId, auth.factoryId, auth.revision, allowed.value, quantityRuleRevision.value], () => {
   void refreshRule()
 }, { immediate: true, flush: 'sync' })
@@ -89,7 +101,7 @@ onBeforeUnmount(() => { generation++; clearTimeout(expiry); rule.value = null })
       {{ error }} <button type="button" @click="refreshRule">重试</button>
     </span>
     <span v-else-if="unitError" class="quantity-input-error" role="alert">{{ unitError }}</span>
-    <span v-else-if="inputError" class="quantity-input-error" role="alert">{{ inputError }}</span>
+    <span v-else-if="inputError && touched" class="quantity-input-error" role="alert">{{ inputError }}</span>
   </div>
 </template>
 

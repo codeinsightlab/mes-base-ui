@@ -8,7 +8,7 @@ import { computed, reactive, ref, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { productionReceipt as api, receiptPermissions, type Receipt } from '@/api/production/productionReceipt'
 import QuantityText from '@/components/business/production/QuantityText.vue'
-import { quantityColumn } from '@/lib/production/quantity'
+import { quantityColumn } from '@/lib/quantity'
 import WarehouseAcceptancePanel from '@/components/business/warehouse/WarehouseAcceptancePanel.vue'
 const auth = useAuth(), rows = ref<Receipt[]>([]), total = ref(0), offset = ref(0), error = ref(''), loading = ref(false)
 const filters = reactive({ workorderId: '', executionId: '', productLotCode: '' }), requestId = ref(''), detail = ref<Awaited<ReturnType<typeof api.detail>> | null>(null), detailOpen = ref(false)

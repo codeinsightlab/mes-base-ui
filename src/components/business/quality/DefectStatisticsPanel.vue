@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import QueryForm from '@/components/QueryForm.vue'
 
-import { quantityColumn } from '@/lib/production/quantity'
+import { quantityColumn } from '@/lib/quantity'
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { qualityV2 as api, wasteLabels, type Statistics } from '@/api/quality/qualityV2'
 import { useAuth } from '@/stores/auth'

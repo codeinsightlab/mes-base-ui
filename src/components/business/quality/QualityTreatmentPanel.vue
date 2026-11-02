@@ -11,7 +11,7 @@ import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
-import { quantityInput } from '@/lib/production/quantity'
+import { normalizeQuantity } from '@/lib/quantity'
 import { positiveQuantity, exceedsQuantity, qualityStateLabel, qualityStateTone, qualityReceiptLabel } from '@/lib/quality/presentation'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
@@ -95,7 +95,7 @@ onBeforeUnmount(() => { clear();emit('dirty', false);emit('pending', false) })
 function openAction(kind:'assess' | 'dispose') {
   if (recoveryBlocked.value || pending.value || (kind === 'assess' ? !canAssess.value : !canTreat.value)) return
   resetForm();actionKind.value = kind;actionOpen.value = true
-  if (kind === 'dispose' && view.value?.pendingDispositionQty != null)form.quantity = quantityInput(view.value.pendingDispositionQty)
+  if (kind === 'dispose' && view.value?.pendingDispositionQty != null)form.quantity = normalizeQuantity(view.value.pendingDispositionQty)
   originalForm.value = snapshot()
 }
 async function closeAction(done?:() => void) {

@@ -4,7 +4,7 @@ import PageDialog from '@/components/page/PageDialog.vue'
 
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
-import { displayQuantity } from '@/lib/production/quantity'
+import { formatQuantity } from '@/lib/quantity'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
@@ -193,7 +193,7 @@ const itemFields:Field[] = [
   { key: 'stockId', label: '确切库存来源', kind: 'text', required: true },
   { key: 'batchNo', label: '批次', kind: 'text' }, { key: 'binCode', label: '库位', kind: 'text' },
   { key: 'unitId', label: '基本单位ID', kind: 'text', required: true },
-  { key: 'quantity', label: '本次收发数量', kind: 'decimal', required: true, format: value => displayQuantity(value as string) },
+  { key: 'quantity', label: '本次收发数量', kind: 'decimal', required: true, format: value => formatQuantity(value as string) },
   { key: 'remark', label: '明细 / 实物清点依据', kind: 'textarea', maxLength: 500 },
   { key: 'stockActionId', label: '库存动作', kind: 'text', readonly: true, columnMinWidth: 260 }
 ]
@@ -211,9 +211,9 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
       <el-button v-if="canIssueLines" :loading="lineLoading" @click="readDirectLines">读取明细列表</el-button>
       <template v-if="canIssueLine"><el-input v-model="lineId" aria-label="独立领料明细 ID" placeholder="明细 ID" /><el-button :loading="lineLoading" @click="readIssueLine(directDocumentId)">读取指定明细</el-button></template>
       <el-alert v-if="lineError" :title="lineError" type="error" :closable="false" />
-      <el-table v-if="directLines.length" :data="directLines"><el-table-column prop="id" label="明细 ID" /><el-table-column prop="materialId" label="物料" /><el-table-column prop="warehouseId" label="仓库" /><el-table-column prop="quantity" label="数量" /></el-table>
-      <p v-if="selectedLine">明细 {{ selectedLine.id }}：物料 {{ selectedLine.materialId }}，数量 {{ selectedLine.quantity }}</p>
-      <p v-if="directBasis">工单 {{ directBasis.workorderCode }}，投入 {{ directBasis.outputQty }}，领料 {{ directBasis.issueQty }}</p>
+      <el-table v-if="directLines.length" :data="directLines"><el-table-column prop="id" label="明细 ID" /><el-table-column prop="materialId" label="物料" /><el-table-column prop="warehouseId" label="仓库" /><el-table-column label="数量"><template #default="{row}">{{ formatQuantity(row.quantity) }}</template></el-table-column></el-table>
+      <p v-if="selectedLine">明细 {{ selectedLine.id }}：物料 {{ selectedLine.materialId }}，数量 {{ formatQuantity(selectedLine.quantity) }}</p>
+      <p v-if="directBasis">工单 {{ directBasis.workorderCode }}，投入 {{ formatQuantity(directBasis.outputQty) }}，领料 {{ formatQuantity(directBasis.issueQty) }}</p>
     </section>
     <MasterDetailDocument
       ref="document"
@@ -250,7 +250,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
             <el-table-column label="库存来源" min-width="200"><template #default="{row}"><StockSourceSelect v-if="writable" v-model="row.stockId" :material-id="(row.materialId as string | null)" :warehouse-id="(row.warehouseId as string | null)" :receipt="header.direction==='IN'" @selected="(s,unit)=>{row.materialId=s.materialId;row.warehouseId=s.warehouseId;row.batchNo=s.batchNo;row.binCode=s.binCode;row.unitId=unit}" /><span v-else>{{ row.stockId || '待确认' }}</span></template></el-table-column>
             <el-table-column label="批次 / 库位" min-width="180"><template #default="{row}">{{ row.batchNo || '—' }} / {{ row.binCode || '—' }}</template></el-table-column>
             <el-table-column label="基本单位" width="120"><template #default="{row}">{{ row.unitId || '待确认' }}</template></el-table-column>
-            <el-table-column label="数量" min-width="160"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" :material-id="(row.materialId as string | null)" required positive :unchanged-value="originalLines.get(String(row.id))?.materialId===row.materialId && originalLines.get(String(row.id))?.stockId===row.stockId && originalLines.get(String(row.id))?.unitId===row.unitId ? originalLines.get(String(row.id))?.quantity as string : null" @validity="setQuantityValidity(row,$event)" /><span v-else>{{ displayQuantity(row.quantity as string) }}</span></template></el-table-column>
+            <el-table-column label="数量" min-width="160"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" :material-id="(row.materialId as string | null)" required positive :unchanged-value="originalLines.get(String(row.id))?.materialId===row.materialId && originalLines.get(String(row.id))?.stockId===row.stockId && originalLines.get(String(row.id))?.unitId===row.unitId ? originalLines.get(String(row.id))?.quantity as string : null" @validity="setQuantityValidity(row,$event)" /><span v-else>{{ formatQuantity(row.quantity as string) }}</span></template></el-table-column>
             <el-table-column label="备注" min-width="180"><template #default="{row}"><el-input v-if="writable" v-model="row.remark" maxlength="500" /><span v-else>{{ row.remark || '—' }}</span></template></el-table-column>
             <el-table-column label="库存动作" min-width="220"><template #default="{row}"><el-button v-if="row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="showAction(row.stockActionId)">{{ row.stockActionId }}</el-button><span v-else>{{ row.stockActionId || '—' }}</span></template></el-table-column>
             <el-table-column v-if="writable || header.documentType === 'MATERIAL_ISSUE' && canIssueLine" label="操作" width="100" fixed="right"><template #default="{row,$index}"><el-button v-if="writable" link type="danger" :disabled="saving" @click="remove($index)">移除</el-button><el-button v-else-if="row.id" link type="primary" @click="lineId=String(row.id);readIssueLine(header.id)">查看明细</el-button></template></el-table-column>
@@ -266,7 +266,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
           <el-descriptions-item label="物料">{{ selectedLine.materialId }}</el-descriptions-item>
           <el-descriptions-item label="仓库">{{ selectedLine.warehouseId || '待确认' }}</el-descriptions-item>
           <el-descriptions-item label="批次">{{ selectedLine.batchNo || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="数量">{{ displayQuantity(selectedLine.quantity as string) }}</el-descriptions-item>
+          <el-descriptions-item label="数量">{{ formatQuantity(selectedLine.quantity as string) }}</el-descriptions-item>
           <el-descriptions-item label="单位">{{ selectedLine.unitId || '待确认' }}</el-descriptions-item>
         </el-descriptions>
       </template>
@@ -274,7 +274,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
 
     <PageDialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
       <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" />
-      <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{ action.id }}</el-descriptions-item><el-descriptions-item label="审核UUID">{{ action.operationId||'—' }}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{ action.documentLineId||'—' }}</el-descriptions-item><el-descriptions-item label="业务来源">{{ action.sourceType }} / {{ action.sourceId }}</el-descriptions-item><el-descriptions-item label="库存来源">{{ action.stockId }}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{ action.batchNo }} / {{ action.binCode }}</el-descriptions-item><el-descriptions-item label="变动量">{{ displayQuantity(action.quantityDelta) }}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{ displayQuantity(action.quantityBefore) }} / {{ displayQuantity(action.quantityAfter) }}</el-descriptions-item><el-descriptions-item label="操作人">{{ action.operatorUserId }}</el-descriptions-item><el-descriptions-item label="原因">{{ action.reason }}</el-descriptions-item></el-descriptions>
+      <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{ action.id }}</el-descriptions-item><el-descriptions-item label="审核UUID">{{ action.operationId||'—' }}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{ action.documentLineId||'—' }}</el-descriptions-item><el-descriptions-item label="业务来源">{{ action.sourceType }} / {{ action.sourceId }}</el-descriptions-item><el-descriptions-item label="库存来源">{{ action.stockId }}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{ action.batchNo }} / {{ action.binCode }}</el-descriptions-item><el-descriptions-item label="变动量">{{ formatQuantity(action.quantityDelta) }}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{ formatQuantity(action.quantityBefore) }} / {{ formatQuantity(action.quantityAfter) }}</el-descriptions-item><el-descriptions-item label="操作人">{{ action.operatorUserId }}</el-descriptions-item><el-descriptions-item label="原因">{{ action.reason }}</el-descriptions-item></el-descriptions>
     </PageDialog>
   </div>
 </template>

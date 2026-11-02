@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { displayQuantity } from '../src/views/production/workorder/quantity'
+import { formatQuantity } from '../src/lib/quantity'
 
 it.each([
   ['8340.000000', '8340'], ['0.000000', '0'], ['12.100000', '12.1'],
@@ -9,5 +9,5 @@ it.each([
   ['0.000001', '0.000001'], ['-0.000001', '-0.000001'],
   ['-12.345000', '-12.345'], [null, '—'], ['', '—']
 ] as const)('displays %s as %s without converting decimals to floating point', (input, expected) => {
-  expect(displayQuantity(input)).toBe(expected)
+  expect(formatQuantity(input)).toBe(expected)
 })

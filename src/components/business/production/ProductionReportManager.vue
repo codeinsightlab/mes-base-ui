@@ -6,7 +6,7 @@ import PageDialog from '@/components/page/PageDialog.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
-import { displayQuantity, quantityColumn } from '@/lib/production/quantity'
+import { formatQuantity, quantityColumn } from '@/lib/quantity'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ApiError } from '@/lib/request'
@@ -174,7 +174,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
       <el-table-column label="工序" min-width="190"><template #default="{row}"><el-button text type="primary" @click.stop="chooseNode(row)">{{ row.name || '工序名称未记录' }}</el-button><span class="secondary">{{ row.code }}</span></template></el-table-column>
       <el-table-column :formatter="quantityColumn" prop="inputQty" label="有效输入" min-width="130" />
       <el-table-column :formatter="quantityColumn" prop="reportedQty" label="累计报工" min-width="130" />
-      <el-table-column label="有效不良" min-width="110"><template #default="{row}">{{ row.qualityIntegrated ? displayQuantity(row.netDefectQty) : '未接入' }}</template></el-table-column>
+      <el-table-column label="有效不良" min-width="110"><template #default="{row}">{{ row.qualityIntegrated ? formatQuantity(row.netDefectQty) : '未接入' }}</template></el-table-column>
       <el-table-column :formatter="quantityColumn" prop="availableQty" label="剩余可报" min-width="130" />
       <el-table-column label="净产出" min-width="150"><template #default="{row}"><QuantityText :value="row.effectiveOutputQty" /><span v-if="row.positiveReportBlockReason"> · 待核实</span></template></el-table-column>
     </el-table>

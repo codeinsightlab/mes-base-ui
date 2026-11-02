@@ -11,6 +11,7 @@ import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import { formatQuantity } from '@/lib/quantity'
 import DateTimeText from '@/components/DateTimeText.vue'
 import { loadQuantityRule, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { api as unitMeasureApi } from '@/api/basic/unitMeasure'
@@ -160,7 +161,7 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
         <el-form-item label="数量增减量"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" show-unit required :disabled="busy || !!pending" placeholder="盘亏填写正数；业务纠错使用有符号增减量" @validity="quantityValid = $event" /></el-form-item>
         <el-form-item v-if="operation === 'return'" label="原领料单" class="form-span"><el-input v-model="form.documentId" placeholder="统一出库单 ID" /><el-button v-if="canReadIssueLines" :loading="issueLinesLoading" @click="readIssueLines">读取原领料明细</el-button></el-form-item>
         <el-form-item v-if="operation === 'return'" label="原领料明细" class="form-span">
-          <el-select v-if="issueLines.length" v-model="form.documentLineId" placeholder="选择当前库存对应的原明细"><el-option v-for="line in issueLines" :key="line.id" :value="line.id" :label="`第 ${line.lineNo} 行 · 批次 ${line.batchNo ?? '未分批'} · 原领用 ${line.quantity}`" /></el-select>
+          <el-select v-if="issueLines.length" v-model="form.documentLineId" placeholder="选择当前库存对应的原明细"><el-option v-for="line in issueLines" :key="line.id" :value="line.id" :label="`第 ${line.lineNo} 行 · 批次 ${line.batchNo ?? '未分批'} · 原领用 ${formatQuantity(line.quantity)}`" /></el-select>
           <el-input v-else v-model="form.documentLineId" placeholder="多行单据需填写明细 ID；单行单据可留空" />
           <el-alert v-if="issueLineError" :title="issueLineError" type="error" :closable="false" />
         </el-form-item>
