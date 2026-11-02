@@ -13,6 +13,7 @@ import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { formatQuantity } from '@/lib/quantity'
 import { firstValidationError, requiredFieldError, textLengthError } from '@/lib/formValidation'
+import { logPendingRequest } from '@/lib/requestDiagnostics'
 import DateTimeText from '@/components/DateTimeText.vue'
 import { loadQuantityRule, normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { api as unitMeasureApi } from '@/api/basic/unitMeasure'
@@ -83,7 +84,7 @@ async function load() {
 function open(id: string) {
   clear(); stockId.value = id; visible.value = true
   const saved = sessionStorage.getItem(key())
-  if (saved) { try { pending.value = JSON.parse(saved); uncertain = true; operation.value = pending.value!.operation } catch { error.value = '原请求无法读取，请核实库存流水后处理'; return } }
+  if (saved) { try { pending.value = JSON.parse(saved); uncertain = true; operation.value = pending.value!.operation;logPendingRequest('local-stock', pending.value!.command.requestId) } catch { error.value = '原请求无法读取，请核实库存流水后处理'; return } }
   void load()
 }
 defineExpose({ open })
@@ -114,7 +115,7 @@ async function submit() {
   } catch(e) {
     if (scope !== generation) return
     error.value = e instanceof Error ? e.message : '结果未知，请使用原请求重查'
-    if (!uncertain && e instanceof ApiError && e.status >= 400 && e.status < 500) { sessionStorage.removeItem(storageKey); pending.value = null } else uncertain = true
+    if (!uncertain && e instanceof ApiError && e.status >= 400 && e.status < 500) { sessionStorage.removeItem(storageKey); pending.value = null } else { uncertain = true;logPendingRequest('local-stock', pending.value?.command.requestId) }
   } finally { if (scope === generation) busy.value = false }
 }
 async function readIssueLines() {
@@ -164,7 +165,6 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
       </section>
       <el-alert v-if="unitError" :title="unitError" type="warning" :closable="false" />
       <el-alert title="数量使用物料基本单位。业务入库统一使用入库单。退料仅支持未开工且无报工、质量和库存收发事实的原领料；退料不改变产品投产额度。整单撤销请到原领料单核实。" type="info" :closable="false" />
-      <el-alert v-if="pending" :title="'原请求已冻结：' + pending.command.requestId + '，请使用原请求核实结果'" type="warning" :closable="false" />
       <el-form v-if="options.length" class="stock-action-form" label-position="top" :disabled="busy || !!pending">
         <el-form-item label="业务动作"><el-select v-model="operation" placeholder="请选择库存动作"><el-option v-for="o in options" :key="o.value" :value="o.value" :disabled="o.value === 'opening' && openingUnavailable" :label="o.value === 'opening' && openingUnavailable ? o.label + '（已有余额或流水）' : o.label" /></el-select></el-form-item>
         <el-form-item label="数量增减量"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" show-unit required :disabled="busy || !!pending" placeholder="盘亏填写正数；业务纠错使用有符号增减量" @validity="quantityValid = $event" /></el-form-item>
@@ -177,7 +177,7 @@ const label = (value: string) => ({ OPENING: '期初建账', RECEIPT: '历史原
         <el-form-item label="依据 / 凭据" class="form-span"><el-input v-model="form.reason" type="textarea" maxlength="500" placeholder="期初依据、外部凭据或调整原因" /></el-form-item>
       </el-form>
       <div class="stock-panel-actions">
-        <el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading || !operation && !pending" @click="submit">{{ pending ? '核实原请求' : '确认库存动作' }}</el-button>
+        <el-button v-if="options.length" type="primary" :loading="busy" :disabled="!stock || loading || !operation && !pending" @click="submit">{{ pending ? '核实上次操作结果' : '确认库存动作' }}</el-button>
         <div class="stock-panel-navigation">
           <el-button :disabled="busy" @click="load">刷新余额与流水</el-button>
           <el-button v-if="inboundPath" :disabled="busy" @click="openInbound">办理入库单</el-button>

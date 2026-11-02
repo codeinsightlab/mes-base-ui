@@ -13,6 +13,7 @@ import { stockDocumentPermission as p, type ApprovalIntent } from '@/api/wm/stoc
 import { useAuth } from '@/stores/auth'
 import { useClosureCommand } from '@/composables/useClosureCommand'
 import { usePageMessageBox } from '@/lib/pageMessageBox'
+import { logPendingRequest } from '@/lib/requestDiagnostics'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import type { WmInventoryVo } from '@/api/wm/wmInventory'
 import type { CrudApi, Field, Row } from '@/lib/crud'
@@ -42,6 +43,7 @@ async function create(raw: unknown) {
     return transferView(result)
   } catch(e) {
     if (!saved && e instanceof ApiError && e.status >= 400 && e.status < 500 && g === generation) { sessionStorage.removeItem(key); pendingCreate.value = null }
+    else logPendingRequest('stock-transfer-create', body.requestId)
     throw e
   }
 }
@@ -95,7 +97,7 @@ async function act(row: Row, refresh: () => Promise<void>, dirty: boolean, cance
 }
 function restoreCreate() {
   const saved = sessionStorage.getItem(`stock-transfer-create:${auth.username}:${auth.factoryId}`)
-  try { pendingCreate.value = saved ? JSON.parse(saved) as TransferCommand : null } catch { error.value = '原创建请求无法读取，请联系管理员核实，勿另建调拨' }
+  try { pendingCreate.value = saved ? JSON.parse(saved) as TransferCommand : null;if (pendingCreate.value) logPendingRequest('stock-transfer-create', pendingCreate.value.requestId) } catch { error.value = '原创建请求无法读取，请联系管理员核实，勿另建调拨' }
 }
 async function recoverCreate() {
   if (!pendingCreate.value || busy.value || readonly.value || !auth.hasPermission(p + ':create', 'factory')) return
@@ -126,8 +128,7 @@ onBeforeUnmount(clear)
   <div>
     <el-alert title="本厂LOCAL库存同步调拨：保持物料、基本单位、批次；选择源库存、目标仓库及可选库位；目标物料、基本单位、批次继承源库存。保存自动解析目标身份或建立零余额身份及双边草稿，审核原子记账。" type="info" :closable="false" />
     <el-alert v-if="error || intent.error.value" :title="error || intent.error.value" type="error" :closable="false" />
-    <el-alert v-if="pendingCreate" :title="'待核实的原创建UUID：'+pendingCreate.requestId" type="warning" :closable="false" />
-    <el-button v-if="pendingCreate" :loading="busy" @click="recoverCreate">核实原调拨创建请求</el-button>
+    <el-button v-if="pendingCreate" :loading="busy" @click="recoverCreate">核实上次调拨创建结果</el-button>
     <MasterDetailDocument
       ref="document"
       :creatable="!pendingCreate"
@@ -149,9 +150,8 @@ onBeforeUnmount(clear)
       <template #header-actions="{row, refresh, dirty}">
         <span v-if="row.targetDocumentId">关联入库单 {{ row.targetDocumentNo }}（{{ row.targetDocumentId }}）</span>
         <el-button v-if="row.id" :disabled="busy" @click="refresh">刷新双边单据</el-button>
-        <el-button v-if="row.status==='DRAFT' && auth.hasPermission(p+':post','factory')" type="primary" :loading="busy" :disabled="dirty || readonly" @click="act(row,refresh,dirty)">{{ intent.pending.value ? '核实原审核请求' : '审核调拨' }}</el-button>
+        <el-button v-if="row.status==='DRAFT' && auth.hasPermission(p+':post','factory')" type="primary" :loading="busy" :disabled="dirty || readonly" @click="act(row,refresh,dirty)">{{ intent.pending.value ? '核实上次审核结果' : '审核调拨' }}</el-button>
         <el-button v-if="row.status==='DRAFT' && auth.hasPermission(p+':cancel','factory')" type="danger" plain :disabled="busy || dirty || readonly || !!intent.pending.value" @click="act(row,refresh,dirty,true)">作废草稿</el-button>
-        <el-alert v-if="intent.pending.value" :title="'原审核UUID：'+intent.pending.value.requestId+'；结果未知时仅核实原请求。'" type="warning" :closable="false" />
       </template>
       <template #items="{items,writable,add,remove,saving}">
         <el-button :disabled="!writable" @click="add({materialId:null,sourceWarehouseId:null,targetWarehouseId:null,sourceStockId:null,targetStockId:null,targetBinCode:null,quantity:'',remark:''})">添加调拨明细</el-button>
