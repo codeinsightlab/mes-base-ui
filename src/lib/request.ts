@@ -59,33 +59,16 @@ async function send<T>(path: string, options: RequestOptions, consume: (response
       assertCurrent(snapshot)
       if (response.status === 401 && !options.public) unauthenticated()
       if (response.status === 422 && error.errorCode === 'FACTORY_SELECTION_REQUIRED' && !options.public) factorySelectionRequired()
-      const businessMessages: Record<string, string> = {
-        PRODUCTION_COMBINATION_CLOSED: '该组合的执行已结束，不能再次领料',
-        PRODUCTION_COMBINATION_BUDGET: '需求或库存规模超过本次组合计算范围，请缩小范围后重试',
-        PRODUCTION_COMBINATION_STOCK_CHANGED: '库存已变化，请重新读取当前可领数量后确认',
-        STOCK_DOCUMENT_SOURCE_PENDING: '来源业务尚未接通或关联依据不完整，禁止审核',
-        QUALITY_DATA_INVALID: '当前记录暂不能处理，请先核对处置记录',
-        WORKORDER_INVALID: '工单、批次数量、工艺引用或完整路径不符合规则',
-        BATCH_ROUTE_FROZEN: '路径已锁定、正在出库或待核实，禁止更改',
-        STOCK_KEY_DUPLICATE: '当前工厂已有相同仓库编码或物料仓库库存记录',
-        STOCK_REFERENCE_INVALID: '物料和仓库必须存在且属于当前工厂',
-        WAREHOUSE_REFERENCED: '仓库已被库存引用，不能删除',
-        MATERIAL_INVENTORY_REFERENCED: '物料已被库存引用，不能删除',
-        SYNC_QUERY_NOT_IMPLEMENTED: '暂未接入外部同步查询接口',
-        SYNC_RUNNING: '同步正在进行，请稍后重试',
-        SYNC_EXECUTION_LOST: '同步执行权已失效，请重新发起',
-        ROUTING_FROZEN: '已发布路线内容已冻结，请创建新版本',
-        ROUTING_REVISION_CONFLICT: '记录已被修改，请刷新后重试',
-        ROUTING_REFERENCE_INVALID: '请选择当前工厂启用的物料产品和工序',
-        ROUTING_GRAPH_INVALID: '路线拓扑无效，请检查节点、连接、环路及孤立节点',
-        ROUTING_PUBLISH_INCOMPLETE: '发布前请至少关联一个物料产品和一个工序步骤',
-        OPERATION_REFERENCED: '工序已被工艺路线引用，不能删除',
-        MATERIAL_ROUTING_REFERENCED: '物料产品已被工艺路线引用，不能删除',
-        ERP_OPERATION_NOT_CONFIGURED: '暂未配置工序 ERP 同步数据来源',
-        ERP_ROUTING_NOT_CONFIGURED: '暂未配置工艺路线 ERP 同步数据来源'
+      const messages: Record<number, string> = {
+        400: '请求参数无效，请检查必填项、格式及取值范围',
+        401: '登录状态无效或已过期，请重新登录',
+        403: '当前账号没有执行此操作的权限',
+        404: '未找到请求的数据，请确认记录是否存在或已被删除',
+        409: '数据已变化或与当前状态冲突，请刷新后重新确认',
+        422: '请求内容不符合当前业务条件，请检查输入或数据状态'
       }
-      const messages: Record<number, string> = { 400: '输入不符合要求，请检查字段', 401: '登录已失效，请重新登录', 403: '当前范围没有此操作权限', 404: '资源不存在或不在当前范围', 409: '数据冲突，请刷新后重试', 422: '当前操作不可执行' }
-      throw new ApiError(error.errorCode ?? 'HTTP_ERROR', businessMessages[error.errorCode ?? ''] ?? (error.errorCode === 'FACTORY_SELECTION_REQUIRED' ? '当前工厂不可用，请重新选择工厂' : error.errorCode === 'SESSION_REVOCATION_PENDING' ? '账号变更已保存，会话撤销正在重试；请勿重复提交' : error.errorCode === 'ERP_SYNC_NOT_CONFIGURED' ? '暂未配置 ERP 同步数据来源' : (error.errorCode === 'BUSINESS_REJECTED' || error.errorCode === 'PRODUCTION_CLOSURE_BLOCKED' || error.errorCode === 'REPORT_QUANTITY_CONFLICT' || error.errorCode === 'QUALITY_ATTRIBUTION_REQUIRED') ? error.message : undefined) ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status, error.maximumQty)
+      const serverMessage = typeof error.message === 'string' && error.message.trim() ? error.message.trim() : undefined
+      throw new ApiError(error.errorCode ?? 'HTTP_ERROR', serverMessage ?? messages[response.status] ?? '服务暂时不可用，请稍后重试', error.requestId ?? response.headers.get('X-Request-Id') ?? '', response.status, error.maximumQty)
     }
     const result = await consume(response, read)
     assertCurrent(snapshot)
