@@ -1,7 +1,7 @@
 import { request } from '@/lib/request'
 
 export interface ProductionIdentity {
-  executionId: string;
+  executionCode: string;
   qrCode: string | null;
   workorderId: string;
   workorderCode: string;
@@ -16,5 +16,5 @@ export interface ProductionIdentity {
   targetQty: string;
 }
 
-export const readProductionIdentity = (executionId: string) =>
-  request<ProductionIdentity>('/api/production/identity/' + encodeURIComponent(executionId), { scope: 'factory' })
+export const readProductionIdentity = (executionCode: string) =>
+  request<ProductionIdentity>('/api/production/identity/' + encodeURIComponent(executionCode), { scope: 'factory' })

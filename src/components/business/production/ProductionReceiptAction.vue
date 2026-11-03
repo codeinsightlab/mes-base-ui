@@ -11,26 +11,26 @@ import type { WmInventoryVo } from '@/api/wm/wmInventory'
 import { useAuth } from '@/stores/auth'
 import { useClosureCommand } from '@/composables/useClosureCommand'
 import { usePageMessageBox } from '@/lib/pageMessageBox'
-const props = defineProps<{ executionId: string; batchNo?: string | null }>()
+const props = defineProps<{ executionCode: string; batchNo?: string | null }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), messageBox = usePageMessageBox()
 const allowed = computed(() => auth.runtimeMode === 'LOCAL' && auth.hasPermission(p + ':create', 'factory') && auth.hasPermission(p + ':post', 'factory'))
 const visible = ref(false), basis = ref<ProductionBasis | null>(null), loading = ref(false), error = ref('')
 const warehouseId = ref<string | null>(null), stockId = ref<string | null>(null), stock = ref<WmInventoryVo | null>(null)
 const unitId = ref(''), quantity = ref(''), quantityValid = ref(false), reason = ref('')
-const intent = useClosureCommand<ProductionReceiptCommand>(() => `production-receipt:${auth.username}:${auth.factoryId}:${props.executionId}`)
+const intent = useClosureCommand<ProductionReceiptCommand>(() => `production-receipt:${auth.username}:${auth.factoryId}:${props.executionCode}`)
 let generation = 0
 function clear() {
   generation++; visible.value = false; basis.value = null; loading.value = false; error.value = ''
   warehouseId.value = null; stockId.value = null; stock.value = null; unitId.value = ''; quantity.value = ''; quantityValid.value = false; reason.value = ''; intent.clear()
 }
-watch(() => [props.executionId, auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), auth.runtimeMode], clear, { flush: 'sync' })
+watch(() => [props.executionCode, auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), auth.runtimeMode], clear, { flush: 'sync' })
 watch(warehouseId, () => { stockId.value = null; stock.value = null; unitId.value = '' }, { flush: 'sync' })
 onBeforeUnmount(clear)
 async function load() {
   if (!allowed.value) return
   const g = ++generation; loading.value = true; error.value = ''
-  try { const data = await stockDocuments.productionBasis(props.executionId); if (g === generation) basis.value = data } catch(e) { if (g === generation) error.value = e instanceof Error ? e.message : '入库依据读取失败' } finally { if (g === generation) loading.value = false }
+  try { const data = await stockDocuments.productionBasis(props.executionCode); if (g === generation) basis.value = data } catch(e) { if (g === generation) error.value = e instanceof Error ? e.message : '入库依据读取失败' } finally { if (g === generation) loading.value = false }
 }
 function open() { if (!allowed.value) return; clear(); intent.restore(); visible.value = true; void load() }
 function selectStock(value: WmInventoryVo, unit: string) { stock.value = value; unitId.value = unit }
@@ -41,7 +41,7 @@ async function submit() {
   }
   const g = generation
   await intent.run(() => ({ requestId: crypto.randomUUID(), stockId: stockId.value!, quantity: normalizedQuantityInput(quantity.value), reason: reason.value }),
-    command => stockDocuments.receiveProduction(props.executionId, command), async() => {
+    command => stockDocuments.receiveProduction(props.executionCode, command), async() => {
       if (g !== generation) return
       quantity.value = ''; reason.value = ''; await load(); if (g + 1 === generation) emit('changed')
     })
@@ -63,7 +63,7 @@ async function close(done?: () => void) {
     <el-button :loading="loading" :disabled="intent.busy.value" @click="load">刷新入库依据</el-button>
     <div v-if="basis">
       <p v-if="batchNo">本次执行产出批次：{{ batchNo }}</p>
-      <p>执行 {{ executionId }} · {{ basis.reportingRequired ? '有效产出' : '正式领料确认量' }} <QuantityText :value="basis.effective" /> · 已入库 <QuantityText :value="basis.received" /> · 可入库 <QuantityText :value="basis.remaining" /></p>
+      <p>执行 {{ executionCode }} · {{ basis.reportingRequired ? '有效产出' : '正式领料确认量' }} <QuantityText :value="basis.effective" /> · 已入库 <QuantityText :value="basis.received" /> · 可入库 <QuantityText :value="basis.remaining" /></p>
       <el-alert v-if="basis.blockedReason" :title="basis.blockedReason" type="warning" :closable="false" />
       <el-form label-position="top" :disabled="intent.busy.value || !!intent.pending.value">
         <el-form-item label="LOCAL入库仓库"><WarehouseSelect v-model="warehouseId" source="LOCAL" /></el-form-item>

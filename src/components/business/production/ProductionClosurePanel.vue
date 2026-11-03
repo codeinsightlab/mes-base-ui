@@ -42,10 +42,10 @@ function close(done:() => void) { clear();done() }
   <PageDrawer v-model="visible" title="生产数量与入库收尾" size="min(1160px,96vw)" append-to-body destroy-on-close :before-close="close">
     <el-alert v-if="loadError" :title="loadError" type="error" :closable="false" />
     <div v-if="!data" v-loading="loading"><el-button v-if="loadError" @click="load">重试读取</el-button></div>
-    <ProductionReceiptAction :execution-id="id" :batch-no="batchNo" @changed="load(); emit('changed')" />
+    <ProductionReceiptAction :execution-code="id" :batch-no="batchNo" @changed="load(); emit('changed')" />
     <section v-if="data" v-loading="loading">
       <el-alert :title="reportingRequired ? '报工只登记生产事实。正常品及不良品入库审核后，系统分别核对执行与工单收尾条件；一张单据审核成功不代表整张工单已完结。' : '此执行无工艺，无需工序报工。按MES已确认投入办理成品入库，全部投入入库后再核对执行及工单收尾。'" type="info" :closable="false" />
-      <h3>{{ data.executionId }} · {{ executionStatusLabel(data.status) }} · {{ receiptLabel }}</h3>
+      <h3>{{ data.executionCode }} · {{ executionStatusLabel(data.status) }} · {{ receiptLabel }}</h3>
       <el-descriptions :column="3" border>
         <el-descriptions-item v-if="batchNo" label="执行产出批次">{{ batchNo }}</el-descriptions-item>
         <el-descriptions-item label="计划目标"><QuantityText :value="data.targetQty" /></el-descriptions-item><el-descriptions-item :label="reportingRequired ? '末道有效净产出 G' : '已审核成品产出'"><QuantityText :value="data.effective" /></el-descriptions-item>
@@ -54,7 +54,7 @@ function close(done:() => void) { clear();done() }
       <el-alert v-if="data.orderBlockedReason" :title="'工单未完结：'+data.orderBlockedReason" type="warning" :closable="false" />
       <el-alert v-if="data.blockedReason" :title="data.blockedReason" type="warning" :closable="false" />
       <el-alert v-if="data.completion" :title="'入库收尾记录：'+data.completion.id+'；完工时有效产出 '+formatQuantity(data.completion.effectiveQty)+'，完工时已入库 '+formatQuantity(data.completion.inboundQty)" type="success" :closable="false" />
-      <div class="table-toolbar"><el-button :disabled="rechecking||loading" @click="load">刷新入库数量</el-button><el-button v-if="canRecheck" :loading="rechecking" :disabled="loading" @click="recheck">{{ data.status==='FULLY_RECEIVED'?'复查工单收尾':'复查入库收尾' }}</el-button><router-link v-if="inboundPath&&data.status!=='FULLY_RECEIVED'" :to="{path:inboundPath,query:{executionId:id}}">办理入库单</router-link></div>
+      <div class="table-toolbar"><el-button :disabled="rechecking||loading" @click="load">刷新入库数量</el-button><el-button v-if="canRecheck" :loading="rechecking" :disabled="loading" @click="recheck">{{ data.status==='FULLY_RECEIVED'?'复查工单收尾':'复查入库收尾' }}</el-button><router-link v-if="inboundPath&&data.status!=='FULLY_RECEIVED'" :to="{path:inboundPath,query:{executionCode:id}}">办理入库单</router-link></div>
       <el-alert v-if="recheckMessage" :title="recheckMessage" type="info" :closable="false" />
     </section>
   </PageDrawer>

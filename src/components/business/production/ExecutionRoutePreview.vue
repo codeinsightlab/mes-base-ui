@@ -6,12 +6,12 @@ import { useAuth } from '@/stores/auth'
 import { executionActions, type PathView } from '@/api/production/executionActions'
 import type { RoutingEdge, RoutingNode } from '@/api/production/routing'
 import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
-const props = defineProps<{ executionId: string }>()
+const props = defineProps<{ executionCode: string }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref(''), view = ref<PathView | null>(null)
 const allowed = computed(() => auth.hasPermission('business:mes:production:execution:query', 'factory'))
 let sequence = 0
 function clear() { sequence++; visible.value = false; loading.value = false; view.value = null; error.value = '' }
-watch(() => [props.executionId, auth.factoryId, auth.revision, allowed.value], clear, { flush: 'sync' })
+watch(() => [props.executionCode, auth.factoryId, auth.revision, allowed.value], clear, { flush: 'sync' })
 onBeforeUnmount(clear)
 const selected = computed(() => view.value?.pathStatus === 'UNSELECTED' ? [] : view.value?.selectedNodeIds ?? [])
 const nodes = computed<RoutingNode[]>(() => view.value?.nodes.map((n, index) => ({ id: n.id, nodeCode: n.nodeCode, operationId: n.operationId, operationCode: n.operationCode, operationName: n.operationName, displayOrder: index, isKey: n.required, description: null })) ?? [])
@@ -23,10 +23,10 @@ async function open() {
   if (!allowed.value) return
   clear(); visible.value = true; loading.value = true; const ticket = sequence
   try {
-    const data = await executionActions.path(props.executionId)
+    const data = await executionActions.path(props.executionCode)
     if (ticket !== sequence) return
     const ids = new Set(data.nodes.map(n => n.id))
-    if (data.executionId !== props.executionId || (data.routingId !== null && !data.routingVersion) || (data.routingId === null && (data.nodes.length > 0 || data.selectedNodeIds.length > 0)) || data.nodes.some(n => !n.operationId) || data.edges.some(e => !ids.has(e.fromNodeId) || !ids.has(e.toNodeId)) || data.selectedNodeIds.some(id => !ids.has(id))) throw new Error('执行路径与工艺版本数据不完整，请刷新后重试')
+    if (data.executionCode !== props.executionCode || (data.routingId !== null && !data.routingVersion) || (data.routingId === null && (data.nodes.length > 0 || data.selectedNodeIds.length > 0)) || data.nodes.some(n => !n.operationId) || data.edges.some(e => !ids.has(e.fromNodeId) || !ids.has(e.toNodeId)) || data.selectedNodeIds.some(id => !ids.has(id))) throw new Error('执行路径与工艺版本数据不完整，请刷新后重试')
     view.value = data
   } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '执行路线读取失败' } finally { if (ticket === sequence) loading.value = false }
 }
@@ -37,7 +37,7 @@ async function open() {
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-alert v-if="view && !view.routingId" title="此执行无工艺，无需工序报工。" type="info" :closable="false" />
     <section v-if="view?.routingId" v-loading="loading">
-      <p><strong>{{ view.executionId }}</strong> · {{ view.routingCode }} / V{{ view.routingVersion }} · 工艺版本 ID：{{ view.routingId }}</p>
+      <p><strong>{{ view.executionCode }}</strong> · {{ view.routingCode }} / V{{ view.routingVersion }} · 工艺版本 ID：{{ view.routingId }}</p>
       <el-alert v-if="view.pathStatus === 'UNSELECTED'" title="尚未选择实际执行路径；下图仅为该执行版本的完整工艺定义。" type="info" :closable="false" />
       <p v-else>{{ view.pathStatus === 'LOCKED' ? '已锁定的实际执行路径' : '已选择，尚未锁定的执行路径' }}；突出节点及连接表示当前已选路径。</p>
       <RoutingGraphPreview :nodes="nodes" :edges="edges" :selected-node-ids="selected" />

@@ -1,8 +1,8 @@
 import { request } from '@/lib/request'
 import type { CrudApi, Row } from '@/lib/crud'
 export interface Bom extends Row { id: string; code: string; version: string; productId: string; baseQty: string; unitId: string; status: string; revision: string; defaultVersion: boolean; remark: string | null }
-export interface BomNode { path: string; materialId: string; code: string; name: string; quantity: string; unitName: string; childBomId: string | null; children: BomNode[] }
-export interface BomGraph { bomId: string; outputQty: string; items: BomNode[]; totals: Omit<BomNode, 'children' | 'path' | 'childBomId'>[] }
+export interface BomNode { path: string; materialId: string; code: string; name: string; quantity: string; unitName: string; childBomId: string | null; childBomCode?: string | null; childBomVersion?: string | null; children: BomNode[] }
+export interface BomGraph { bomId: string; outputQty: string; items: BomNode[]; totals: Omit<BomNode, 'children' | 'path' | 'childBomId' | 'childBomCode' | 'childBomVersion'>[] }
 function crud(path:string):CrudApi {
   const remove = (ids:string[]) => request<void>(path, { method: 'DELETE', body: ids, scope: 'factory' })
   return {

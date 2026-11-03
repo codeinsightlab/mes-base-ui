@@ -20,19 +20,19 @@ watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), a
 watch(visible, value => { if (!value) { sequence++;clearImage();detail.value = null;busy.value = false } })
 onBeforeUnmount(reset)
 function open() { reset();quantity.value = props.order.plannedQty;visible.value = true }
-async function image(ticket: number, id: string) {
+async function image(ticket: number, code: string) {
   qrError.value = '';clearImage()
-  try { const blob = await api.qr(id);if (ticket === sequence) qrUrl.value = URL.createObjectURL(blob) } catch(e) { if (ticket === sequence) qrError.value = e instanceof Error ? e.message : '二维码图像读取失败' }
+  try { const blob = await api.qr(code);if (ticket === sequence) qrUrl.value = URL.createObjectURL(blob) } catch(e) { if (ticket === sequence) qrError.value = e instanceof Error ? e.message : '二维码图像读取失败' }
 }
 async function generate() {
   if (!allowed.value || auth.runtimeMode !== 'LOCAL' || !valid.value || busy.value) return
   const ticket = ++sequence;busy.value = true;error.value = '';detail.value = null;clearImage()
-  try { const data = await api.generate(props.order.id, normalizedQuantityInput(quantity.value));if (ticket !== sequence) return;detail.value = data.combination;suggested.value = data.suggestedQty;await image(ticket, data.combination.id) } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '组合生成失败' } finally { if (ticket === sequence) busy.value = false }
+  try { const data = await api.generate(props.order.id, normalizedQuantityInput(quantity.value));if (ticket !== sequence) return;detail.value = data.combination;suggested.value = data.suggestedQty;await image(ticket, data.combination.code) } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '组合生成失败' } finally { if (ticket === sequence) busy.value = false }
 }
 async function read() {
   if (!allowed.value || busy.value) return
   const ticket = ++sequence;busy.value = true;error.value = '';detail.value = null;suggested.value = '';clearImage()
-  try { const data = await api.resolve(lookup.value);if (ticket !== sequence) return;if (data.workorderId !== props.order.id) throw new Error('该组合不属于当前工单');detail.value = data;await image(ticket, data.id) } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '组合读取失败' } finally { if (ticket === sequence) busy.value = false }
+  try { const data = await api.resolve(lookup.value);if (ticket !== sequence) return;if (data.workorderId !== props.order.id) throw new Error('该组合不属于当前工单');detail.value = data;await image(ticket, data.code) } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '组合读取失败' } finally { if (ticket === sequence) busy.value = false }
 }
 function print() {
   if (!label.value || !qrUrl.value || !allowed.value) return
@@ -55,9 +55,9 @@ function print() {
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form label-position="top"><el-form-item label="本次希望规划的产出数量"><QuantityInput v-model="quantity" :material-id="order.productId" required positive :disabled="busy" @validity="valid=$event" /></el-form-item></el-form>
     <el-button type="primary" :disabled="!valid || busy || auth.runtimeMode !== 'LOCAL' || !['DRAFT','RELEASED'].includes(order.status)" :loading="busy" @click="generate">计算并生成组合码</el-button>
-    <p>打印不占用库存。现场领料时按固定批次组合和当时库存重新计算可领套数。</p>
+    <p>每种材料只选一个可满足规划数量的批次；单批次不足时请补料或合并批次后重试。打印不占用库存。</p>
     <el-input v-model="lookup" placeholder="已有组合码，可查询并补印" aria-label="已有组合码" :disabled="busy" /><el-button :disabled="busy || !lookup" @click="read">查询已有组合</el-button>
-    <el-alert v-if="qrError" :title="qrError" type="error" :closable="false"><el-button v-if="detail" @click="image(sequence, detail.id)">重试加载二维码</el-button></el-alert>
+    <el-alert v-if="qrError" :title="qrError" type="error" :closable="false"><el-button v-if="detail" @click="image(sequence, detail.code)">重试加载二维码</el-button></el-alert>
     <div v-if="detail" ref="label" class="combination-label">
       <h3>工单 {{ detail.workorderCode }}</h3><img v-if="qrUrl" :src="qrUrl" alt="材料组合二维码" width="220" height="220"><p>{{ detail.code }}</p>
       <p v-if="suggested">本次计算可配套 <QuantityText :value="suggested" /> 套；扫码数量以当时库存为准。</p>

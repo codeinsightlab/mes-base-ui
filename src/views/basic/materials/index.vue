@@ -40,7 +40,8 @@ const materialFields = computed<Field[]>(() => [
   { key: 'specification', label: '规格型号', kind: 'text', maxLength: 500, columnMinWidth: 160 },
   { key: 'categoryId', label: '分类', kind: 'text', format: value => value ? categoryNames.value[String(value)] ?? String(value) : '未分类' },
   { key: 'unitId', label: '基本单位', kind: 'text', required: true, format: value => unitNames.value[String(value)] ?? String(value) },
-  { key: 'status', label: '状态', kind: 'select', required: true, options: [{ value: 'ENABLED', label: '启用', tone: 'success' }, { value: 'DISABLED', label: '停用', tone: 'info' }] }
+  { key: 'status', label: '状态', kind: 'select', required: true, options: [{ value: 'ENABLED', label: '启用', tone: 'success' }, { value: 'DISABLED', label: '停用', tone: 'info' }] },
+  { key: 'workOrderRuleCode', label: '展阶建单默认编码规则', kind: 'text', maxLength: 64, columnMinWidth: 180 }
 ])
 const editorFields = materialFields
 const editorReadonly = computed(() => !can('material', editorId.value ? 'update' : 'create'))
@@ -74,7 +75,7 @@ async function openEditor(row?:Row) {
       if (current !== generation || request !== editRequest) return
       Object.assign(draft, data);editorId.value = String(data.id)
     } catch(e) { if (current === generation && request === editRequest) ElMessage.error(e instanceof Error ? e.message : '记录读取失败');return }
-  } else Object.assign(draft, { categoryId: selectedCategory.value?.id ?? null, status: 'ENABLED', externalId: null, externalCode: null })
+  } else Object.assign(draft, { categoryId: selectedCategory.value?.id ?? null, status: 'ENABLED', externalId: null, externalCode: null, workOrderRuleCode: null })
   savedDraft = JSON.stringify(draft);editorOpen.value = true
 }
 async function closeEditor(done:() => void) {
@@ -93,6 +94,7 @@ async function save() {
   try {
     const body = commandFromDraft(editorFields.value, draft, !!editorId.value, 'id')
     body.externalId = draft.externalId ?? null;body.externalCode = draft.externalCode ?? null
+    body.workOrderRuleCode = draft.workOrderRuleCode ?? null
     if (editorId.value) await api.update(editorId.value, body);else await api.create(body)
     if (current !== generation) return
     editorOpen.value = false;resetDraft();await loadCategories();await page.value?.load();ElMessage.success('物料已保存')

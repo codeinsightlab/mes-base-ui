@@ -6,6 +6,8 @@ export interface Order {
   status: 'DRAFT' | 'RELEASED' | 'CANCELLED' | 'COMPLETED'; plannedStartAt: string | null; plannedEndAt: string | null
   createTime: string | null
   externalId: string | null; externalCode: string | null; remark: string | null; revision: number
+  bomId?: string | null; bomRevision?: number | null; bomBuildId?: string | null
+  bomBuildParentWorkorderId?: string | null; bomBuildSourceLineId?: string | null; bomBuildPath?: string | null
 }
 export interface RoutingOption { id: string; code: string; name: string; version: number; status: string }
 export interface NumberingRuleOption { ruleCode: string; ruleName: string; prefix: string }
@@ -16,6 +18,16 @@ export interface Save {
   plannedStartAt: string | null; plannedEndAt: string | null; externalId: string | null
   externalCode: string | null; remark: string | null; material: MaterialDemandSave
 }
+export interface BomBuildMaterial { lineId: string; materialId: string; code: string; name: string; unitId: string; quantity: string; componentQty: string; baseQty: string }
+export interface BomBuildRoute { id: string; code: string; name: string; version: number }
+export interface BomBuildProblem { code: string; message: string }
+export interface BomBuildOrder {
+  path: string; parentPath: string | null; sourceLineId: string | null; productId: string; productCode: string; productName: string
+  plannedQty: string; bomId: string; bomCode: string; bomVersion: string; bomRevision: number; defaultRuleCode: string | null
+  routingId: string | null; routings: BomBuildRoute[]; materials: BomBuildMaterial[]; problems: BomBuildProblem[]
+}
+export interface BomBuildPreview { fingerprint: string; complete: boolean; orders: BomBuildOrder[]; problems: BomBuildProblem[] }
+export interface BomBuildChoice { path: string; ruleCode: string | null; routingId: string | null; plannedStartAt: string | null; plannedEndAt: string | null; remark: string | null }
 export function saveBody(input: Save, creating = false): Save {
   return {
     ...(input.code ? { code: input.code } : {}), ...(creating && input.ruleCode ? { ruleCode: input.ruleCode } : {}), productId: input.productId, routingId: input.routingId || null, plannedQty: input.plannedQty,
@@ -54,6 +66,8 @@ export const api = {
   remove: (id: string, revision: number) => request<void>(path(id), { method: 'DELETE', body: { revision }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   routings: (productId: string, search = '') => request<RoutingOption[]>(base + '/references/routings', { query: { productId, search }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   numberingRules: () => request<NumberingRuleOption[]>(base + '/numbering-rules', { scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  bomBuildPreview: (body: { productId: string; bomId: string; plannedQty: string }) => request<BomBuildPreview>(base + '/bom-build/preview', { method: 'POST', body, scope: 'factory', parseResponse: parseWorkOrderResponse }),
+  bomBuildConfirm: (source: { productId: string; bomId: string; plannedQty: string }, confirmation: { requestId: string; fingerprint: string; orders: BomBuildChoice[] }) => request<{ buildId: string; orders: { path: string; parentPath: string | null; sourceBomLineId: string | null; bomId: string; bomRevision: number; workorder: Detail }[] }>(base + '/bom-build/confirm', { method: 'POST', body: { source, confirmation }, scope: 'factory', parseResponse: parseWorkOrderResponse }),
   graph: (id: string) => request<RoutingDetail>(path(id) + '/graph', { scope: 'factory', parseResponse: parseWorkOrderResponse }),
   allocation: (id: string) => request<Allocation>(path(id) + '/allocation', { scope: 'factory' })
 }

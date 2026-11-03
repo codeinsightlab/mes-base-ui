@@ -103,7 +103,7 @@ async function submit() {
         <el-descriptions :column="2" border>
           <el-descriptions-item label="工单">{{ combination.workorderCode }}</el-descriptions-item>
           <el-descriptions-item label="当前最大可领套数"><QuantityText v-if="calculation" :value="calculation.maximumQty" /><span v-else>待重新计算</span></el-descriptions-item>
-          <el-descriptions-item label="执行">{{ combination.executionId || '首次成功领料后创建' }}</el-descriptions-item>
+          <el-descriptions-item label="执行">{{ combination.executionCode || '首次成功领料后创建' }}</el-descriptions-item>
           <el-descriptions-item label="组合码">{{ combination.code }}</el-descriptions-item>
         </el-descriptions>
         <el-table :data="combination.items" row-key="demandLineId">
@@ -132,7 +132,7 @@ async function submit() {
         </template>
       </template>
       <el-result v-if="result" :icon="result.stockApplied ? 'success' : 'warning'" :title="result.stockApplied ? '领料成功' : '该笔领料已撤销'">
-        <template #sub-title>执行 {{ result.executionId }} · 累计正式投入 <QuantityText :value="result.confirmedInputQty" /> · 出库单 {{ result.documentId }}</template>
+        <template #sub-title>执行 {{ result.executionCode }} · 累计正式投入 <QuantityText :value="result.confirmedInputQty" /> · 出库单 {{ result.documentId }}</template>
         <template #extra><el-button @click="query()">读取下一次可领数量</el-button></template>
       </el-result>
     </template>

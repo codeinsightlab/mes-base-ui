@@ -12,7 +12,7 @@ import { operatorConfiguration, type UserOption, type AssignmentNode } from '@/a
 import type { Field } from '@/lib/crud'
 const ElMessageBox = usePageMessageBox()
 
-const props = defineProps<{ operationId?: string; executionId?: string; contextLabel?: string; triggerLabel?: string }>()
+const props = defineProps<{ operationId?: string; executionCode?: string; contextLabel?: string; triggerLabel?: string }>()
 const emit = defineEmits<{ changed: []; pending: [value: boolean]; busy: [value: boolean] }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref(''), keyword = ref('')
 const selected = ref<string[]>([]), options = ref<UserOption[]>([]), nodes = ref<AssignmentNode[]>([]), nodeId = ref(''), status = ref('')
@@ -21,13 +21,13 @@ const retainedOptions = computed(() => selected.value.map(id => userLabels.value
 function userLabel(id: unknown) { const u = userLabels.value[String(id)]; return u ? `${u.name}（${u.id}）` : String(id) }
 const offset = ref(0), hasMore = ref(false), refresh = ref(0)
 let sequence = 0, optionSequence = 0
-const assignment = computed(() => Boolean(props.executionId))
+const assignment = computed(() => Boolean(props.executionCode))
 const permission = computed(() => assignment.value ? 'business:mes:execution:assignment' : 'business:mes:operation:user')
 const canRead = computed(() => auth.hasPermission(permission.value + ':list', 'factory'))
 const canCreate = computed(() => auth.hasPermission(permission.value + ':create', 'factory'))
 const mutable = computed(() => !assignment.value || ['READY', 'RUNNING'].includes(status.value))
 const node = computed(() => nodes.value.find(n => n.id === nodeId.value))
-const fixed = computed(() => { const value: Record<string, string> = {}; if (assignment.value) { value.executionId = props.executionId!; value.routingNodeId = nodeId.value } else value.operationId = props.operationId!; return value })
+const fixed = computed(() => { const value: Record<string, string> = {}; if (assignment.value) { value.executionCode = props.executionCode!; value.routingNodeId = nodeId.value } else value.operationId = props.operationId!; return value })
 const fields = computed<Field[]>(() => [
   { key: 'id', label: '关系编号', kind: 'text', hidden: true, readonly: true },
   { key: 'userId', label: '操作人员', kind: 'select', options: options.value.map(u => ({ label: `${u.name}（${u.id}）`, value: u.id })) },
@@ -35,7 +35,7 @@ const fields = computed<Field[]>(() => [
   ...(assignment.value ? [{ key: 'assignedAt', label: '派工时间', kind: 'datetime', readonly: true } as Field] : [])
 ])
 function clear() { sequence++; optionSequence++; searching.value = false; userLabels.value = {}; visible.value = false; loading.value = false; error.value = ''; keyword.value = ''; selected.value = []; options.value = []; nodes.value = []; nodeId.value = ''; status.value = ''; offset.value = 0; hasMore.value = false }
-watch(() => [props.operationId, props.executionId, auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
+watch(() => [props.operationId, props.executionCode, auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
 onBeforeUnmount(clear)
 async function loadOptions(more = false) {
   if (!visible.value || !canRead.value || assignment.value && !node.value) return
@@ -64,7 +64,7 @@ async function open() {
   clear(); visible.value = true
   if (assignment.value) {
     const ticket = ++sequence; loading.value = true
-    try { const result = await operatorConfiguration.nodes(props.executionId!); if (ticket !== sequence) return; nodes.value = result.nodes; status.value = result.status } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '节点读取失败' } finally { if (ticket === sequence) loading.value = false }
+    try { const result = await operatorConfiguration.nodes(props.executionCode!); if (ticket !== sequence) return; nodes.value = result.nodes; status.value = result.status } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '节点读取失败' } finally { if (ticket === sequence) loading.value = false }
   } else await loadOptions()
 }
 function nodeLabel(n: AssignmentNode) { return `${n.code} · ${n.name?.trim() || '工序名称未记录'}（节点 ${n.id}）` }
@@ -73,7 +73,7 @@ async function save() {
   if (!canCreate.value || !mutable.value || !selected.value.length || selected.value.length > 100 || loading.value) return
   const ticket = ++sequence; loading.value = true; error.value = ''
   try {
-    if (assignment.value) await assignmentApi.create({ executionId: props.executionId, routingNodeId: nodeId.value, userId: selected.value[0], remark: null })
+    if (assignment.value) await assignmentApi.create({ executionCode: props.executionCode, routingNodeId: nodeId.value, userId: selected.value[0], remark: null })
     else await operatorConfiguration.bind(props.operationId!, selected.value)
     if (ticket === sequence) { selected.value = []; refresh.value++; ElMessage.success(assignment.value ? '节点派工已保存' : '工序能力已保存'); emit('changed') }
   } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '保存失败' } finally { if (ticket === sequence) loading.value = false }
@@ -94,12 +94,12 @@ defineExpose({ beforeClose })
 </script>
 <template>
   <div class="operator-configuration">
-    <p class="operator-context">{{ assignment ? '生产执行：' : '当前工序：' }}{{ contextLabel || (assignment ? executionId : operationId) }}</p>
+    <p class="operator-context">{{ assignment ? '生产执行：' : '当前工序：' }}{{ contextLabel || (assignment ? executionCode : operationId) }}</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <p class="secondary">{{ assignment ? '派工可选；有名单时，报工人须同时在名单内且具备工序能力。' : '仅展示拥有当前工厂业务授权的有效用户。取消能力会保留已有派工，但后续报工将被拒绝。' }}</p>
     <div v-if="assignment" class="operator-node">
-      <label :for="`assignment-node-${executionId}`">工艺节点</label>
-      <el-select :id="`assignment-node-${executionId}`" v-model="nodeId" aria-label="派工节点" placeholder="选择本次工艺版本的节点" :disabled="loading" @change="changeNode">
+      <label :for="`assignment-node-${executionCode}`">工艺节点</label>
+      <el-select :id="`assignment-node-${executionCode}`" v-model="nodeId" aria-label="派工节点" placeholder="选择本次工艺版本的节点" :disabled="loading" @change="changeNode">
         <el-option v-for="n in nodes" :key="n.id" :value="n.id" :label="nodeLabel(n)" />
       </el-select>
     </div>

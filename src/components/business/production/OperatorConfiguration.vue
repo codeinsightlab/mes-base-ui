@@ -4,13 +4,13 @@ import PageDialog from '@/components/page/PageDialog.vue'
 import { computed, ref, watch } from 'vue'
 import { useAuth } from '@/stores/auth'
 import OperatorConfigurationPanel from './OperatorConfigurationPanel.vue'
-const props = defineProps<{ operationId?: string; executionId?: string; contextLabel?: string; triggerLabel?: string }>()
+const props = defineProps<{ operationId?: string; executionCode?: string; contextLabel?: string; triggerLabel?: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), visible = ref(false)
 const panel = ref<InstanceType<typeof OperatorConfigurationPanel> | null>(null)
-const assignment = computed(() => Boolean(props.executionId))
+const assignment = computed(() => Boolean(props.executionCode))
 const canRead = computed(() => auth.hasPermission((assignment.value ? 'business:mes:execution:assignment' : 'business:mes:operation:user') + ':list', 'factory'))
-watch(() => [props.operationId, props.executionId, auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { visible.value = false }, { flush: 'sync' })
+watch(() => [props.operationId, props.executionCode, auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { visible.value = false }, { flush: 'sync' })
 function beforeClose(done: () => void) { if (panel.value) return panel.value.beforeClose(done); done() }
 </script>
 <template>

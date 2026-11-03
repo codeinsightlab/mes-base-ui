@@ -1,7 +1,7 @@
 import { request } from '@/lib/request'
 
 export interface RecentReport {
-  id: string; executionId: string | null; workorderId: string | null
+  id: string; executionCode: string | null; workorderId: string | null
   workorderCode: string | null; source: string | null; productCode: string | null; productName: string | null
   unitName: string | null; routingNodeId: string; operationName: string | null; recordType: string
   quantityDelta: string; operatorUserId: string; operatorName: string | null; reportTime: string; createTime: string

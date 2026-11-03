@@ -13,7 +13,7 @@ const { calculate, preview, submit, resolve } = vi.hoisted(() => ({ calculate: v
 vi.mock('../src/api/production/productionInput', () => ({ inputPermission: 'business:mes:material:issue:update', productionInput: { preview, submit }}))
 vi.mock('../src/api/production/productionCombination', () => ({ productionCombination: { calculate, resolve }}))
 const definition = { routing: { id: '7', code: 'R1', name: '加工', version: 2 }, products: [], nodes: [{ id: '11', nodeCode: 'A', operationId: '1', operationName: '钻孔', isKey: false }], edges: [] }
-const combination = { id: '1', code: 'COMB:A:1', workorderId: '1', workorderCode: 'WO1', productId: '2', closed: false, executionId: null, items: [{ demandLineId: '1', lineNo: 1, materialCode: 'B', batches: ['B01', 'B02'] }, { demandLineId: '2', lineNo: 2, materialCode: 'C', batches: ['C01'] }] }
+const combination = { code: 'WO1:B#B01$C#C01', workorderId: '1', workorderCode: 'WO1', productId: '2', closed: false, executionCode: null, items: [{ demandLineId: '1', lineNo: 1, materialCode: 'B', batches: ['B01'] }, { demandLineId: '2', lineNo: 2, materialCode: 'C', batches: ['C01'] }] }
 const calculation = { combination, maximumQty: '100', outputQty: '100.000000', allocations: [{ demandLineId: '1', materialId: 'B', batchNo: 'B01', warehouseId: '1', quantity: '200' }], calculationKey: 'freeze-1' }
 type State = { code: string; quantity: string; selected: string[]; calculation: unknown; pending: { requestId: string } | null; query: (defaultMaximum?: boolean) => Promise<void>; submit: () => Promise<void> }
 let wrapper: ReturnType<typeof mount>
@@ -22,7 +22,7 @@ beforeEach(() => {
   rules.material.mockResolvedValue({ unitId: 'u' });rules.unit.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 })
   vi.stubGlobal('ResizeObserver', class {observe() {} unobserve() {} disconnect() {}})
   resolve.mockResolvedValue(combination);calculate.mockResolvedValue(calculation);preview.mockResolvedValue({ definition, actual: null })
-  submit.mockResolvedValue({ requestId: 'r', documentId: '902', executionId: '3', code: combination.code, status: 'POSTED', confirmedInputQty: '100', stockApplied: true })
+  submit.mockResolvedValue({ requestId: 'r', documentId: '902', executionCode: combination.code, code: combination.code, status: 'POSTED', confirmedInputQty: '100', stockApplied: true })
 })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '' })
 async function setup() {
@@ -34,7 +34,7 @@ async function setup() {
 }
 it('defaults to current maximum, displays fixed multi-material batches and performs no write while reading', async() => {
   const { s } = await setup();expect(s.quantity).toBe('100.000000');expect(calculate).toHaveBeenCalledWith(combination.code, undefined)
-  expect(wrapper.text()).toContain('B01、B02');expect(wrapper.text()).toContain('C01');expect(submit).not.toHaveBeenCalled()
+  expect(wrapper.text()).toContain('B01');expect(wrapper.text()).toContain('C01');expect(submit).not.toHaveBeenCalled()
 })
 it('requires recalculation after a quantity edit and posts the chosen sets without material edits', async() => {
   const { s } = await setup();s.quantity = '50';await flushPromises();await s.submit();expect(submit).not.toHaveBeenCalled()
@@ -61,12 +61,12 @@ it.each(['factory', 'permission', 'mode'])('clears state and rejects late reads 
 })
 it('keeps fixed material facts visible when the independent path read fails', async() => {
   preview.mockRejectedValueOnce(new Error('工艺读取失败'));await setup()
-  expect(wrapper.text()).toContain('B01、B02');expect(wrapper.text()).toContain('工艺读取失败');expect(submit).not.toHaveBeenCalled()
+  expect(wrapper.text()).toContain('B01');expect(wrapper.text()).toContain('工艺读取失败');expect(submit).not.toHaveBeenCalled()
 })
 
 it('keeps raw combination facts readable when stock calculation fails', async() => {
   calculate.mockRejectedValueOnce(new ApiError('RESOURCE_CONFLICT', '库存待核对', '', 409))
-  await setup();expect(wrapper.text()).toContain('B01、B02');expect(wrapper.text()).toContain('待重新计算');expect(submit).not.toHaveBeenCalled()
+  await setup();expect(wrapper.text()).toContain('B01');expect(wrapper.text()).toContain('待重新计算');expect(submit).not.toHaveBeenCalled()
 })
 
 it('confirms a no-routing workorder without inventing a path and explains direct finished-goods receipt', async() => {

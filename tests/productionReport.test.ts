@@ -14,12 +14,12 @@ vi.mock('../src/api/production/productionReport', async original => ({ ...await 
 const paths = vi.hoisted(() => ({ path: vi.fn() }))
 vi.mock('../src/api/production/executionActions', () => ({ executionActions: paths }))
 const id = '9007199254740993'
-const node = { executionId: id, routingNodeId: '9007199254740994', operationId: '7', code: 'A', name: '首工序', sequenceNo: 1, inputQty: '99999999999999.123456', reportedQty: '4.000001', defectQty: '1.000000', effectiveOutputQty: '3.000001', availableQty: '99999999999995.123455', qualityIntegrated: true, directDefectQty: '1.000000', returnedQty: '0.000000', netDefectQty: '1.000000', propagatedLossQty: '0.000000', historicalOverrunQty: '0.000000', rawEffectiveOutputQty: '3.000001', rawAvailableQty: '99999999999995.123455', unverifiedDefectQty: '0.000000', historicalConflict: false }
-const ledger = { id, executionId: id, routingNodeId: node.routingNodeId, recordType: 'REPORT', quantityDelta: '4.000001', referenceReportId: null, operatorUserId: '100', recordedBy: '200', operatorName: '历史操作人员', recordedByName: '验收提交人员', reportTime: '2026-01-01T10:00:00', createTime: '2026-10-15T10:00:00', reason: '历史补录', workstationId: null }
+const node = { executionCode: id, routingNodeId: '9007199254740994', operationId: '7', code: 'A', name: '首工序', sequenceNo: 1, inputQty: '99999999999999.123456', reportedQty: '4.000001', defectQty: '1.000000', effectiveOutputQty: '3.000001', availableQty: '99999999999995.123455', qualityIntegrated: true, directDefectQty: '1.000000', returnedQty: '0.000000', netDefectQty: '1.000000', propagatedLossQty: '0.000000', historicalOverrunQty: '0.000000', rawEffectiveOutputQty: '3.000001', rawAvailableQty: '99999999999995.123455', unverifiedDefectQty: '0.000000', historicalConflict: false }
+const ledger = { id, executionCode: id, routingNodeId: node.routingNodeId, recordType: 'REPORT', quantityDelta: '4.000001', referenceReportId: null, operatorUserId: '100', recordedBy: '200', operatorName: '历史操作人员', recordedByName: '验收提交人员', reportTime: '2026-01-01T10:00:00', createTime: '2026-10-15T10:00:00', reason: '历史补录', workstationId: null }
 const wrappers: ReturnType<typeof mount>[] = []
 beforeEach(() => {
   sessionStorage.clear(); vi.resetAllMocks();invalidateQuantityRules();rules.material.mockResolvedValue({unitId:'u'});rules.unit.mockResolvedValue({mustBeWholeNumber:0,quantityPrecision:6}); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-  api.quantities.mockResolvedValue({ productId:'2', executionId: id, workorderId: '1', routingId: '2', targetQty: node.inputQty, pathStatus: 'LOCKED', writable: true, boundary: null, nodes: [node] })
+  api.quantities.mockResolvedValue({ productId:'2', executionCode: id, workorderId: '1', routingId: '2', targetQty: node.inputQty, pathStatus: 'LOCKED', writable: true, boundary: null, nodes: [node] })
   api.page.mockResolvedValue({ items: [ledger], total: 1 }); api.users.mockResolvedValue({ items: [{ id: '100', name: '历史操作人员' }], total: 1 })
   api.detail.mockResolvedValue({ record: ledger, originalEffectiveQty: '3.000001' }); api.history.mockResolvedValue({ items: [{ ...ledger, id: '10', recordType: 'ADJUSTMENT', quantityDelta: '-1', reason: '核对订正' }], total: 1 })
   api.supplement.mockResolvedValue(ledger); api.adjust.mockResolvedValue(ledger); api.void.mockResolvedValue(ledger)
@@ -29,7 +29,7 @@ async function click(text: string) { await flushPromises(); const button = [...d
 async function setup(actions = ['quantity', 'detail', 'supplement', 'adjust', 'void'], executionQuery = false) {
   const pinia = createPinia(), auth = useAuth(pinia); auth.factoryId = 'A'; auth.factoryPermissions = ['business:material:query','business:unit:measure:query',...actions.map(action => 'business:production:report:' + action)]
   if (executionQuery) auth.factoryPermissions.push('business:mes:production:execution:query')
-  const wrapper = mount(Manager, { props: { executionId: id }, attachTo: document.body, global: { plugins: [pinia, ElementPlus] }}); wrappers.push(wrapper)
+  const wrapper = mount(Manager, { props: { executionCode: id }, attachTo: document.body, global: { plugins: [pinia, ElementPlus] }}); wrappers.push(wrapper)
   await flushPromises()
   return { wrapper, auth, state: wrapper.vm as unknown as { form: { quantity: string; operatorUserId: string; reportTime: string; reason: string; workstationId: string }}}
 }
@@ -97,7 +97,7 @@ describe('production report management', () => {
     const { state } = await setup(); await click('管理员历史补录')
     Object.assign(state.form, { quantity: '99999999999999.12', operatorUserId: '100', reportTime: '2026-01-01T10:00:00', reason: '核对原始记录' })
     await click('追加数量流水')
-    expect(api.supplement).toHaveBeenCalledWith({ requestId: expect.any(String), executionId: id, routingNodeId: node.routingNodeId, quantity: '99999999999999.12', operatorUserId: '100', reportTime: '2026-01-01T10:00:00', workstationId: null, reason: '核对原始记录' })
+    expect(api.supplement).toHaveBeenCalledWith({ requestId: expect.any(String), executionCode: id, routingNodeId: node.routingNodeId, quantity: '99999999999999.12', operatorUserId: '100', reportTime: '2026-01-01T10:00:00', workstationId: null, reason: '核对原始记录' })
     expect(api.quantities).toHaveBeenCalledTimes(2)
   })
   it('adjusts and voids only the original report with a required reason', async() => {
@@ -127,7 +127,7 @@ describe('production report management', () => {
     let release!: (value: unknown) => void
     api.quantities.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
     const { auth } = await setup(['quantity']); auth.factoryId = 'B'; auth.revision++; await flushPromises()
-    release({ executionId: 'stale', nodes: [{ ...node, name: '旧工厂执行' }] }); await flushPromises()
+    release({ executionCode: 'stale', nodes: [{ ...node, name: '旧工厂执行' }] }); await flushPromises()
     expect(document.body.textContent).not.toContain('旧工厂执行'); expect(document.body.textContent).not.toContain('管理员历史补录'); expect(api.page).not.toHaveBeenCalled()
   })
   it('allows read-only ledger access while hiding every administrator write action', async() => {
@@ -138,10 +138,10 @@ describe('production report management', () => {
   })
   it('rejects the previous execution response after selecting another execution', async() => {
     let release!: (value: unknown) => void
-    api.quantities.mockImplementationOnce(() => new Promise(resolve => { release = resolve })).mockResolvedValue({ executionId: '2', targetQty: '8', nodes: [] })
-    const { wrapper } = await setup(); await wrapper.setProps({ executionId: '2' }); await flushPromises()
-    release({ executionId: id, nodes: [node] }); await flushPromises()
-    expect((wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState.quantity.executionId).toBe('2');expect(document.body.textContent).toContain('执行 2')
+    api.quantities.mockImplementationOnce(() => new Promise(resolve => { release = resolve })).mockResolvedValue({ executionCode: '2', targetQty: '8', nodes: [] })
+    const { wrapper } = await setup(); await wrapper.setProps({ executionCode: '2' }); await flushPromises()
+    release({ executionCode: id, nodes: [node] }); await flushPromises()
+    expect((wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState.quantity.executionCode).toBe('2');expect(document.body.textContent).toContain('执行 2')
   })
   it('shows a read failure and allows retry without fabricating quantities', async() => {
     api.quantities.mockRejectedValueOnce(new Error('数量接口尚未就绪')); await setup()
@@ -150,12 +150,12 @@ describe('production report management', () => {
   })
 })
 
-it('keeps negative correction accessible while affected-node positive supplements are blocked', async() => { api.quantities.mockResolvedValue({ productId:'2', executionId: id, workorderId: '1', routingId: '2', targetQty: '10', pathStatus: 'LOCKED', writable: true, boundary: '存在待核实不良', nodes: [{ ...node, positiveReportBlockReason: '工序 D 存在待核实不良，请先核实' }] });await setup();const buttons = [...document.querySelectorAll('button')];expect(buttons.find(b => b.textContent?.trim() === '管理员历史补录')?.disabled).toBe(true);expect(buttons.find(b => b.textContent?.trim() === '数量订正')?.disabled).toBe(false);expect(document.body.textContent).toContain('工序 D 存在待核实不良') })
+it('keeps negative correction accessible while affected-node positive supplements are blocked', async() => { api.quantities.mockResolvedValue({ productId:'2', executionCode: id, workorderId: '1', routingId: '2', targetQty: '10', pathStatus: 'LOCKED', writable: true, boundary: '存在待核实不良', nodes: [{ ...node, positiveReportBlockReason: '工序 D 存在待核实不良，请先核实' }] });await setup();const buttons = [...document.querySelectorAll('button')];expect(buttons.find(b => b.textContent?.trim() === '管理员历史补录')?.disabled).toBe(true);expect(buttons.find(b => b.textContent?.trim() === '数量订正')?.disabled).toBe(false);expect(document.body.textContent).toContain('工序 D 存在待核实不良') })
 
 it('does not discard a previously unknown intent when a retry is forbidden', async() => { api.adjust.mockRejectedValueOnce(new Error('response lost')).mockRejectedValueOnce(new ApiError('FORBIDDEN', '权限撤销', '', 403));const { state } = await setup();await click('数量订正');Object.assign(state.form, { quantity: '-1', reason: '核对' });await click('追加数量流水');const first = [...api.adjust.mock.calls[0]];await click('追加数量流水');expect(api.adjust.mock.calls[1]).toEqual(first);expect(document.body.textContent).toContain('结果待确认');expect(sessionStorage.length).toBeGreaterThan(0) })
 
 it('explains closed normal reporting while preserving independently authorized historical correction', async() => {
-  api.quantities.mockResolvedValue({ productId:'2', executionId: id, workorderId: '1', routingId: '2', targetQty: '10', pathStatus: 'LOCKED', writable: false, boundary: '工单未下达或已作废，禁止继续正常报工', nodes: [node] })
+  api.quantities.mockResolvedValue({ productId:'2', executionCode: id, workorderId: '1', routingId: '2', targetQty: '10', pathStatus: 'LOCKED', writable: false, boundary: '工单未下达或已作废，禁止继续正常报工', nodes: [node] })
   const { state } = await setup();expect(document.body.textContent).toContain('当前不可继续正常报工')
   await click('数量订正');Object.assign(state.form, { quantity: '-1', reason: 'TEST ONLY历史订正' });await click('追加数量流水')
   expect(api.adjust).toHaveBeenCalledWith(id, '-1', 'TEST ONLY历史订正', expect.any(String))
@@ -176,7 +176,7 @@ it('lets the node table grow with expanded quality details and keeps technical d
 })
 
 it('keeps quantity conflicts and raw reporting facts visible with the concise node layout', async() => {
-  api.quantities.mockResolvedValueOnce({ executionId: id, pathStatus: 'LOCKED', nodes: [{ ...node, historicalConflict: true, positiveReportBlockReason: '存在待核实不良，请先核实' }] })
+  api.quantities.mockResolvedValueOnce({ executionCode: id, pathStatus: 'LOCKED', nodes: [{ ...node, historicalConflict: true, positiveReportBlockReason: '存在待核实不良，请先核实' }] })
   const { wrapper } = await setup()
   expect(wrapper.text()).toContain('部分工序的已报数量超过当前有效输入')
   expect(wrapper.text()).toContain('存在待核实不良，请先核实')

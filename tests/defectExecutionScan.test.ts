@@ -7,7 +7,7 @@ import Panel from '../src/components/business/quality/DefectDeclarationPanel.vue
 const api = vi.hoisted(() => ({ scan: vi.fn(), nodes: vi.fn(), context: vi.fn(), declare: vi.fn() }))
 vi.mock('../src/api/production/productionScan', () => ({ scanExecution: api.scan }))
 vi.mock('../src/api/quality/qualityV2', () => ({ qualityV2: api, wasteLabels: { PROCESS: '工废', MATERIAL: '料废', BOTH: '工废＋料废' }}))
-const identity = { executionId: '9007199254740999', workorderCode: 'WO-EXACT', productCode: 'PRODUCT-EXACT', batchNo: 'BATCH-EXACT' }
+const identity = { executionCode: '9007199254740999', workorderCode: 'WO-EXACT', productCode: 'PRODUCT-EXACT', batchNo: 'BATCH-EXACT' }
 let wrapper:ReturnType<typeof mount>
 beforeEach(() => {
   sessionStorage.clear();vi.clearAllMocks();vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}})
@@ -24,10 +24,10 @@ it('locates independent declarations through the shared scanner without submitti
   const { state } = await setup()
   wrapper.findComponent({ name: 'CodeScanner' }).vm.$emit('confirm', ' WO:PRODUCT#BATCH ', 'IMAGE');await flushPromises()
   expect(api.scan).toHaveBeenCalledExactlyOnceWith('DEFECT_DECLARATION', ' WO:PRODUCT#BATCH ', 'IMAGE')
-  expect(state.execution).toBe(identity.executionId);expect(api.nodes).toHaveBeenCalledWith(identity.executionId)
+  expect(state.execution).toBe(identity.executionCode);expect(api.nodes).toHaveBeenCalledWith(identity.executionCode)
   expect(wrapper.text()).toContain('BATCH-EXACT');expect(api.declare).not.toHaveBeenCalled()
   state.node = '12';await state.loadContext();await state.loadNodes()
-  expect(api.scan).toHaveBeenCalledTimes(1);expect(api.context).toHaveBeenCalledWith(identity.executionId, '12', 0)
+  expect(api.scan).toHaveBeenCalledTimes(1);expect(api.context).toHaveBeenCalledWith(identity.executionCode, '12', 0)
 })
 it('preserves dirty fields when changing execution is cancelled before any scan request', async() => {
   const { state } = await setup();state.quantity = '3';state.remark = '尚未提交'
@@ -40,16 +40,16 @@ it('clears confirmed discarded fields only after a successful scan', async() => 
   vi.spyOn(ElMessageBox, 'confirm').mockResolvedValueOnce('confirm' as MessageBoxData)
   await state.locateExecution('WO:PRODUCT#BATCH')
   expect(api.scan).toHaveBeenCalledWith('DEFECT_DECLARATION', 'WO:PRODUCT#BATCH', 'TEXT')
-  expect(state.quantity).toBe('');expect(state.remark).toBe('');expect(state.type).toBe('');expect(state.execution).toBe(identity.executionId)
+  expect(state.quantity).toBe('');expect(state.remark).toBe('');expect(state.type).toBe('');expect(state.execution).toBe(identity.executionCode)
 })
 it('cannot replace an unknown declaration or corrupted recovery payload with a scan', async() => {
-  const { state } = await setup();state.pending = { requestId: 'original', executionId: 'old-execution' }
+  const { state } = await setup();state.pending = { requestId: 'original', executionCode: 'old-execution' }
   await state.locateExecution('WO:PRODUCT#BATCH');expect(api.scan).not.toHaveBeenCalled();expect(state.pending.requestId).toBe('original')
   state.pending = null;state.recoveryBlocked = true;await state.locateExecution('WO:PRODUCT#BATCH');expect(api.scan).not.toHaveBeenCalled()
 })
 it('does not scan without create permission or replace an execution fixed by the caller', async() => {
   const { state } = await setup([]);await state.locateExecution('WO:PRODUCT#BATCH');expect(api.scan).not.toHaveBeenCalled()
-  wrapper.unmount();const fixed = await setup(undefined, { executionId: 'fixed' })
+  wrapper.unmount();const fixed = await setup(undefined, { executionCode: 'fixed' })
   await fixed.state.locateExecution('WO:PRODUCT#BATCH');expect(api.scan).not.toHaveBeenCalled();expect(fixed.state.execution).toBe('fixed')
 })
 it.each(['factory', 'permission'])('rejects a late scan on %s change without loading its nodes', async mode => {

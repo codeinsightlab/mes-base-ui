@@ -11,12 +11,12 @@ vi.mock('../src/api/production/productionScan', () => ({ scanExecution: scan }))
 vi.mock('../src/api/production/productionReporting', () => ({ submitPermission: 'business:production:report:submit', productionReporting: { context, submit }}))
 vi.mock('../src/api/basic/material', () => ({ api: { detail: materialDetail }}))
 vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: unitDetail }}))
-const data = (id = '1') => ({ identity: { executionId: id, workorderCode: 'TEST_WO', productCode: 'M', productName: '阶段物料', batchNo: 'BATCH-001', routingId: '7', routingCode: 'R', routingVersion: 2, status: 'READY', targetQty: '10.000001' }, quantities: { routingLabel: 'R / V2 · 工艺', executionId: id, pathStatus: 'LOCKED', nodes: [{ routingNodeId: '11', code: 'A', name: '钻孔', sequenceNo: 1, inputQty: '10.000001', reportedQty: '3.000001', defectQty: '1.000000', effectiveOutputQty: '2.000001', qualityIntegrated: true, availableQty: '7.000000' }, { routingNodeId: '12', code: 'B', name: '铣削', sequenceNo: 2, inputQty: '0', reportedQty: '0', defectQty: '0', effectiveOutputQty: '0', qualityIntegrated: true, availableQty: '0' }] }, candidates: [{ routingNodeId: '11', status: 'AVAILABLE', reason: null }, { routingNodeId: '12', status: 'NOT_ASSIGNED', reason: '不在派工名单中' }], path: { nodes: [], edges: [], selectedNodeIds: [] }})
+const data = (id = '1') => ({ identity: { executionCode: id, workorderCode: 'TEST_WO', productCode: 'M', productName: '阶段物料', batchNo: 'BATCH-001', routingId: '7', routingCode: 'R', routingVersion: 2, status: 'READY', targetQty: '10.000001' }, quantities: { routingLabel: 'R / V2 · 工艺', executionCode: id, pathStatus: 'LOCKED', nodes: [{ routingNodeId: '11', code: 'A', name: '钻孔', sequenceNo: 1, inputQty: '10.000001', reportedQty: '3.000001', defectQty: '1.000000', effectiveOutputQty: '2.000001', qualityIntegrated: true, availableQty: '7.000000' }, { routingNodeId: '12', code: 'B', name: '铣削', sequenceNo: 2, inputQty: '0', reportedQty: '0', defectQty: '0', effectiveOutputQty: '0', qualityIntegrated: true, availableQty: '0' }] }, candidates: [{ routingNodeId: '11', status: 'AVAILABLE', reason: null }, { routingNodeId: '12', status: 'NOT_ASSIGNED', reason: '不在派工名单中' }], path: { nodes: [], edges: [], selectedNodeIds: [] }})
 type State = { code: string; locate: () => Promise<void>; submit: () => Promise<void>; retryPending: () => Promise<void>; selectedId: string; quantity: string; context: ReturnType<typeof data> | null; result: { id: string } | null; pending: { requestId: string } | null; error: string; showAll: boolean; loading: boolean }
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
   sessionStorage.clear(); vi.resetAllMocks(); invalidateQuantityRules();scan.mockImplementation((_type:string, code:string) => Promise.resolve(data(code === 'WO2:P001#BATCH-002' ? '2' : '1').identity)); materialDetail.mockResolvedValue({ unitId: '4' }); unitDetail.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 }); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); context.mockResolvedValue({ ...data(), identity: { ...data().identity, productId: '3' }})
-  submit.mockResolvedValue({ id: '81', executionId: '1', quantityDelta: '2.000001', reportTime: '2026-10-16T09:00:00' })
+  submit.mockResolvedValue({ id: '81', executionCode: '1', quantityDelta: '2.000001', reportTime: '2026-10-16T09:00:00' })
 })
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; vi.restoreAllMocks(); vi.unstubAllGlobals() })
 async function setup() {
@@ -36,7 +36,7 @@ it('submits only the allowed command fields, blocks double clicks, refreshes and
   const { state } = await setup(); let release!: (v: unknown) => void; submit.mockImplementationOnce(() => new Promise(r => { release = r }))
   state.selectedId = '11'; state.quantity = '2.01'; await flushPromises(); const pending = state.submit(); await flushPromises(); await state.submit()
   expect(submit).toHaveBeenCalledTimes(1)
-  const first = { ...submit.mock.calls[0]![0] }; expect(Object.keys(first).sort()).toEqual(['executionId', 'reportQty', 'requestId', 'routingNodeId', 'workstationId'])
+  const first = { ...submit.mock.calls[0]![0] }; expect(Object.keys(first).sort()).toEqual(['executionCode', 'reportQty', 'requestId', 'routingNodeId', 'workstationId'])
   release({ id: '81', quantityDelta: '2.000001', reportTime: '2026-10-16T09:00:00' }); await pending
   expect(state.result?.id).toBe('81'); expect(context).toHaveBeenCalledTimes(2);expect(scan).toHaveBeenCalledTimes(1)
   state.selectedId = '11'; state.quantity = '1'; await flushPromises(); await state.submit(); expect(submit.mock.calls[1]![0].requestId).not.toBe(first.requestId)
@@ -70,7 +70,7 @@ it('ignores a late scan response without querying context for the old execution'
   const { state } = await setup();let release!:(v:unknown) => void;context.mockClear();context.mockResolvedValueOnce(data('2'))
   scan.mockImplementationOnce(() => new Promise(r => release = r))
   const old = state.locate();state.code = 'WO2:P001#BATCH-002';await state.locate();release(data('1').identity);await old
-  expect(state.context?.identity.executionId).toBe('2');expect(context).toHaveBeenCalledExactlyOnceWith('2')
+  expect(state.context?.identity.executionCode).toBe('2');expect(context).toHaveBeenCalledExactlyOnceWith('2')
 })
 it.each(['0', '-1', '1.1234567'])('rejects invalid quantity %s before sending', async(qty) => {
   const { state } = await setup(); state.selectedId = '11'; state.quantity = qty; await flushPromises(); await state.submit(); expect(submit).not.toHaveBeenCalled()
@@ -110,7 +110,7 @@ it('keeps an unknown request when locating another execution and replays only th
   context.mockResolvedValueOnce(data('2'))
   const scanner = wrapper.findComponent({ name: 'CodeScanner' }); expect(scanner.props('disabled')).toBe(false)
   scanner.vm.$emit('confirm', 'WO2:P001#BATCH-002', 'TEXT'); await flushPromises()
-  expect(state.context?.identity.executionId).toBe('2'); expect(state.pending).toEqual(original)
+  expect(state.context?.identity.executionCode).toBe('2'); expect(state.pending).toEqual(original)
   await flushPromises(); await state.submit(); expect(submit).toHaveBeenCalledTimes(1)
   await state.retryPending(); expect(submit.mock.calls[1]![0]).toEqual(original)
   expect(context).toHaveBeenCalledTimes(2)
@@ -216,7 +216,7 @@ it.each(['button', 'form'])('sends a first report through the normal %s DOM entr
   else await wrapper.find('form.report-form').trigger('submit')
   await flushPromises()
   expect(submit).toHaveBeenCalledTimes(1)
-  expect(submit.mock.calls[0]![0]).toMatchObject({ executionId: '1', routingNodeId: '11', reportQty: '2' })
+  expect(submit.mock.calls[0]![0]).toMatchObject({ executionCode: '1', routingNodeId: '11', reportQty: '2' })
   expect(state.result?.id).toBe('81')
 })
 

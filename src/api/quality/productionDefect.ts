@@ -1,6 +1,6 @@
 import { request } from '@/lib/request'
 export const defectPermissions = { read: 'business:quality:defect:read', create: 'business:quality:defect:create', revise: 'business:quality:defect:revise', void: 'business:quality:defect:void' }
-export interface Facts { executionId: string; affectedNodeId: string; defectQty: string; wasteCategory: 'PROCESS' | 'MATERIAL' | 'BOTH' | null; defectReason: string; responsibleUserId: string | null; responsibilityRemark: string | null; occurredAt: string }
+export interface Facts { executionCode: string; affectedNodeId: string; defectQty: string; wasteCategory: 'PROCESS' | 'MATERIAL' | 'BOTH' | null; defectReason: string; responsibleUserId: string | null; responsibilityRemark: string | null; occurredAt: string }
 export interface Version extends Facts { defectTypeId?: string | null; defectTypeCodeSnapshot?: string | null; defectTypeNameSnapshot?: string | null; defectTypeRevision?: number | null; id: string; declarationId: string; revisionNo: number; recordAction: 'CREATE' | 'REVISE' | 'VOID'; revisionReason: string | null; reportedBy: string; recordedBy: string; recordedAt: string; affectedNodeName?: string | null; responsibleUserName?: string | null; reportedByName?: string | null; recordedByName?: string | null; processingState: string; receiptState: 'PENDING' | 'PARTIAL' | 'RECEIVED' | null; pendingQuantity: string | null; returnedQuantity: string | null; transferredQuantity: string | null; workorderCode: string | null; productCode: string | null; productName: string | null; batchNo: string | null; specification: string | null; workorderStatus: string | null; executionStatus: string | null; source: 'LOCAL' | 'EXTERNAL' | null }
 export interface Command { requestKey: string; expectedRevision?: number; revisionReason?: string; facts?: Facts }
 export interface Page { items: Version[]; total: number; offset: number; limit: number }
@@ -17,5 +17,5 @@ export const productionDefect = {
   void: (id: string, body: Command) => request<Acknowledgement>(path(id) + '/void', { method: 'POST', body, scope: 'factory' })
 }
 export function factsOf(row: Facts): Facts {
-  return { executionId: row.executionId, affectedNodeId: row.affectedNodeId, defectQty: row.defectQty, wasteCategory: row.wasteCategory, defectReason: row.defectReason, responsibleUserId: row.responsibleUserId, responsibilityRemark: row.responsibilityRemark, occurredAt: row.occurredAt }
+  return { executionCode: row.executionCode, affectedNodeId: row.affectedNodeId, defectQty: row.defectQty, wasteCategory: row.wasteCategory, defectReason: row.defectReason, responsibleUserId: row.responsibleUserId, responsibilityRemark: row.responsibilityRemark, occurredAt: row.occurredAt }
 }

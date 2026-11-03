@@ -49,9 +49,9 @@ it('approval endpoint preserves the exact caller intent and explicit flow for re
 
 it('creates a document and its lines with the selected rule in one request', async() => {
   const { aggregateApi } = stockDocumentApis(undefined, () => 'IN');mocks.request.mockResolvedValueOnce({ document: { id: '1' }, lines: [] })
-  await aggregateApi.create({ ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999', reason: 'TEST', remark: null, items: [{ materialId: '2', quantity: '1' }] })
+  await aggregateApi.create({ ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionCode: '9007199254740999', reason: 'TEST', remark: null, items: [{ materialId: '2', quantity: '1' }] })
   expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/inbound-documents/aggregate')
-  expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', sourceExecutionId: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
+  expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', sourceExecutionCode: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
 })
 it('requires a selected rule before creating a stock document', async() => { const { aggregateApi } = stockDocumentApis();await expect(aggregateApi.create({ documentType: 'OTHER_RECEIPT', items: [] })).rejects.toThrow('请选择出入库单编码规则');expect(mocks.request).not.toHaveBeenCalled() })
 it('queries stock numbering rules with the explicit document direction', async() => { mocks.request.mockResolvedValueOnce([]);await stockDocuments.numberingRules('OUT');expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/outbound-documents/numbering-rules', { scope: 'factory' }) })

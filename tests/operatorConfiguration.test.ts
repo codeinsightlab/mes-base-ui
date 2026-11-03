@@ -22,7 +22,7 @@ afterEach(() => { wrappers.forEach(w => w.unmount()); wrappers.length = 0; docum
 function setup(execution = false, actions = ['list', 'create', 'delete']) {
   const pinia = createPinia(), auth = useAuth(pinia), prefix = execution ? 'business:mes:execution:assignment' : 'business:mes:operation:user'
   auth.factoryId = 'A'; auth.factoryPermissions = actions.map(a => prefix + ':' + a)
-  const wrapper = mount(Panel, { props: execution ? { executionId: '9007199254740995' } : { operationId: '9007199254740994' }, global: { plugins: [pinia, ElementPlus], stubs: { CrudPage: { name: 'CrudPage', props: ['fixedValues', 'permission', 'managedEditing', 'readonly'], template: '<section>配置列表</section>' }}}})
+  const wrapper = mount(Panel, { props: execution ? { executionCode: '9007199254740995' } : { operationId: '9007199254740994' }, global: { plugins: [pinia, ElementPlus], stubs: { CrudPage: { name: 'CrudPage', props: ['fixedValues', 'permission', 'managedEditing', 'readonly'], template: '<section>配置列表</section>' }}}})
   wrappers.push(wrapper)
   return { wrapper, auth }
 }
@@ -83,9 +83,9 @@ describe('production operator configuration', () => {
     expect(config.candidates).toHaveBeenCalledWith('7', 0)
     await select(wrapper, 1, ['9007199254740993']); await click('增加派工')
     await select(wrapper, 1, ['2']); await click('增加派工')
-    expect(assignment.create).toHaveBeenNthCalledWith(1, { executionId: '9007199254740995', routingNodeId: '12', userId: '9007199254740993', remark: null })
-    expect(assignment.create).toHaveBeenNthCalledWith(2, { executionId: '9007199254740995', routingNodeId: '12', userId: '2', remark: null })
-    expect(wrapper.findComponent({ name: 'CrudPage' }).props('fixedValues')).toEqual({ executionId: '9007199254740995', routingNodeId: '12' })
+    expect(assignment.create).toHaveBeenNthCalledWith(1, { executionCode: '9007199254740995', routingNodeId: '12', userId: '9007199254740993', remark: null })
+    expect(assignment.create).toHaveBeenNthCalledWith(2, { executionCode: '9007199254740995', routingNodeId: '12', userId: '2', remark: null })
+    expect(wrapper.findComponent({ name: 'CrudPage' }).props('fixedValues')).toEqual({ executionCode: '9007199254740995', routingNodeId: '12' })
   })
   it('terminal execution hides add controls', async() => {
     config.nodes.mockResolvedValue({ status: 'FULLY_RECEIVED', nodes: [{ id: '11', operationId: '7', code: 'N1', name: '钻孔' }] })

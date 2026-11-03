@@ -3,7 +3,7 @@ import { request } from '@/lib/request'
 export interface MesExecutionAssignmentVo {
   [key: string]: unknown;
   id: string;
-  executionId: string;
+  executionCode: string;
   routingNodeId: string;
   userId: string;
   assignedBy: string;
@@ -18,8 +18,8 @@ export interface Page {
   limit: number;
 }
 
-export type CreateCommand = Pick<MesExecutionAssignmentVo, 'executionId' | 'routingNodeId' | 'userId' | 'remark'>
-export type UpdateCommand = Pick<MesExecutionAssignmentVo, 'executionId' | 'routingNodeId' | 'userId' | 'remark'>
+export type CreateCommand = Pick<MesExecutionAssignmentVo, 'executionCode' | 'routingNodeId' | 'userId' | 'remark'>
+export type UpdateCommand = Pick<MesExecutionAssignmentVo, 'executionCode' | 'routingNodeId' | 'userId' | 'remark'>
 
 const removeIds = (ids: string[]) =>
   request<void>('/api/production/mes-execution-assignment', { method: 'DELETE', body: ids, scope: 'factory' })

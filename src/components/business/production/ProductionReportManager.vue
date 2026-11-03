@@ -16,7 +16,7 @@ import { executionActions, type PathView } from '@/api/production/executionActio
 import { productionReport as api, reportPermissions, type ExecutionQuantity, type Ledger, type Detail, type HistoricalUser } from '@/api/production/productionReport'
 const ElMessageBox = usePageMessageBox()
 
-const props = defineProps<{ executionId: string }>()
+const props = defineProps<{ executionCode: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref('')
 const quantity = ref<ExecutionQuantity | null>(null), nodeId = ref(''), rows = ref<Ledger[]>([]), total = ref(0), page = ref(1), limit = ref(20), ledgerLoading = ref(false)
@@ -32,8 +32,8 @@ const historyWritable = computed(() => quantity.value?.pathStatus === 'LOCKED')
 const can = (action: keyof typeof reportPermissions) => auth.hasPermission(reportPermissions[action], 'factory')
 const quantityValid = ref(false)
 const command = ref<'supplement' | 'adjust' | 'void' | null>(null), original = ref<Ledger | null>(null), saving = ref(false), commandError = ref('')
-const pending = ref<{ requestId: string; uncertain: boolean; mode: 'supplement' | 'adjust' | 'void'; originalId: string | null; executionId: string; nodeId: string; form: typeof form } | null>(null)
-const pendingKey = () => 'mes-admin-report-pending:' + auth.username + ':' + auth.factoryId + ':' + props.executionId
+const pending = ref<{ requestId: string; uncertain: boolean; mode: 'supplement' | 'adjust' | 'void'; originalId: string | null; executionCode: string; nodeId: string; form: typeof form } | null>(null)
+const pendingKey = () => 'mes-admin-report-pending:' + auth.username + ':' + auth.factoryId + ':' + props.executionCode
 const form = reactive({ quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' })
 const users = ref<HistoricalUser[]>([]), userKeyword = ref(''), usersLoading = ref(false), userOffset = ref(0), usersMore = ref(false)
 const historyVisible = ref(false), detail = ref<Detail | null>(null), history = ref<Ledger[]>([]), historyPage = ref(1), historyLimit = ref(20), historyTotal = ref(0), historyLoading = ref(false), historyError = ref('')
@@ -42,7 +42,7 @@ const commandTitle = computed(() => command.value === 'supplement' ? '管理员�
 function setCommandVisible(value: boolean) { if (!value && !pending.value) clearCommand() }
 function clearCommand() { pending.value = null; userSequence++; command.value = null; original.value = null; users.value = []; usersLoading.value = false; saving.value = false; commandError.value = ''; Object.assign(form, { quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' }) }
 function clear() { generation++; ledgerSequence++; historySequence++; visible.value = false; quantity.value = null; path.value = null; pathError.value = ''; ledgerError.value = ''; rows.value = []; nodeId.value = ''; total.value = 0; page.value = 1; loading.value = false; ledgerLoading.value = false; error.value = ''; clearCommand(); historyVisible.value = false; detail.value = null; history.value = []; historyLoading.value = false }
-watch(() => props.executionId, () => { clear(); if (props.executionId && can('quantity')) { visible.value = true; void refresh() } }, { flush: 'sync', immediate: true })
+watch(() => props.executionCode, () => { clear(); if (props.executionCode && can('quantity')) { visible.value = true; void refresh() } }, { flush: 'sync', immediate: true })
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
 onBeforeUnmount(clear)
 async function refresh() {
@@ -56,7 +56,7 @@ async function refresh() {
     requestedNode = nodeId.value
     await loadLedger()
   }
-  const reads = [api.quantities(props.executionId).then(async value => {
+  const reads = [api.quantities(props.executionCode).then(async value => {
     if (ticket !== generation || !visible.value) return
     quantity.value = value
     await refreshLedger()
@@ -64,7 +64,7 @@ async function refresh() {
     if (ticket === generation) error.value = e instanceof Error ? e.message : '数量读取失败'
   })]
   if (can('detail') && auth.hasPermission('business:mes:production:execution:query', 'factory')) {
-    reads.push(executionActions.path(props.executionId).then(async value => {
+    reads.push(executionActions.path(props.executionCode).then(async value => {
       if (ticket !== generation || !visible.value) return
       path.value = value
       await refreshLedger()
@@ -82,7 +82,7 @@ async function loadLedger() {
   const ticket = ++ledgerSequence; rows.value = []; total.value = 0; ledgerError.value = ''
   if (!visible.value || !nodeId.value || !can('detail')) return
   ledgerLoading.value = true
-  try { const result = await api.page(props.executionId, nodeId.value, (page.value - 1) * limit.value, limit.value); if (ticket !== ledgerSequence) return; rows.value = result.items; total.value = result.total } catch(e) { if (ticket === ledgerSequence) ledgerError.value = e instanceof Error ? e.message : '流水读取失败' } finally { if (ticket === ledgerSequence) ledgerLoading.value = false }
+  try { const result = await api.page(props.executionCode, nodeId.value, (page.value - 1) * limit.value, limit.value); if (ticket !== ledgerSequence) return; rows.value = result.items; total.value = result.total } catch(e) { if (ticket === ledgerSequence) ledgerError.value = e instanceof Error ? e.message : '流水读取失败' } finally { if (ticket === ledgerSequence) ledgerLoading.value = false }
 }
 async function openCommand(mode: 'supplement' | 'adjust' | 'void', row?: Ledger) {
   if (!can(mode) || !historyWritable.value || !node.value || mode === 'supplement' && node.value.positiveReportBlockReason || row && row.recordType !== 'REPORT') return
@@ -108,13 +108,13 @@ async function save() {
   if (mode !== 'void' && (!quantityValid.value || !/[1-9]/.test(form.quantity))) { commandError.value = '请输入符合单位规则的非零数量；补录必须为正数'; return }
   if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) { commandError.value = '请选择历史操作人员并填写实际生产时间'; return }
   if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) { commandError.value = '工作站编号应为正整数'; return }
-    pending.value = { requestId: crypto.randomUUID(), uncertain: false, mode, originalId: original.value?.id ?? null, executionId: props.executionId, nodeId: node.value.routingNodeId, form: { ...form, quantity: normalizedQuantityInput(form.quantity) }}
+    pending.value = { requestId: crypto.randomUUID(), uncertain: false, mode, originalId: original.value?.id ?? null, executionCode: props.executionCode, nodeId: node.value.routingNodeId, form: { ...form, quantity: normalizedQuantityInput(form.quantity) }}
     sessionStorage.setItem(pendingKey(), JSON.stringify(pending.value))
   }
   const intent = pending.value, body = intent.form, storageKey = pendingKey()
   const ticket = generation; saving.value = true; commandError.value = ''
   try {
-    if (intent.mode === 'supplement') await api.supplement({ requestId: intent.requestId, executionId: intent.executionId, routingNodeId: intent.nodeId, quantity: body.quantity, operatorUserId: body.operatorUserId, reportTime: body.reportTime, workstationId: body.workstationId || null, reason: body.reason.trim() })
+    if (intent.mode === 'supplement') await api.supplement({ requestId: intent.requestId, executionCode: intent.executionCode, routingNodeId: intent.nodeId, quantity: body.quantity, operatorUserId: body.operatorUserId, reportTime: body.reportTime, workstationId: body.workstationId || null, reason: body.reason.trim() })
     else if (intent.mode === 'adjust') await api.adjust(intent.originalId!, body.quantity, body.reason.trim(), intent.requestId)
     else await api.void(intent.originalId!, body.reason.trim(), intent.requestId)
     sessionStorage.removeItem(storageKey)
@@ -153,7 +153,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
 <template>
   <section v-if="visible && can('quantity')" aria-label="生产数量与报工管理">
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
-    <div class="table-toolbar"><strong>{{ '执行 ' + executionId }}</strong><span v-if="quantity">计划数量：<QuantityText :value="quantity.targetQty" /> · 确认投产：<QuantityText :value="quantity.confirmedInputQty" /> · 撤销预留：<QuantityText :value="quantity.reservedInputQty" /> · 可支用投产额度：<QuantityText :value="quantity.productionInputQty" /> · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
+    <div class="table-toolbar"><strong>{{ '执行 ' + executionCode }}</strong><span v-if="quantity">计划数量：<QuantityText :value="quantity.targetQty" /> · 确认投产：<QuantityText :value="quantity.confirmedInputQty" /> · 撤销预留：<QuantityText :value="quantity.reservedInputQty" /> · 可支用投产额度：<QuantityText :value="quantity.productionInputQty" /> · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
     <el-alert title="当前净产出按正式报工与有效不良计算。不良入仓不会增加产出，入库审核后核对完结条件。" type="info" :closable="false" />
     <p v-if="quantity && !quantity.writable" class="secondary">当前不可继续正常报工；历史补录、订正及冲销仍按独立权限与业务约束校验。</p>
     <el-alert v-if="quantity?.boundary" :title="quantity.boundary" type="warning" :closable="false" />
@@ -209,7 +209,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
   </PageDialog>
   <PageDialog :model-value="Boolean(command)" :title="commandTitle" width="min(640px, 94vw)" append-to-body destroy-on-close :before-close="closeCommand" :show-close="!saving" :close-on-click-modal="!saving" :close-on-press-escape="!saving" @update:model-value="setCommandVisible">
     <el-alert v-if="commandError" :title="commandError" type="error" :closable="false" />
-    <p>{{ quantity?.executionId }} · {{ node?.code }} · {{ node?.name || '工序名称未记录' }}</p>
+    <p>{{ quantity?.executionCode }} · {{ node?.code }} · {{ node?.name || '工序名称未记录' }}</p>
     <p v-if="original">原始流水：{{ original.id }}，原始报工量：<QuantityText :value="original.quantityDelta" />。调整继承原操作人员及实际生产时间。</p>
     <p v-if="command === 'void'" class="secondary">将追加一笔负向调整，把原始报工当前有效余额调整为零；上下游数量仍须满足约束。</p>
     <el-form class="report-command" label-position="top" :disabled="saving || !!pending" @submit.prevent="save">

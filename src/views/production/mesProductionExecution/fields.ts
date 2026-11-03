@@ -4,13 +4,13 @@ import type { Field } from '@/lib/crud'
 
 export const fields: Field[] = [
   {
-    key: 'id',
-    label: '执行ID',
+    key: 'executionCode',
+    label: '执行码',
     kind: 'text',
     readonly: true,
     required: true,
     searchable: true,
-    maxLength: 19
+    maxLength: 2048
   },
   {
     key: 'workorderId',

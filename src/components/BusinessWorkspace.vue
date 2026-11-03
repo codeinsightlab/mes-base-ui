@@ -42,12 +42,12 @@ function refreshWorkspace() { void reload(); void progress.value?.reload() }
               <template #error><h3>待办：恢复近期报工接入</h3><p>近期报工读取失败，请确认后端已加载接口后重新读取。</p><p>{{ reports.error }}</p></template>
               <div class="console-caption">按流水编号倒序显示最近 10 条</div>
               <el-table :data="reports.value || []" row-key="id" empty-text="当前工厂暂无报工流水">
-                <el-table-column label="工单 / 执行" min-width="185"><template #default="{ row }"><CodeText :value="row.workorderCode || row.workorderId" /><div><CodeText :value="row.executionId" /></div></template></el-table-column>
+                <el-table-column label="工单 / 执行" min-width="185"><template #default="{ row }"><CodeText :value="row.workorderCode || row.workorderId" /><div><CodeText :value="row.executionCode" /></div></template></el-table-column>
                 <el-table-column label="产品 / 工序" min-width="155"><template #default="{ row }">{{ row.productName || row.productCode || '未提供' }}<div class="secondary">{{ row.operationName || row.routingNodeId }}</div></template></el-table-column>
                 <el-table-column label="类型 / 数量增量" min-width="180" align="right"><template #default="{ row }">{{ row.recordType === 'REPORT' ? '报工' : row.recordType === 'ADJUSTMENT' ? '调整 / 冲销' : row.recordType }}<div><QuantityText :value="row.quantityDelta" /></div><div class="secondary">{{ row.unitName || '单位未提供' }}</div></template></el-table-column>
                 <el-table-column label="报工人" min-width="110"><template #default="{ row }">{{ row.operatorName || row.operatorUserId }}</template></el-table-column>
                 <el-table-column label="登记时间" min-width="170"><template #default="{ row }">{{ parseTime(row.createTime) }}</template></el-table-column>
-                <el-table-column label="操作" width="100"><template #default="{ row }"><RouterLink v-if="row.executionId && auth.hasPermission('business:production:report:quantity', 'factory')" :to="{ path: '/production/productionReport', query: { executionId: row.executionId } }">查看数量</RouterLink></template></el-table-column>
+                <el-table-column label="操作" width="100"><template #default="{ row }"><RouterLink v-if="row.executionCode && auth.hasPermission('business:production:report:quantity', 'factory')" :to="{ path: '/production/productionReport', query: { executionCode: row.executionCode } }">查看数量</RouterLink></template></el-table-column>
               </el-table>
               <footer class="console-footer">包含历史补录、调整与冲销，数量增量不等于合格产出；单位为当前产品单位。</footer>
             </WorkspaceReadState>
@@ -57,7 +57,7 @@ function refreshWorkspace() { void reload(); void progress.value?.reload() }
               <template #error><h3>待办：恢复质量数据接入</h3><p>质量处置流水读取失败，请核实接口与业务库版本后重新读取。</p><p>{{ defects.error }}</p></template>
               <div class="console-caption"><span>按登记时间倒序显示最近 10 条处理记录</span><RouterLink to="/quality/productionDefect">质量管理</RouterLink></div>
               <el-table :data="defects.value || []" row-key="id" empty-text="当前工厂暂无不良处置流水">
-                <el-table-column label="不良声明 / 执行" min-width="180"><template #default="{ row }"><CodeText :value="row.declarationId" /><div><CodeText :value="row.executionId" /></div></template></el-table-column>
+                <el-table-column label="不良声明 / 执行" min-width="180"><template #default="{ row }"><CodeText :value="row.declarationId" /><div><CodeText :value="row.executionCode" /></div></template></el-table-column>
                 <el-table-column label="处理动作" min-width="160"><template #default="{ row }">{{ treatmentActionLabel(row.actionType) }}</template></el-table-column>
                 <el-table-column label="处理数量" min-width="110" align="right"><template #default="{ row }"><QuantityText v-if="row.actionType === 'RETURN_NODE'" :value="row.returnedQty" /><QuantityText v-else-if="row.actionType === 'TRANSFER_WAREHOUSE'" :value="row.transferQty" /><span v-else>—</span></template></el-table-column>
                 <el-table-column label="操作人" min-width="120"><template #default="{ row }">{{ row.operatorName || row.operatorUserId }}</template></el-table-column>
@@ -84,7 +84,7 @@ function refreshWorkspace() { void reload(); void progress.value?.reload() }
         <WorkspaceReadState :resource="ready" @retry="reload">
           <p class="section-note">仅列本次前 6 条中所属工单已下达的记录。</p>
           <p v-if="!readyTasks.length" class="console-empty">本次读取无匹配待办，可在执行列表继续查询。</p>
-          <ul v-else class="business-task-list"><li v-for="row in readyTasks" :key="row.id"><RouterLink :to="{ path: '/production/mesProductionExecution', query: { workorderId: row.workorderId } }"><CodeText :value="row.id" /></RouterLink><p>核对实际路径、派工与开工条件</p></li></ul>
+          <ul v-else class="business-task-list"><li v-for="row in readyTasks" :key="row.executionCode"><RouterLink :to="{ path: '/production/mesProductionExecution', query: { workorderId: row.workorderId } }"><CodeText :value="row.executionCode" /></RouterLink><p>核对实际路径、派工与开工条件</p></li></ul>
           <RouterLink to="/production/mesProductionExecution">打开执行列表</RouterLink>
         </WorkspaceReadState>
         <details class="module-disclosure"><summary>待接入事项</summary><p class="section-note">首检 / 巡检任务、班次计划、工时采集尚无完整数据契约，暂不提供数量与合格率。</p></details>

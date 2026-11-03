@@ -59,11 +59,11 @@ const fixed = computed(() => props.workorderId ? { workorderId: props.workorderI
     detail-action="query"
     :api="api"
     :fields="fields"
-    id-key="id"
+    id-key="executionCode"
     @changed="$emit('changed')"
   >
     <template #search-routingId="{ search }"><BusinessDirectorySelect v-model="(search.routingId as string | null)" resource="routings" placeholder="搜索工艺名称或编码" /></template>
-    <template #field-workorderId="{ draft }"><WorkOrderSelect v-model="(draft.workorderId as string | null)" :source="auth.runtimeMode==='LOCAL'?'LOCAL':auth.runtimeMode==='ERP'?'EXTERNAL':null" :disabled="Boolean(draft.id)" /></template>
+    <template #field-workorderId="{ draft }"><WorkOrderSelect v-model="(draft.workorderId as string | null)" :source="auth.runtimeMode==='LOCAL'?'LOCAL':auth.runtimeMode==='ERP'?'EXTERNAL':null" :disabled="Boolean(draft.executionCode)" /></template>
     <template #field-routingId="{ draft }"><ExecutionRoutingSelect v-model="(draft.routingId as string | null)" :workorder-id="(draft.workorderId as string | null)" :disabled="draft.status !== 'READY'" /></template>
     <template #toolbar><el-button v-if="auth.hasPermission('business:mes:material:issue:update', 'factory')" @click="router.push('/production/productionInput')">正式领料创建执行</el-button><ExecutionIdentityLookup /></template>
     <template #cell-status="{row}">{{ executionStatusLabel(String(row.status)) }}<el-tag v-if="row.workorderStatus==='CANCELLED'" type="danger">所属工单已作废</el-tag></template>
@@ -77,26 +77,26 @@ const fixed = computed(() => props.workorderId ? { workorderId: props.workorderI
         trigger="click"
         :width="240"
         :persistent="true"
-        :visible="activeActions === String(row.id)"
-        @update:visible="setActionsVisible(String(row.id), $event)"
+        :visible="activeActions === String(row.executionCode)"
+        @update:visible="setActionsVisible(String(row.executionCode), $event)"
       >
-        <template #reference><el-button link type="primary" :aria-expanded="activeActions === String(row.id)" @keydown.esc="activeActions = null">更多操作 <span class="execution-actions-chevron" aria-hidden="true" /></el-button></template>
+        <template #reference><el-button link type="primary" :aria-expanded="activeActions === String(row.executionCode)" @keydown.esc="activeActions = null">更多操作 <span class="execution-actions-chevron" aria-hidden="true" /></el-button></template>
         <div class="execution-actions" @click="actionClicked" @keydown.esc="activeActions = null">
-          <div class="execution-actions-context" :title="String(row.id)">{{ row.id }}</div>
+          <div class="execution-actions-context" :title="String(row.executionCode)">{{ row.executionCode }}</div>
           <section v-if="canQuery || canQuantity" class="execution-actions-group" aria-label="执行查看">
             <h3>执行查看</h3>
-            <ExecutionRoutePreview :execution-id="String(row.id)" />
-            <el-button v-if="canQuantity" link type="primary" @click="router.push({path:'/production/productionReport',query:{executionId:String(row.id),workorderId:String(row.workorderId)}})">查看生产数量</el-button>
-            <ExecutionIdentityLookup :id="String(row.id)" />
+            <ExecutionRoutePreview :execution-code="String(row.executionCode)" />
+            <el-button v-if="canQuantity" link type="primary" @click="router.push({path:'/production/productionReport',query:{executionCode:String(row.executionCode),workorderId:String(row.workorderId)}})">查看生产数量</el-button>
+            <ExecutionIdentityLookup :id="String(row.executionCode)" />
           </section>
           <section v-if="['DRAFT','RELEASED'].includes(String(row.workorderStatus)) && (canAssign || canQuery)" class="execution-actions-group" aria-label="生产操作">
             <h3>生产操作</h3>
-            <OperatorConfiguration :execution-id="String(row.id)" :context-label="String(row.id)" />
-            <ExecutionActions :id="String(row.id)" @changed="changed" />
+            <OperatorConfiguration :execution-code="String(row.executionCode)" :context-label="String(row.executionCode)" />
+            <ExecutionActions :id="String(row.executionCode)" @changed="changed" />
           </section>
           <section v-if="canQuery" class="execution-actions-group" aria-label="生产闭环">
             <h3>生产闭环</h3>
-            <ProductionClosurePanel :id="String(row.id)" :routing-id="row.routingId" :batch-no="row.batchNo" @changed="changed" />
+            <ProductionClosurePanel :id="String(row.executionCode)" :routing-id="row.routingId" :batch-no="row.batchNo" @changed="changed" />
           </section>
         </div>
       </el-popover>

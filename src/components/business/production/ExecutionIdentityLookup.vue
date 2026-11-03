@@ -79,7 +79,7 @@ function open() {
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-descriptions v-if="result" :column="1" border>
       <el-descriptions-item label="身份码">{{ result.qrCode || '未生成（未记录批次）' }}</el-descriptions-item>
-      <el-descriptions-item label="执行ID">{{ result.executionId }}</el-descriptions-item>
+      <el-descriptions-item label="执行码">{{ result.executionCode }}</el-descriptions-item>
       <el-descriptions-item label="工单">{{ result.workorderCode }}（{{ result.workorderId }}）</el-descriptions-item>
       <el-descriptions-item label="产出产品">{{ result.productCode }} · {{ result.productName }}</el-descriptions-item>
       <el-descriptions-item label="生产批次">{{ result.batchNo || '未记录' }}</el-descriptions-item>
@@ -88,6 +88,6 @@ function open() {
       <el-descriptions-item label="计划执行数量"><QuantityText :value="result.targetQty" /></el-descriptions-item>
     </el-descriptions>
     <el-button v-if="selectable && result" type="primary" @click="emit('selected', result); clear()">使用此执行单元</el-button>
-    <OperatorConfiguration v-if="result && !selectable" :execution-id="result.executionId" :context-label="result.executionId" />
+    <OperatorConfiguration v-if="result && !selectable" :execution-code="result.executionCode" :context-label="result.executionCode" />
   </PageDialog>
 </template>

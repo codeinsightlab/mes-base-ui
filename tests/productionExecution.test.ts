@@ -14,7 +14,7 @@ vi.mock('../src/api/production/mesProductionExecution', () => ({ api }))
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   resolve.mockReset();scan.mockReset()
-  api.list.mockReset().mockResolvedValue({ items: [{ id: '9007199254740993', workorderId: '1', productId: '781234', productCode: 'P-001', routingId: '3', targetQty: '99999999999999.123456', status: 'READY' }], total: 1, offset: 0, limit: 20 })
+  api.list.mockReset().mockResolvedValue({ items: [{ id: '9007199254740993', executionCode: 'WO001:M1#LOT1', workorderId: '1', productId: '781234', productCode: 'P-001', routingId: '3', targetQty: '99999999999999.123456', status: 'READY' }], total: 1, offset: 0, limit: 20 })
 })
 function setup() {
   const pinia = createPinia(), auth = useAuth(pinia)
@@ -26,7 +26,7 @@ describe('production execution identity', () => {
   it('read grants allow scanning and preserve decimal/ID precision while hiding mutations', async() => {
     const context = setup(), wrapper = mount(Page, { global: context.global })
     await flushPromises()
-    expect(wrapper.text()).toContain('9007199254740993')
+    expect(wrapper.text()).toContain('WO001:M1#LOT1')
     expect(wrapper.text()).toContain('产出品号')
     expect(wrapper.text()).toContain('P-001')
     expect(wrapper.text()).not.toContain('781234')
@@ -41,7 +41,7 @@ describe('production execution identity', () => {
     wrapper.unmount()
   })
   it('queries exact identity code and never calls CRUD mutations', async() => {
-    resolve.mockResolvedValue({ executionId: '9007199254740993', qrCode: 'WO001:P001#9007199254740993', batchNo: '9007199254740993', productName: '验收产品', routingVersion: 2 })
+    resolve.mockResolvedValue({ executionCode: '9007199254740993', qrCode: 'WO001:P001#9007199254740993', batchNo: '9007199254740993', productName: '验收产品', routingVersion: 2 })
     const context = setup(), wrapper = mount(Lookup, { props: { id: '9007199254740993' }, global: context.global })
     await wrapper.find('button').trigger('click')
     await flushPromises()
@@ -78,7 +78,7 @@ describe('production execution identity', () => {
 })
 
 it('routes scanner and manual code lookup through the shared audit function while showing the authoritative batch', async() => {
-  scan.mockResolvedValue({ executionId: '9007199254740993', batchNo: 'BATCH-EXACT', productCode: 'PRODUCT', targetQty: '1' })
+  scan.mockResolvedValue({ executionCode: '9007199254740993', batchNo: 'BATCH-EXACT', productCode: 'PRODUCT', targetQty: '1' })
   const context = setup(), wrapper = mount(Lookup, { global: context.global })
   const state = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState
   state.scanned(' WO:PRODUCT#BATCH ', 'IMAGE');await flushPromises()
@@ -110,12 +110,12 @@ it.each(['factory', 'permission', 'switching', 'close', 'native close', 'unmount
   else if (mode === 'native close')wrapper.findAllComponents({ name: 'ElDialog' }).find(dialog => dialog.props('title') === '生产执行身份查询')!.props('beforeClose')!(vi.fn())
   else wrapper.unmount()
   expect(state.visible).toBe(false);expect(state.code).toBe('');expect(state.loading).toBe(false)
-  finish({ executionId: 'old', batchNo: 'OLD-BATCH' });await wait
+  finish({ executionCode: 'old', batchNo: 'OLD-BATCH' });await wait
   expect(state.result).toBeNull();if (mode !== 'unmount')wrapper.unmount()
 })
 
 it('shows an execution with no historical batch as an ID and an ungenerated code', async() => {
-  resolve.mockResolvedValueOnce({ executionId: '9007199254740993', batchNo: null, qrCode: null, productName: '历史产品' })
+  resolve.mockResolvedValueOnce({ executionCode: '9007199254740993', batchNo: null, qrCode: null, productName: '历史产品' })
   const context = setup(), wrapper = mount(Lookup, { props: { id: '9007199254740993' }, global: context.global })
   await wrapper.get('button').trigger('click');await flushPromises()
   expect(resolve).toHaveBeenCalledExactlyOnceWith('9007199254740993');expect(scan).not.toHaveBeenCalled()

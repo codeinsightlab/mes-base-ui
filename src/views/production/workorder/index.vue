@@ -27,6 +27,7 @@ import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import { emptyMaterialDemand, materialDemandDraft, workorderMaterial } from '@/api/production/workorderMaterial'
 import WorkOrderExecutions from '@/components/business/production/WorkOrderExecutions.vue'
 import WorkOrderRoutePreview from '@/components/business/production/WorkOrderRoutePreview.vue'
+import WorkOrderBomBuildDialog from '@/components/business/production/WorkOrderBomBuildDialog.vue'
 import { api, type Detail, type NumberingRuleOption, type RoutingOption, type Save } from '@/api/production/workorder'
 import { useAuth } from '@/stores/auth'
 const ElMessageBox = usePageMessageBox()
@@ -49,6 +50,7 @@ function resizeDetails() { detailColumns.value = window.innerWidth < 600 ? 1 : 2
 onMounted(() => { resizeDetails(); window.addEventListener('resize', resizeDetails) })
 onBeforeUnmount(() => window.removeEventListener('resize', resizeDetails))
 const dialog = ref(false), drawer = ref(false), detail = ref<Detail | null>(null), editId = ref<string | null>(null)
+const bomBuildDialog = ref(false)
 const routeOptions = ref<RoutingOption[]>([])
 const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false)
 const routesLoading = ref(false)
@@ -191,7 +193,7 @@ onMounted(load)
       <el-form-item label="状态"><el-select v-model="status" clearable style="width:140px"><el-option v-for="(state, value) in orderStates" :key="value" :label="state.label" :value="value" /></el-select></el-form-item>
       <el-button native-type="submit">查询</el-button>
     </QueryForm>
-    <div class="table-toolbar"><E10SyncPreview kind="workorder" permission="workorder:sync" @completed="load" /><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量；数量最多显示两位小数，悬停查看精确值</span></div>
+    <div class="table-toolbar"><E10SyncPreview kind="workorder" permission="workorder:sync" @completed="load" /><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" @click="bomBuildDialog=true">BOM展阶创建工单</el-button><el-button v-if="can('create') && auth.runtimeMode === 'LOCAL'" type="primary" @click="create">新增工单</el-button><el-button @click="load">刷新</el-button><span class="secondary">未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量；数量最多显示两位小数，悬停查看精确值</span></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-table v-loading="loading" :data="rows" row-key="workorder.id">
       <el-table-column label="工单号" width="160"><template #default="{row}"><CodeText :value="row.workorder.code" /><el-tag v-if="row.erpExtraMissing" type="warning" size="small" title="该工单扩展记录缺失，详情和修改仍需通过完整性校验">扩展记录缺失</el-tag></template></el-table-column>
@@ -213,6 +215,7 @@ onMounted(load)
       </template></el-table-column>
     </el-table>
     <Pagination v-model:page="page" v-model:limit="pageSize" :total="total" @pagination="load" />
+    <WorkOrderBomBuildDialog v-model="bomBuildDialog" @completed="load" />
     <PageDialog v-model="dialog" :title="editId?'编辑工单':'新增工单'" width="min(1220px,96vw)">
       <el-form label-width="110px">
         <el-form-item v-if="!editId" label="工单编码规则" required><el-select v-model="form.ruleCode" :loading="numberingRulesLoading" :disabled="busy" placeholder="选择工单编码规则"><el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode}）`" /></el-select><span class="help-block">单号由服务端按所选规则生成。</span></el-form-item>
@@ -237,6 +240,7 @@ onMounted(load)
         <el-descriptions :column="detailColumns" border>
           <el-descriptions-item label="来源">{{ detail.workorder.source || '历史待核实：禁止新交易' }}</el-descriptions-item><el-descriptions-item label="工单">{{ detail.workorder.code }}</el-descriptions-item><el-descriptions-item label="产出物料">{{ detail.productCode }} · {{ detail.productName }}</el-descriptions-item>
           <el-descriptions-item label="默认工艺">{{ detail.routing ? detail.routing.code + ' / V' + detail.routing.version : '无工艺，直接入库' }}</el-descriptions-item><el-descriptions-item label="计划数量"><QuantityText :value="detail.allocation.plannedQty" /></el-descriptions-item>
+          <el-descriptions-item v-if="detail.workorder.bomBuildId" label="展阶创建集合">{{ detail.workorder.bomBuildId }} · 来源路径 {{ detail.workorder.bomBuildPath || 'ROOT' }} · 父工单 {{ detail.workorder.bomBuildParentWorkorderId || '无' }} · BOM行 {{ detail.workorder.bomBuildSourceLineId || '根版本' }}</el-descriptions-item>
           <el-descriptions-item label="执行目标合计"><QuantityText :value="detail.allocation.allocatedTargetQty" /></el-descriptions-item><el-descriptions-item label="未分配执行数量"><QuantityText :value="detail.allocation.remainingTargetQty" /></el-descriptions-item>
           <el-descriptions-item label="执行单元数">{{ detail.allocation.executionCount }}</el-descriptions-item>
         </el-descriptions>

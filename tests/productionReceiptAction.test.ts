@@ -16,7 +16,7 @@ vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: quantityReads.un
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => {
   sessionStorage.clear(); vi.clearAllMocks(); invalidateQuantityRules();quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 })
-  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '100', received: '90', remaining: '10', canReceive: true, blockedReason: null })
+  calls.basis.mockResolvedValue({ executionCode: '9007199254740999', productId: '88', effective: '100', received: '90', remaining: '10', canReceive: true, blockedReason: null })
   calls.receive.mockResolvedValue({ document: { id: '901', status: 'POSTED' }, lines: [] })
   calls.confirm.mockResolvedValue('confirm')
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
@@ -25,7 +25,7 @@ afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '';vi.unstubAllG
 async function setup(approve = true) {
   const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.username = 'qa'
   auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:wm:stock:document:create', ...(approve ? ['business:wm:stock:document:post'] : [])]
-  wrapper = mount(ReceiptAction, { props: { executionId: '9007199254740999' }, global: { plugins: [pinia, ElementPlus], stubs: { WarehouseSelect: true, StockSourceSelect: true }}})
+  wrapper = mount(ReceiptAction, { props: { executionCode: '9007199254740999' }, global: { plugins: [pinia, ElementPlus], stubs: { WarehouseSelect: true, StockSourceSelect: true }}})
   const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState
   s.open();await flushPromises()
   return { s, auth }
@@ -87,7 +87,7 @@ it.each([
   { whole: 0, precision: 2 }
 ])('settles only the exact trusted old receipt remainder with rule $whole/$precision', async({ whole, precision }) => {
   quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: whole, quantityPrecision: precision })
-  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '1.234567', received: '0', remaining: '1.234567', canReceive: true, blockedReason: null })
+  calls.basis.mockResolvedValue({ executionCode: '9007199254740999', productId: '88', effective: '1.234567', received: '0', remaining: '1.234567', canReceive: true, blockedReason: null })
   const { s } = await setup();fill(s);s.quantity = '0.234567'
   await flushPromises();await s.submit()
   expect(calls.receive).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
@@ -97,22 +97,22 @@ it.each([
 
 it('keeps compliant partial receipt quantities valid after tightening and rejects an obsolete remainder after refresh', async() => {
   quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 0 })
-  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '2.234567', received: '0', remaining: '2.234567', canReceive: true, blockedReason: null })
+  calls.basis.mockResolvedValue({ executionCode: '9007199254740999', productId: '88', effective: '2.234567', received: '0', remaining: '2.234567', canReceive: true, blockedReason: null })
   const { s } = await setup();fill(s);s.quantity = '1'
   await flushPromises();await s.submit()
   expect(calls.receive.mock.calls[0]![1].quantity).toBe('1')
   calls.receive.mockClear();s.quantity = '2.234567';s.reason = '重新核对余量'
-  calls.basis.mockResolvedValueOnce({ executionId: '9007199254740999', productId: '88', effective: '2.234567', received: '1', remaining: '1.234567', canReceive: true, blockedReason: null })
+  calls.basis.mockResolvedValueOnce({ executionCode: '9007199254740999', productId: '88', effective: '2.234567', received: '1', remaining: '1.234567', canReceive: true, blockedReason: null })
   await s.load();await flushPromises();await s.submit()
   expect(calls.receive).not.toHaveBeenCalled()
 })
 
 it('does not mistake another execution remainder for settlement when the execution changes', async() => {
   quantityReads.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 0 })
-  calls.basis.mockResolvedValue({ executionId: '9007199254740999', productId: '88', effective: '1.234567', received: '0', remaining: '1.234567', canReceive: true, blockedReason: null })
+  calls.basis.mockResolvedValue({ executionCode: '9007199254740999', productId: '88', effective: '1.234567', received: '0', remaining: '1.234567', canReceive: true, blockedReason: null })
   const { s } = await setup();fill(s);s.quantity = '1.234567';await flushPromises()
   expect(s.quantityValid).toBe(true)
-  await wrapper.setProps({ executionId: '123' });await flushPromises()
+  await wrapper.setProps({ executionCode: '123' });await flushPromises()
   expect(s.basis).toBeNull();expect(s.quantityValid).toBe(false)
   await s.submit();expect(calls.receive).not.toHaveBeenCalled()
 })

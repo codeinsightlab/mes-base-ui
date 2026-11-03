@@ -17,25 +17,25 @@ export const stockDocumentPurpose = (value:unknown) => typeof value === 'string'
 export const stockDocumentPermission = 'business:wm:stock:document'
 export interface Header extends Row {
   id: string; documentNo: string; direction: StockDocumentDirection; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED';
-  reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionId: string | null; postRequestId: string | null; createRequestId?: string | null
+  reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionCode: string | null; postRequestId: string | null; createRequestId?: string | null
 }
 export interface Line extends Row { demandLineId?: string | null; id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
 export interface MaterialIssueBasis { requestId: string;code: string;workorderId: string;outputQty: string;routingId: string;routingNodeIds: string[] }
 export interface ProductionInputBasis { combinationId: string | null; allocations: import('@/api/production/productionCombination').Allocation[];
-  requestId: string;inputKind: string;sourceMode: string;executionId: string;workorderId: string;workorderCode: string;
+  requestId: string;inputKind: string;sourceMode: string;executionCode: string;workorderId: string;workorderCode: string;
   outputQty: string;issueQty: string | null;materialId: string | null;materialCode: string | null;warehouseId: string | null;unitId: string | null;batchNo: string | null;
   bomId: string | null;bomBaseQty: string | null;bomComponentQty: string | null;pathRevision: string | null;
   routingNodeIds: string[];businessOccurredAt: string | null;confirmedAt: string | null;stockApplied: boolean | null;voidOperationId: string | null;
   voidResultStatus: string | null;pathError: string | null
 }
-export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionId: string } | null }
+export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionCode: string } | null }
 export interface ProductionReceiptCommand { requestId: string; stockId: string; quantity: string; reason: string }
 export interface ApprovalIntent { requestId: string;expectedRevision: string }
 export interface MaterialIssueVoidResult {
   documentId: string;documentStatus: string;productionInputStatus: string | null;voidOperationId: string | null;
   voidResultStatus: string | null;voidRequestedAt: string | null;voidFinishedAt: string | null;message: string | null
 }
-export interface ProductionBasis { reportingRequired: boolean; executionId: string;productId: string;effective: string;received: string;remaining: string;canReceive: boolean;blockedReason: string | null }
+export interface ProductionBasis { reportingRequired: boolean; executionCode: string;productId: string;effective: string;received: string;remaining: string;canReceive: boolean;blockedReason: string | null }
 export interface CancellationBasis { workorderId: string;productId: string;status: string;handedOver: string;accepted: string;manuallyReceived: string;remaining: string }
 const root = (direction: StockDocumentDirection = 'OUT') => '/api/wm/' + (direction === 'IN' ? 'inbound-documents' : 'outbound-documents')
 const path = (id:string, direction: StockDocumentDirection = 'OUT') => root(direction) + '/' + encodeURIComponent(id)
@@ -78,7 +78,7 @@ export function stockDocumentApis(access: { issueListOnly: () => boolean; issueQ
     const b = raw as Row
     if (!Array.isArray(b.items)) throw Error('请填写单据明细')
     return { header: { documentType: b.documentType, reason: b.reason, remark: b.remark,
-      sourceWorkorderId: b.sourceWorkorderId, sourceExecutionId: b.sourceExecutionId,
+      sourceWorkorderId: b.sourceWorkorderId, sourceExecutionCode: b.sourceExecutionCode,
       ruleCode: b.ruleCode, expectedRevision: b.revision }, productionIssue: b.productionIssue, items: b.items.map((value:unknown) => {
       const line = value as Row
       return { id: line.id ?? null, stockId: line.stockId, materialId: line.materialId, warehouseId: line.warehouseId,

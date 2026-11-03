@@ -6,12 +6,12 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { qualityV2 as api, wasteLabels, type Statistics } from '@/api/quality/qualityV2'
 import { useAuth } from '@/stores/auth'
 import Pagination from '@/components/Pagination/index.vue'
-const props = defineProps<{ executionId?: string }>(), auth = useAuth(), allowed = computed(() => auth.hasPermission('business:quality:defect:read', 'factory'))
+const props = defineProps<{ executionCode?: string }>(), auth = useAuth(), allowed = computed(() => auth.hasPermission('business:quality:defect:read', 'factory'))
 const rows = ref<Statistics[]>([]), page = ref(1), total = ref(0), category = ref(''), attribution = ref(''), from = ref(''), to = ref(''), error = ref(''), loading = ref(false)
 let ticket = 0
 function clear() { ticket++;rows.value = [];total.value = 0;error.value = '';loading.value = false }
-async function load() { clear();if (!allowed.value) return;const t = ticket;loading.value = true;try { const p = await api.statistics({ ...(props.executionId ? { executionId: props.executionId } : {}), ...(category.value ? { wasteCategory: category.value } : {}), ...(attribution.value ? { attribution: attribution.value } : {}), ...(from.value ? { from: from.value } : {}), ...(to.value ? { to: to.value } : {}), offset: (page.value - 1) * 20, limit: 20 });if (t === ticket) { rows.value = p.items;total.value = p.total } } catch(e) { if (t === ticket)error.value = e instanceof Error ? e.message : '统计读取失败' } finally { if (t === ticket)loading.value = false } }
-watch(() => [props.executionId, auth.factoryId, auth.revision, allowed.value], () => { clear();page.value = 1 }, { flush: 'sync' })
+async function load() { clear();if (!allowed.value) return;const t = ticket;loading.value = true;try { const p = await api.statistics({ ...(props.executionCode ? { executionCode: props.executionCode } : {}), ...(category.value ? { wasteCategory: category.value } : {}), ...(attribution.value ? { attribution: attribution.value } : {}), ...(from.value ? { from: from.value } : {}), ...(to.value ? { to: to.value } : {}), offset: (page.value - 1) * 20, limit: 20 });if (t === ticket) { rows.value = p.items;total.value = p.total } } catch(e) { if (t === ticket)error.value = e instanceof Error ? e.message : '统计读取失败' } finally { if (t === ticket)loading.value = false } }
+watch(() => [props.executionCode, auth.factoryId, auth.revision, allowed.value], () => { clear();page.value = 1 }, { flush: 'sync' })
 onBeforeUnmount(clear)
 </script>
 <template>

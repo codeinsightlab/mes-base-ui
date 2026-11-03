@@ -2,7 +2,7 @@
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { bomApi, type Bom } from '@/api/basic/materialBom'
 import { useAuth } from '@/stores/auth'
-const props = defineProps<{ modelValue?: string | null; materialId?: string | null; disabled?: boolean; placeholder?: string }>()
+const props = defineProps<{ modelValue?: string | null; materialId?: string | null; disabled?: boolean; allowDraft?: boolean; placeholder?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [string | null]; selected: [Bom | null] }>()
 const auth = useAuth(), rows = ref<Bom[]>([]), selectedRow = ref<Bom | null>(null), total = ref(0), error = ref(''), loading = ref(false)
 const options = computed(() => {
@@ -14,7 +14,7 @@ async function load(more = false) {
   if (!props.materialId || !auth.hasPermission('business:material:list', 'factory')) return
   const current = ++generation; loading.value = true; error.value = ''
   try {
-    const page = await bomApi.list({ productId: props.materialId, status: 'PUBLISHED', offset: more ? rows.value.length : 0, limit: 20 })
+    const page = await bomApi.list({ productId: props.materialId, ...(props.allowDraft ? {} : { status: 'PUBLISHED' }), offset: more ? rows.value.length : 0, limit: 20 })
     if (current !== generation) return
     rows.value = more ? [...rows.value, ...page.items as Bom[]] : page.items as Bom[];total.value = page.total
   } catch(e) { if (current === generation) error.value = e instanceof Error ? e.message : 'BOM版本读取失败' } finally { if (current === generation) loading.value = false }
@@ -37,7 +37,7 @@ async function loadSelected() {
   try {
     const row = await bomApi.detail!(selectedId) as Bom
     if (current !== generation || selectedId !== props.modelValue || materialId !== props.materialId) return
-    if (row.productId !== materialId || row.status !== 'PUBLISHED') {
+    if (row.productId !== materialId || (row.status !== 'PUBLISHED' && !(props.allowDraft && row.status === 'DRAFT'))) {
       error.value = '已保存的BOM版本不属于当前产品或已不可用，请刷新工单核对'
       return
     }
@@ -62,8 +62,8 @@ onBeforeUnmount(clear)
 </script>
 <template>
   <div class="bom-version-select">
-    <el-select :model-value="modelValue" clearable :disabled="disabled || !materialId" :loading="loading" :placeholder="placeholder || '选择已发布子BOM；不选则为本层叶项'" @update:model-value="select($event || null)">
-      <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.version}${row.defaultVersion ? ' · 默认' : ''}`" :value="row.id" />
+    <el-select :model-value="modelValue" clearable :disabled="disabled || !materialId" :loading="loading" :placeholder="placeholder || (allowDraft ? '选择子BOM版本；不选则为本层叶项' : '选择已发布子BOM；不选则为本层叶项')" @update:model-value="select($event || null)">
+      <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.version}${row.status === 'DRAFT' ? ' · 草稿' : ''}${row.defaultVersion ? ' · 默认' : ''}`" :disabled="row.status === 'DISABLED'" :value="row.id" />
     </el-select>
     <el-button v-if="rows.length<total" link :disabled="loading || disabled" @click="load(true)">加载更多版本</el-button>
     <el-button v-if="error" link type="danger" @click="load()">{{ error }}，重试</el-button>

@@ -43,7 +43,7 @@ const snapshot = () => JSON.stringify({ form, attribution: attribution.value, re
 const dirty = computed(() => actionOpen.value && !!originalForm.value && snapshot() !== originalForm.value)
 watch(() => pending.value != null && pending.value.kind !== 'retired-return' || busy.value, v => emit('pending', v), { flush: 'sync' })
 watch(dirty, v => emit('dirty', v), { flush: 'sync' })
-const relatedOptions = computed(() => props.candidates.filter(d => d.declarationId !== props.declarationId && d.executionId === view.value?.executionId && !['UNVERIFIED', 'UNRESOLVED'].includes(d.processingState) && d.recordAction !== 'VOID'))
+const relatedOptions = computed(() => props.candidates.filter(d => d.declarationId !== props.declarationId && d.executionCode === view.value?.executionCode && !['UNVERIFIED', 'UNRESOLVED'].includes(d.processingState) && d.recordAction !== 'VOID'))
 function assessmentAttributionLabel(value: string | null | undefined) {
   if (value === 'INDEPENDENT') return '确认为独立申报'
   if (value === 'OVERLAP') return '确认为重复申报'
@@ -159,7 +159,7 @@ async function submit() {
       <Pagination v-model:page="eventPage" :total="eventTotal" :limit="20" @pagination="loadEvents" />
     </section>
     <section v-if="allowed">
-      <details class="audit-records"><summary>操作留痕</summary><el-descriptions :column="1" border><el-descriptions-item label="不良记录编号">{{ declarationId }}</el-descriptions-item><el-descriptions-item label="当前版本">{{ view?.revision ?? current?.revisionNo ?? '—' }}</el-descriptions-item><el-descriptions-item label="执行单元">{{ current?.executionId || view?.executionId || '—' }}</el-descriptions-item></el-descriptions><slot name="versions" /></details>
+      <details class="audit-records"><summary>操作留痕</summary><el-descriptions :column="1" border><el-descriptions-item label="不良记录编号">{{ declarationId }}</el-descriptions-item><el-descriptions-item label="当前版本">{{ view?.revision ?? current?.revisionNo ?? '—' }}</el-descriptions-item><el-descriptions-item label="执行单元">{{ current?.executionCode || view?.executionCode || '—' }}</el-descriptions-item></el-descriptions><slot name="versions" /></details>
     </section>
     <section v-if="pending" aria-label="原质量请求恢复">
       <el-alert title="原请求结果待确认，查询失败不会删除原请求。" type="warning" :closable="false" />

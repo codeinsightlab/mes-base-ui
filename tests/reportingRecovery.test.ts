@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { readReportingRecovery, saveReportingRecovery, removeReportingRecovery, isDefiniteReportingRejection } from '../src/lib/production/reportingRecovery'
 import { ApiError } from '../src/lib/request'
 const owner = { userId: '7', factoryId: 'A' }
-const command = { executionId: '1', routingNodeId: '2', reportQty: '2.00', workstationId: null, requestId: '12345678-abcd-1234-abcd-123456789abc' }
+const command = { executionCode: '1', routingNodeId: '2', reportQty: '2.00', workstationId: null, requestId: '12345678-abcd-1234-abcd-123456789abc' }
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear() })
 it('stores only the frozen command and identity binding, without TTL, token or cached profiles/grants', () => {
   saveReportingRecovery(owner, command)

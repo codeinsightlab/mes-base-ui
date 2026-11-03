@@ -55,7 +55,7 @@ async function locate(value?:string, inputMethod:ScanInputMethod = 'TEXT') {
   try {
     const identity = await scanExecution('REPORTING', code.value, inputMethod)
     if (ticket !== version) return
-    const value = await productionReporting.context(identity.executionId)
+    const value = await productionReporting.context(identity.executionCode)
     if (ticket !== version) return
     context.value = value
   } catch(e) { if (ticket === version) error.value = e instanceof Error ? e.message : '执行查询失败' } finally { if (ticket === version) loading.value = false }
@@ -66,7 +66,7 @@ async function submit(recover = false) {
   if (!!pending.value !== recover) return
   const fresh = !pending.value
   if (fresh && (!context.value || selected.value?.status !== 'AVAILABLE' || !quantityValid.value || !positiveQuantity(normalizedQuantityInput(quantity.value)))) { error.value = '请选择可报工序，输入符合物料单位精度的正数量'; return }
-  const command = pending.value ? { ...pending.value } : { executionId: context.value!.identity.executionId, routingNodeId: selectedId.value, reportQty: normalizedQuantityInput(quantity.value), workstationId: null, requestId: crypto.randomUUID() }
+  const command = pending.value ? { ...pending.value } : { executionCode: context.value!.identity.executionCode, routingNodeId: selectedId.value, reportQty: normalizedQuantityInput(quantity.value), workstationId: null, requestId: crypto.randomUUID() }
   const owner = { userId: auth.userId, factoryId: auth.factoryId }, token = auth.token, revision = auth.revision
   const trusted = () => allowed.value && auth.userId === owner.userId && auth.factoryId === owner.factoryId && auth.token === token && auth.revision === revision
   try { saveReportingRecovery(owner, command) } catch(e) { recoveryError.value = e instanceof Error ? e.message : '无法保存原请求，尚未发送'; return }
@@ -92,9 +92,9 @@ async function submit(recover = false) {
   try { removeReportingRecovery(owner, command) } catch(e) { if (mounted && ticket === version) recoveryError.value = e instanceof Error ? e.message : '报工已成功，原请求无法清理'; return }
   if (!mounted || ticket !== version) return
   result.value = saved; pending.value = null; quantity.value = ''; selectedId.value = ''
-  if (context.value?.identity.executionId !== command.executionId) return
+  if (context.value?.identity.executionCode !== command.executionCode) return
   try {
-    const freshContext = await productionReporting.context(command.executionId)
+    const freshContext = await productionReporting.context(command.executionCode)
     if (mounted && ticket === version) context.value = freshContext
   } catch(e) { if (mounted && ticket === version) error.value = '报工已成功，数量刷新失败，请重新定位执行单元：' + (e instanceof Error ? e.message : '读取失败') }
 }
@@ -117,14 +117,14 @@ async function submit(recover = false) {
       <el-button v-if="recoveryError" :disabled="busy" @click="restore">重新读取原报工请求</el-button>
       <section v-if="pending" class="panel" aria-label="待确认报工请求">
         <strong>{{ result ? '报工已成功，恢复记录待清理' : '报工结果待确认' }}</strong>
-        <p>执行 {{ pending.executionId }} · 工序 {{ pending.routingNodeId }} · 数量 {{ formatQuantity(pending.reportQty) }}</p>
+        <p>执行 {{ pending.executionCode }} · 工序 {{ pending.routingNodeId }} · 数量 {{ formatQuantity(pending.reportQty) }}</p>
         <p>原请求 {{ pending.requestId }}</p>
         <p class="secondary">请核对原请求后人工重试；同一工厂待确认请求解决前不能新增报工。重新定位和离页会保留原请求，本标签页关闭后不保证恢复。</p>
         <el-button type="primary" :loading="busy" :disabled="!!recoveryError" @click="retryPending">{{ result ? '按原请求核对／清理记录' : '按原请求确认／重试报工' }}</el-button>
       </section>
       <section v-if="context" v-loading="loading" class="panel">
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="生产执行">{{ context.identity.executionId }} · {{ executionStatusLabel(context.identity.status) }}</el-descriptions-item>
+          <el-descriptions-item label="生产执行">{{ context.identity.executionCode }} · {{ executionStatusLabel(context.identity.status) }}</el-descriptions-item>
           <el-descriptions-item label="工单">{{ context.identity.workorderCode }}</el-descriptions-item>
           <el-descriptions-item label="产出物料">{{ context.identity.productCode }} · {{ context.identity.productName }}</el-descriptions-item>
           <el-descriptions-item label="生产批次">{{ context.identity.batchNo || '未记录' }}</el-descriptions-item>
@@ -152,7 +152,7 @@ async function submit(recover = false) {
           <el-form-item label="本次完成数量"><QuantityInput v-model="quantity" required positive :material-id="context.identity.productId" :disabled="busy || !!pending" @validity="quantityValid = $event" /></el-form-item>
           <el-button type="primary" size="large" :loading="busy" :disabled="!!pending || !!recoveryError || selected?.status !== 'AVAILABLE'" @click="submit()">确认报工</el-button>
         </el-form>
-        <el-collapse v-if="context && selected && auth.hasPermission('business:quality:defect:create', 'factory')"><el-collapse-item title="申报本工序不良" name="defect"><DefectDeclarationPanel :execution-id="context.identity.executionId" :node-id="selected.routingNodeId" /></el-collapse-item></el-collapse>
+        <el-collapse v-if="context && selected && auth.hasPermission('business:quality:defect:create', 'factory')"><el-collapse-item title="申报本工序不良" name="defect"><DefectDeclarationPanel :execution-code="context.identity.executionCode" :node-id="selected.routingNodeId" /></el-collapse-item></el-collapse>
         <p class="secondary">报工数量为加工完成总量（含不良），不良由质量申报独立记录并扣减可流转产出；末道报工只登记事实；正常品及不良入库审核后统一核对执行和工单收尾条件。待开工执行的首次报工还会校验正式领料确认。</p>
       </section>
       <el-empty v-else-if="!loading" description="请扫描或输入生产执行身份码" />

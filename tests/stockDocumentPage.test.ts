@@ -12,7 +12,7 @@ vi.mock('vue-router', () => ({ useRoute: () => ({ query: mocks.query }), useRout
 const Document = defineComponent({
   props: ['aggregateApi', 'headerFields'],
   setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft } },
-  template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="field-documentType" :draft="draft" :disabled="false"/><slot name="field-ruleCode" :draft="draft" :disabled="false"/><slot name="field-sourceExecutionId" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
+  template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="field-documentType" :draft="draft" :disabled="false"/><slot name="field-ruleCode" :draft="draft" :disabled="false"/><slot name="field-sourceExecutionCode" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
 })
 const RouterLinkStub = defineComponent({ name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' })
 const ExecutionSelect = defineComponent({ props: ['modelValue', 'disabled', 'statuses'], emits: ['update:modelValue'], template: '<div />' })
@@ -32,19 +32,19 @@ it('creates production inbound from the ordinary menu with a selectable executio
   expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(false)
   wrapper.findComponent(ExecutionSelect).vm.$emit('update:modelValue', '9007199254740999');await flushPromises()
   await document.get('button').trigger('click');await flushPromises()
-  expect(mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
+  expect(mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionCode: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
   type.vm.$emit('update:modelValue', 'OTHER_RECEIPT');type.vm.$emit('change', 'OTHER_RECEIPT');await flushPromises();expect(state.draft.ruleCode).toBeNull();state.draft.ruleCode = 'OTHER_IN_RULE'
   await document.get('button').trigger('click');await flushPromises()
-  expect(mocks.request.mock.calls.filter(call => call[1]?.method === 'POST').at(-1)?.[1].body).toMatchObject({ header: { ruleCode: 'OTHER_IN_RULE', documentType: 'OTHER_RECEIPT', sourceExecutionId: null }})
+  expect(mocks.request.mock.calls.filter(call => call[1]?.method === 'POST').at(-1)?.[1].body).toMatchObject({ header: { ruleCode: 'OTHER_IN_RULE', documentType: 'OTHER_RECEIPT', sourceExecutionCode: null }})
 })
 
 it('preserves the deep-linked execution as a visible production type and allows changing it before save', async() => {
-  mocks.query = { executionId: '9007199254740999' }
+  mocks.query = { executionCode: '9007199254740999' }
   const document = await setup()
   expect(wrapper.findComponent(ElSelect).props('modelValue')).toBe('PRODUCTION_RECEIPT')
   expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(false)
   await document.get('button').trigger('click');await flushPromises()
-  expect(mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionId: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
+  expect(mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionCode: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
 })
 
 it('links each transfer direction directly to the paired transfer detail through the authorized menu', async() => {

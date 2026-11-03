@@ -9,7 +9,7 @@ export interface StockAction {
   actionType: string; quantityDelta: string; availableDelta: string; quantityBefore: string; quantityAfter: string;
   availableBefore: string; availableAfter: string; sourceType: string; sourceId: string | null; referenceActionId: string | null;
   documentLineId?: string | null; operationId?: string | null;
-  executionId: string | null; operatorUserId: string; occurredAt: string; reason: string
+  executionCode: string | null; operatorUserId: string; occurredAt: string; reason: string
 }
 export const stockOperations: { value: StockOperation; label: string }[] = [
   { value: 'opening', label: '期初建账' }, { value: 'receipt', label: '原材料入库' },

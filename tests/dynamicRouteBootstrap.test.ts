@@ -13,9 +13,9 @@ it('preserves workorder, execution and hash when login restoration installs the 
     })
   })
   try {
-    await router.push('/production/productionReport?executionId=90&workorderId=77#nodes')
+    await router.push('/production/productionReport?executionCode=90&workorderId=77#nodes')
     expect(router.currentRoute.value.name).toBe('TEST_ONLY_REPORT')
-    expect(router.currentRoute.value.query).toEqual({ executionId: '90', workorderId: '77' })
+    expect(router.currentRoute.value.query).toEqual({ executionCode: '90', workorderId: '77' })
     expect(router.currentRoute.value.hash).toBe('#nodes')
   } finally { router.removeRoute('TEST_ONLY_REPORT'); restore.mockRestore() }
 })

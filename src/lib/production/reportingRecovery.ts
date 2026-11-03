@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/request'
 
 export interface ReportingOwner { userId: string; factoryId: string }
 interface RecoveryRecord extends ReportingOwner { version: 1; command: ReportCommand }
-const fields = ['executionId', 'reportQty', 'requestId', 'routingNodeId', 'workstationId']
+const fields = ['executionCode', 'reportQty', 'requestId', 'routingNodeId', 'workstationId']
 const id = (value: unknown): value is string => typeof value === 'string' && /^[1-9]\d*$/.test(value)
 function key(owner: ReportingOwner) {
   if (!id(owner.userId) || !owner.factoryId) throw new Error('身份或工厂尚未校验，不能恢复报工请求')
@@ -12,7 +12,7 @@ function key(owner: ReportingOwner) {
 function validCommand(value: unknown): value is ReportCommand {
   if (!value || typeof value !== 'object') return false
   const c = value as ReportCommand
-  return Object.keys(c).sort().join(',') === fields.join(',') && id(c.executionId) && id(c.routingNodeId)
+  return Object.keys(c).sort().join(',') === fields.join(',') && typeof c.executionCode === 'string' && c.executionCode.length > 0 && c.executionCode.length <= 2048 && id(c.routingNodeId)
     && typeof c.reportQty === 'string' && /^\d{1,14}(\.\d{1,2})?$/.test(c.reportQty) && /[1-9]/.test(c.reportQty)
     && (c.workstationId === null || id(c.workstationId)) && typeof c.requestId === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(c.requestId)
