@@ -90,19 +90,19 @@ function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value
     <el-alert v-if="error" :title="error" type="error" />
     <el-button @click="!dirty || windowConfirm() ? emit('close') : undefined">返回版本列表</el-button>
     <template v-if="active">
-      <p>选择左侧版本，编辑右侧直接组件。共享节点的修改应用于当前根内所有引用；仅改所选路径时先分开修订。</p>
+      <p>选择树中版本，编辑其直接组件。共享节点的修改应用于当前根内所有引用；仅改所选路径时先分开修订。</p>
       <div class="workspace">
         <nav aria-label="BOM 结构">
-          <div v-for="r in tree()" :key="r.index.join('/')" :style="{paddingLeft:r.index.length*12+'px'}">
-            <el-button v-if="r.leaf" link @click="selected=r.path;branch=r.index.slice(0,-1)">{{ names[r.leaf.material]??r.leaf.material }} × {{ r.leaf.quantity }}（叶项）</el-button>
+          <div v-for="r in tree()" :key="r.index.join('/')" class="tree-row" :style="{paddingLeft:r.index.length*12+'px'}">
+            <el-button v-if="r.leaf" class="node-label" link @click="selected=r.path;branch=r.index.slice(0,-1)">{{ names[r.leaf.material]??r.leaf.material }} × {{ r.leaf.quantity }}（叶项）</el-button>
             <template v-else>
               <el-button link :aria-label="collapsed.has(r.index.join('/'))?'展开':'折叠'" @click="collapsed.has(r.index.join('/'))?collapsed.delete(r.index.join('/')):collapsed.add(r.index.join('/'))">{{ collapsed.has(r.index.join('/'))?'▸':'▾' }}</el-button>
-              <el-button link :class="{changed:preview?.changes.some(c=>c.key===r.node.key && c.action!=='REUSE')}" @click="selected=r.path;branch=r.index">{{ names[r.node.product]??r.node.product }} · {{ r.node.version }}</el-button>
+              <el-button class="node-label" link :class="{changed:preview?.changes.some(c=>c.key===r.node.key && c.action!=='REUSE')}" @click="selected=r.path;branch=r.index">{{ names[r.node.product]??r.node.product }} · {{ r.node.version }}</el-button>
             </template>
           </div>
         </nav>
         <main>
-          <strong>{{ names[active.product]??active.product }}</strong> <el-button v-if="branch.length" @click="split">仅此路径单独修订</el-button>
+          <div class="node-heading"><strong>{{ names[active.product]??active.product }}</strong><el-button v-if="branch.length" @click="split">仅此路径单独修订</el-button></div>
           <label>BOM 编码 <el-input v-model="active.code" :disabled="!!active.source" />
           </label>
           <label>版本号 <el-input v-model="active.version" />
@@ -112,12 +112,12 @@ function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value
           <label>备注 <el-input v-model="active.remark" />
           </label>
           <el-table :data="active.lines">
-            <el-table-column label="组件">
+            <el-table-column label="组件" min-width="240">
               <template #default="{row,$index}">
                 <el-button link @click="pick($index)">{{ names[row.material]??row.material }}</el-button>
               </template>
             </el-table-column>
-            <el-table-column label="用量">
+            <el-table-column label="用量" min-width="260">
               <template #default="{row}">
                 <QuantityInput v-model="row.quantity" semantic="bom-ratio" show-unit :material-id="row.material" />
               </template>
@@ -135,12 +135,12 @@ function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value
                 </template>
               </template>
             </el-table-column>
-            <el-table-column label="顺序">
+            <el-table-column label="顺序" width="150">
               <template #default="{row}">
                 <el-input-number v-model="row.sort" :min="0" controls-position="right" />
               </template>
             </el-table-column>
-            <el-table-column label="操作">
+            <el-table-column label="操作" width="100" fixed="right">
               <template #default="{$index}">
                 <el-button link @click="active.lines.splice($index,1)">移除组件</el-button>
               </template>
@@ -163,4 +163,20 @@ function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value
     </template>
   </section>
 </template>
-<style scoped>.changed{color:var(--el-color-primary)}.workspace{display:grid;grid-template-columns:minmax(180px,24%) 1fr;gap:12px}.workspace nav,.workspace main{min-width:0;overflow:auto}.workspace label{display:inline-block;max-width:200px;margin:6px}</style>
+<style scoped>
+.changed { color: var(--el-color-primary); }
+.workspace { display: grid; grid-template-columns: minmax(240px, 28%) minmax(0, 1fr); gap: 12px; }
+.workspace nav, .workspace main { min-width: 0; overflow: auto; }
+.workspace label { display: inline-block; max-width: 200px; margin: 6px; }
+.tree-row { display: flex; align-items: flex-start; margin-bottom: 8px; }
+.node-label { min-width: 0; height: auto; white-space: normal; text-align: left; line-height: 1.5; }
+.node-label :deep(span) { overflow-wrap: anywhere; }
+.workspace :deep(.el-table .el-button.is-link) { height: auto; white-space: normal; text-align: left; line-height: 1.5; overflow-wrap: anywhere; }
+.node-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.workspace :deep(.quantity-input .el-input__wrapper) { min-width: 70px; }
+.workspace :deep(.quantity-input .el-input-group__append) { max-width: 130px; white-space: normal; overflow-wrap: anywhere; padding: 0 8px; }
+@media (max-width: 1280px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .workspace nav { max-height: 240px; }
+}
+</style>
