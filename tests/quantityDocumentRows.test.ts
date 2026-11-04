@@ -8,8 +8,8 @@ import ProductionPlan from '../src/views/production/plan/index.vue'
 import QuantityInput from '../src/components/business/material/QuantityInput.vue'
 import { useAuth } from '../src/stores/auth'
 import { invalidateQuantityRules } from '../src/lib/production/quantityRuleInvalidation'
-vi.mock('../src/api/basic/material', () => ({ api: { detail: vi.fn(async id => ({ unitId: id })) } }))
-vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn(async id => ({ mustBeWholeNumber: id === 'B' ? 1 : 0, quantityPrecision: 6 })) } }))
+vi.mock('../src/api/basic/material', () => ({ api: { detail: vi.fn(async id => ({ unitId: id })) }}))
+vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn(async id => ({ mustBeWholeNumber: id === 'B' ? 1 : 0, quantityPrecision: 6 })) }}))
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => { invalidateQuantityRules(); vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }) })
 afterEach(() => { wrapper?.unmount(); vi.unstubAllGlobals(); document.body.innerHTML = '' })
@@ -21,7 +21,7 @@ it.each([{ page: SalesOrder, key: 'orderedQty' }, { page: ProductionPlan, key: '
   })
   const pinia = createPinia(), auth = useAuth(pinia)
   auth.factoryId = 'F1'; auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query']
-  wrapper = mount(page, { global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: document, MaterialSelect: true } } })
+  wrapper = mount(page, { global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: document, MaterialSelect: true }}})
   await flushPromises()
   const validate = wrapper.findComponent(document).props('validateAggregateItems') as (items: unknown) => string | null
   expect(validate(rows)).toBeNull()

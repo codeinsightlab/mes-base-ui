@@ -33,6 +33,7 @@ const itemFields: Field[] = [
 
 const quantityValidity = new WeakMap<object, boolean>()
 function setQuantityValidity(row: object, valid: boolean) { quantityValidity.set(row, valid) }
+function materialIdFor(row: Row) { return row.materialId as string | null }
 function validate(items: Row[]) {
   for (const [index, item] of items.entries()) {
     const quantity = normalizedQuantityInput(String(item.orderedQty ?? ''))
@@ -81,7 +82,7 @@ function validate(items: Row[]) {
         </el-table-column>
         <el-table-column label="订购数量" width="160" align="right">
           <template #default="{ row }">
-            <QuantityInput required positive v-model="row.orderedQty as any" :material-id="row.materialId as string | null" :disabled="!writable" @validity="setQuantityValidity(row, $event)" />
+            <QuantityInput v-model="row.orderedQty as any" required positive :material-id="materialIdFor(row)" :disabled="!writable" @validity="setQuantityValidity(row, $event)" />
           </template>
         </el-table-column>
         <el-table-column label="要求交期" width="190">

@@ -7,15 +7,15 @@ import { useAuth } from '../src/stores/auth'
 import { ApiError } from '../src/lib/request'
 import Panel from '../src/components/business/quality/QualityTreatmentPanel.vue'
 const rules = vi.hoisted(() => ({ material: vi.fn(), unit: vi.fn() }))
-vi.mock('../src/api/basic/material', () => ({ api: { detail: rules.material } }))
-vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: rules.unit } }))
+vi.mock('../src/api/basic/material', () => ({ api: { detail: rules.material }}))
+vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: rules.unit }}))
 const api = vi.hoisted(() => ({ details: vi.fn(), assess: vi.fn(), dispose: vi.fn(), history: vi.fn(), check: vi.fn() }))
 vi.mock('../src/api/quality/qualityTreatment', () => ({ qualityTreatment: api, treatmentActionLabel: (v:string) => ({ ASSESS: '申报核实', RETURN_NODE: '退回返工', TRANSFER_WAREHOUSE: '转仓入库' }[v] ?? '未识别的操作') }))
-const view = { productId:'2', declarationId: 'd1', revision: 1, executionCode: '9007199254740999', routingNodeId: '12', defectQty: '10', returnedQty: '0', transferredQty: '0', attribution: 'INDEPENDENT', relatedDeclarationId: null, basis: '已确认独立申报', pendingDispositionQty: '10', state: 'PENDING', receiptState: 'PENDING', recordAction: 'CREATE', events: [] }
+const view = { productId: '2', declarationId: 'd1', revision: 1, executionCode: '9007199254740999', routingNodeId: '12', defectQty: '10', returnedQty: '0', transferredQty: '0', attribution: 'INDEPENDENT', relatedDeclarationId: null, basis: '已确认独立申报', pendingDispositionQty: '10', state: 'PENDING', receiptState: 'PENDING', recordAction: 'CREATE', events: [] }
 let wrapper:ReturnType<typeof mount>
-beforeEach(() => { sessionStorage.clear();vi.resetAllMocks();invalidateQuantityRules();rules.material.mockResolvedValue({unitId:'u'});rules.unit.mockResolvedValue({mustBeWholeNumber:0,quantityPrecision:6});vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}});api.details.mockResolvedValue(view);api.history.mockResolvedValue({ items: [], total: 0, offset: 0, limit: 20 });api.assess.mockResolvedValue({ ...view, attribution: 'INDEPENDENT' });api.dispose.mockResolvedValue({ ...view, pendingDispositionQty: '0', transferredQty: '10', state: 'TRANSFERRED', receiptState: 'RECEIVED' }) })
+beforeEach(() => { sessionStorage.clear();vi.resetAllMocks();invalidateQuantityRules();rules.material.mockResolvedValue({ unitId: 'u' });rules.unit.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 });vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}});api.details.mockResolvedValue(view);api.history.mockResolvedValue({ items: [], total: 0, offset: 0, limit: 20 });api.assess.mockResolvedValue({ ...view, attribution: 'INDEPENDENT' });api.dispose.mockResolvedValue({ ...view, pendingDispositionQty: '0', transferredQty: '10', state: 'TRANSFERRED', receiptState: 'RECEIVED' }) })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '';vi.unstubAllGlobals() })
-async function setup(write = true) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.username = 'tester';auth.factoryPermissions = ['business:material:query','business:unit:measure:query','business:quality:defect:read', ...(write ? ['business:quality:defect:revise'] : [])];wrapper = mount(Panel, { props: { declarationId: 'd1', candidates: [], record: { declarationId: 'd1', executionStatus: 'RUNNING', workorderStatus: 'RELEASED', source: 'LOCAL' } as any }, global: { plugins: [pinia, ElementPlus] }});await flushPromises();const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;return { s, auth } }
+async function setup(write = true) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.username = 'tester';auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:quality:defect:read', ...(write ? ['business:quality:defect:revise'] : [])];wrapper = mount(Panel, { props: { declarationId: 'd1', candidates: [], record: { declarationId: 'd1', executionStatus: 'RUNNING', workorderStatus: 'RELEASED', source: 'LOCAL' } as any }, global: { plugins: [pinia, ElementPlus] }});await flushPromises();const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;return { s, auth } }
 it('opens as a read-only document with explicit actions and no implementation concepts', async() => { await setup();expect(wrapper.text()).toContain('不良信息');expect(wrapper.text()).toContain('处理记录');expect(wrapper.text()).toContain('办理入仓');expect(wrapper.text()).not.toContain('旧流程');expect(wrapper.text()).not.toContain('本次处理');expect(wrapper.text()).not.toContain('净损失');expect(wrapper.find('.el-dialog').exists()).toBe(false);expect(api.dispose).not.toHaveBeenCalled() })
 it.each([
   { name: 'null', field: { attributionType: null }, label: '归属待确认' },
@@ -49,7 +49,7 @@ it('rejects quantity above the pending balance before sending', async() => { con
 it('restores the current frozen request after reopening', async() => { const { s } = await setup();s.openAction('dispose');s.form.quantity = '4';s.form.reason = '现场确认';s.form.warehouseId = '3';api.dispose.mockRejectedValueOnce(new Error('响应丢失'));await flushPromises();await s.submit();const first = JSON.parse(JSON.stringify(api.dispose.mock.calls[0]![1]));wrapper.unmount();const { s: again } = await setup();expect(again.actionOpen).toBe(true);await again.submit();expect(api.dispose.mock.calls[1]![1]).toEqual(first) })
 it('keeps an unknown request when its retry is rejected', async() => { const { s } = await setup();s.openAction('dispose');s.form.reason = '现场确认';s.form.warehouseId = '3';api.dispose.mockRejectedValueOnce(new Error('lost')).mockRejectedValueOnce(new ApiError('FORBIDDEN', '撤权', '', 403));await flushPromises();await s.submit();const first = JSON.parse(JSON.stringify(s.pending));await flushPromises();await s.submit();expect(s.pending).toEqual(first) })
 it('sends a separate assessment before any disposition', async() => { api.details.mockResolvedValueOnce({ ...view, attribution: 'UNVERIFIED', state: 'UNVERIFIED' });const { s } = await setup();expect(s.canTreat).toBe(false);s.openAction('assess');s.basis = '独立实物核对';s.form.reason = '核实完成';await flushPromises();await s.submit();expect(api.assess.mock.calls[0]![1]).toMatchObject({ assessment: { type: 'INDEPENDENT', relatedDeclarationId: null, basis: '独立实物核对' }});expect(api.dispose).not.toHaveBeenCalled() })
-it.each(['factory', 'permission'])('rejects late details after %s changes', async kind => { const { s, auth } = await setup();let release!:(v:unknown) => void;api.details.mockImplementationOnce(() => new Promise(r => release = r));const wait = s.load();api.details.mockImplementation(() => new Promise(() => {}));if (kind === 'factory')auth.factoryId = 'B';else auth.factoryPermissions = ['business:material:query','business:unit:measure:query',];await flushPromises();release({ ...view, declarationId: 'old-factory' });await wait;expect(s.view).toBeNull();expect(s.pending).toBeNull();expect(s.actionOpen).toBe(false) })
+it.each(['factory', 'permission'])('rejects late details after %s changes', async kind => { const { s, auth } = await setup();let release!:(v:unknown) => void;api.details.mockImplementationOnce(() => new Promise(r => release = r));const wait = s.load();api.details.mockImplementation(() => new Promise(() => {}));if (kind === 'factory')auth.factoryId = 'B';else auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query'];await flushPromises();release({ ...view, declarationId: 'old-factory' });await wait;expect(s.view).toBeNull();expect(s.pending).toBeNull();expect(s.actionOpen).toBe(false) })
 it('retains a changed form if discard is cancelled', async() => { const { s } = await setup();s.openAction('dispose');s.form.reason = '未提交';vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel');await s.closeAction();expect(s.actionOpen).toBe(true);expect(s.form.reason).toBe('未提交') })
 it('closes an untouched action without a discard prompt', async() => { const { s } = await setup();const confirm = vi.spyOn(ElMessageBox, 'confirm');s.openAction('dispose');await s.closeAction();expect(s.actionOpen).toBe(false);expect(confirm).not.toHaveBeenCalled() })
 it('does not allow a readonly user to start processing', async() => { const { s } = await setup(false);s.openAction('dispose');expect(s.actionOpen).toBe(false);expect(wrapper.findAll('button').some(b => b.text() === '办理入仓')).toBe(false) })
@@ -116,7 +116,7 @@ it('retains an unresolved request independently of summary failure and exact loo
 it('loads event offsets independently and rejects a late page after revocation', async() => {
   const { s, auth } = await setup();s.eventPage = 3;await s.loadEvents();expect(api.history).toHaveBeenLastCalledWith('d1', 40, 20)
   let release!:(v:unknown) => void;api.history.mockImplementationOnce(() => new Promise(r => release = r));const task = s.loadEvents()
-  auth.factoryPermissions = ['business:material:query','business:unit:measure:query',];await flushPromises();release({ items: [{ id: 'late' }], total: 99, offset: 40, limit: 20 });await task
+  auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query'];await flushPromises();release({ items: [{ id: 'late' }], total: 99, offset: 40, limit: 20 });await task
   expect(s.events).toEqual([]);expect(s.eventTotal).toBe(0)
 })
 
@@ -124,18 +124,18 @@ it('clears the pending action on revocation while preserving the stored original
   const original = { kind: 'assess', command: { requestId: '00000000-0000-0000-0000-000000000002', expectedRevision: 1, reason: '核实', assessment: { type: 'INDEPENDENT', relatedDeclarationId: null, basis: '证据' }}}
   const key = 'mes-quality-action:tester:A:d1';sessionStorage.setItem(key, JSON.stringify(original))
   const { s, auth } = await setup();expect(s.pending).toEqual(original)
-  auth.factoryPermissions = ['business:material:query','business:unit:measure:query','business:quality:defect:read'];await flushPromises()
+  auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:quality:defect:read'];await flushPromises()
   expect(s.pending).toBeNull();expect(s.actionOpen).toBe(false);expect(sessionStorage.getItem(key)).toBe(JSON.stringify(original))
   await flushPromises();await s.submit();await s.checkPending();expect(api.assess).not.toHaveBeenCalled();expect(api.check).not.toHaveBeenCalled()
 })
 
 it('settles only the complete trusted old defect remainder after UOM becomes integer', async() => {
-  api.details.mockResolvedValue({...view,pendingDispositionQty:'1.234567',defectQty:'1.234567'})
-  rules.unit.mockResolvedValue({mustBeWholeNumber:1,quantityPrecision:0})
-  const {s}=await setup();s.openAction('dispose');await flushPromises()
-  s.form.quantity='0.234567';s.form.reason='旧不良完整入仓';s.form.warehouseId='3'
+  api.details.mockResolvedValue({ ...view, pendingDispositionQty: '1.234567', defectQty: '1.234567' })
+  rules.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 0 })
+  const { s } = await setup();s.openAction('dispose');await flushPromises()
+  s.form.quantity = '0.234567';s.form.reason = '旧不良完整入仓';s.form.warehouseId = '3'
   await flushPromises();await s.submit();expect(api.dispose).not.toHaveBeenCalled()
-  s.form.quantity='1.234567';await flushPromises();await s.submit()
+  s.form.quantity = '1.234567';await flushPromises();await s.submit()
   expect(api.dispose.mock.calls[0]![1].quantity).toBe('1.234567')
   expect(wrapper.text()).not.toContain('办理返工')
 })

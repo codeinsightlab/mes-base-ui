@@ -5,7 +5,7 @@ import ElementPlus, { ElMessageBox } from 'element-plus'
 import { useAuth } from '../src/stores/auth'
 import Action from '../src/components/business/MaterialIssueVoidAction.vue'
 const cancel = vi.hoisted(() => vi.fn())
-vi.mock('../src/api/wm/stockDocuments', () => ({ stockDocuments: { voidMaterialIssue: cancel } }))
+vi.mock('../src/api/wm/stockDocuments', () => ({ stockDocuments: { voidMaterialIssue: cancel }}))
 beforeEach(() => { vi.clearAllMocks();vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue(undefined as never);cancel.mockResolvedValue({ documentId: '9007199254740993', documentStatus: 'POSTED', productionInputStatus: 'VOIDED', voidOperationId: 'op-1', voidResultStatus: 'SUCCEEDED', voidRequestedAt: null, voidFinishedAt: null, message: '已撤销' }) })
 function setup(status = 'POSTED', permission = true) {
   const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = permission ? ['business:mes:material:issue:void'] : []

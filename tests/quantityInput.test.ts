@@ -8,8 +8,8 @@ import { invalidateQuantityRules } from '../src/lib/production/quantityRuleInval
 import { loadQuantityRule, QUANTITY_RULE_TTL_MS } from '../src/lib/production/quantityRules'
 
 const calls = vi.hoisted(() => ({ material: vi.fn(), unit: vi.fn() }))
-vi.mock('../src/api/basic/material', () => ({ api: { detail: calls.material } }))
-vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: calls.unit } }))
+vi.mock('../src/api/basic/material', () => ({ api: { detail: calls.material }}))
+vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: calls.unit }}))
 const wrappers: ReturnType<typeof mount>[] = []
 beforeEach(() => {
   invalidateQuantityRules()
@@ -21,7 +21,7 @@ function setup(props: Record<string, unknown> = {}) {
   const pinia = createPinia(), auth = useAuth(pinia)
   auth.factoryId = 'F1'
   auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query']
-  const w = mount(QuantityInput, { props: { modelValue: '1', materialId: 'A', ...props }, global: { plugins: [pinia, ElementPlus] } })
+  const w = mount(QuantityInput, { props: { modelValue: '1', materialId: 'A', ...props }, global: { plugins: [pinia, ElementPlus] }})
   wrappers.push(w)
   return { w, auth }
 }
@@ -122,14 +122,14 @@ it('allows an unchanged precise stored value but applies current rules to edits'
 
 it('does not query a unit in a different factory after the material read resolves', async() => {
   let finish!: (value: unknown) => void
-  calls.material.mockImplementationOnce(() => new Promise(resolve => { finish=resolve }))
+  calls.material.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
   let current = true
-  const original = loadQuantityRule('A','F1',1,()=>current)
+  const original = loadQuantityRule('A', 'F1', 1, () => current)
   const rejected = expect(original).rejects.toThrow('工厂上下文已变化')
-  current=false;finish({unitId:'same-id'})
+  current = false;finish({ unitId: 'same-id' })
   await rejected
   expect(calls.unit).not.toHaveBeenCalled()
-  calls.material.mockResolvedValue({unitId:'same-id'})
-  await loadQuantityRule('A','F1',1)
+  calls.material.mockResolvedValue({ unitId: 'same-id' })
+  await loadQuantityRule('A', 'F1', 1)
   expect(calls.unit).toHaveBeenCalledTimes(1)
 })

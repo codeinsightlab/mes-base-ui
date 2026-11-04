@@ -15,8 +15,8 @@ const emit = defineEmits<{ back: [] }>()
 const props = withDefaults(defineProps<{
   creatable?: boolean;
   deletable?: boolean;
-  title: string; headerApi: Omit<CrudApi,'create'|'update'> & { create(body:unknown):Promise<Row>; update(id:string,body:unknown):Promise<Row> }; itemApi: CrudApi;
-  aggregateApi?: { detail(id:string):Promise<{header:Row;items:Row[]}>; create(body:unknown):Promise<{header:Row;items:Row[]}>; update(id:string,body:unknown):Promise<{header:Row;items:Row[]}> };
+  title: string; headerApi: Omit<CrudApi, 'create' | 'update'> & { create(body:unknown):Promise<Row>; update(id:string, body:unknown):Promise<Row> }; itemApi: CrudApi;
+  aggregateApi?: { detail(id:string):Promise<{ header: Row;items: Row[] }>; create(body:unknown):Promise<{ header: Row;items: Row[] }>; update(id:string, body:unknown):Promise<{ header: Row;items: Row[] }> };
   headerFields: Field[]; itemFields: Field[];
   headerActionColumnWidth?: number;
   headerPermission: string; itemPermission: string; parentKey: string;
@@ -44,7 +44,7 @@ const readonly = computed(() => !!id.value && !!props.headerReadonly?.(draft))
 const writable = computed(() => !readonly.value && (id.value ? can('update') : can('create')))
 const fixedValues = computed(() => id.value ? { [props.parentKey]: id.value } : {})
 const atomic = computed(() => !!props.aggregateApi)
-function snapshot() { return JSON.stringify({ header:draft, items:atomic.value ? aggregateItems.value : [] }) }
+function snapshot() { return JSON.stringify({ header: draft, items: atomic.value ? aggregateItems.value : [] }) }
 function editableItems(items: Row[]) {
   return items.map(item => {
     const result = { ...item }
@@ -145,7 +145,7 @@ async function save() {
       ...commandFromDraft(props.itemFields, item, false, 'id')
     }))
     const result: Row | { header: Row; items: Row[] } = atomic.value
-      ? (id.value ? await props.aggregateApi!.update(id.value, { ...body, items:requestItems }) : await props.aggregateApi!.create({ ...body, items:requestItems }))
+      ? (id.value ? await props.aggregateApi!.update(id.value, { ...body, items: requestItems }) : await props.aggregateApi!.create({ ...body, items: requestItems }))
       : await (id.value ? props.headerApi.update(id.value, body) : props.headerApi.create(body))
     if (current !== generation) return
     if (atomic.value) {
@@ -225,27 +225,27 @@ onBeforeUnmount(clear)
         <slot name="items" :header="draft" :items="aggregateItems" :writable="writable && !itemsReadonly?.(draft) && !loading && !saving" :saving="saving" :add="(row: Row) => aggregateItems.push(row)" :remove="(index: number) => aggregateItems.splice(index, 1)" />
       </template>
       <template v-else>
-      <el-alert v-if="!id" title="先保存主单，再新增明细。" type="info" :closable="false" />
-      <CrudPage
-        v-else
-        :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
-        embedded
-        :hide-refresh="hideItemRefresh"
-        :readonly="readonly || !!itemsReadonly?.(draft) || !!itemsReadonlyWhenDirty && snapshot() !== savedDraft"
-        title="明细"
-        :api="itemApi"
-        :fields="itemFields"
-        :permission="itemPermission"
-        :permission-overrides="itemPermissionOverrides"
-        permission-scope="factory"
-        list-action="list"
-        detail-action="query"
-        :fixed-values="fixedValues"
-        :before-create="itemBeforeCreate"
-        :table-key="itemTableKey"
-      >
-        <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
-      </CrudPage>
+        <el-alert v-if="!id" title="先保存主单，再新增明细。" type="info" :closable="false" />
+        <CrudPage
+          v-else
+          :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
+          embedded
+          :hide-refresh="hideItemRefresh"
+          :readonly="readonly || !!itemsReadonly?.(draft) || !!itemsReadonlyWhenDirty && snapshot() !== savedDraft"
+          title="明细"
+          :api="itemApi"
+          :fields="itemFields"
+          :permission="itemPermission"
+          :permission-overrides="itemPermissionOverrides"
+          permission-scope="factory"
+          list-action="list"
+          detail-action="query"
+          :fixed-values="fixedValues"
+          :before-create="itemBeforeCreate"
+          :table-key="itemTableKey"
+        >
+          <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
+        </CrudPage>
       </template>
     </section>
   </section>

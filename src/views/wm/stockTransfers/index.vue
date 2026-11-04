@@ -42,8 +42,7 @@ async function create(raw: unknown) {
     if (g === generation) { sessionStorage.removeItem(key); pendingCreate.value = null }
     return transferView(result)
   } catch(e) {
-    if (!saved && e instanceof ApiError && e.status >= 400 && e.status < 500 && g === generation) { sessionStorage.removeItem(key); pendingCreate.value = null }
-    else logPendingRequest('stock-transfer-create', body.requestId)
+    if (!saved && e instanceof ApiError && e.status >= 400 && e.status < 500 && g === generation) { sessionStorage.removeItem(key); pendingCreate.value = null } else logPendingRequest('stock-transfer-create', body.requestId)
     throw e
   }
 }

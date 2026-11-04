@@ -103,11 +103,11 @@ async function save() {
   const mode = command.value
   if (!mode || saving.value || !can(mode)) return
   if (!pending.value) {
-  if (!historyWritable.value || !node.value) return
-  if (!form.reason.trim() || form.reason.length > 500) { commandError.value = '请填写操作原因（最多500字）'; return }
-  if (mode !== 'void' && (!quantityValid.value || !/[1-9]/.test(form.quantity))) { commandError.value = '请输入符合单位规则的非零数量；补录必须为正数'; return }
-  if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) { commandError.value = '请选择历史操作人员并填写实际生产时间'; return }
-  if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) { commandError.value = '工作站编号应为正整数'; return }
+    if (!historyWritable.value || !node.value) return
+    if (!form.reason.trim() || form.reason.length > 500) { commandError.value = '请填写操作原因（最多500字）'; return }
+    if (mode !== 'void' && (!quantityValid.value || !/[1-9]/.test(form.quantity))) { commandError.value = '请输入符合单位规则的非零数量；补录必须为正数'; return }
+    if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) { commandError.value = '请选择历史操作人员并填写实际生产时间'; return }
+    if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) { commandError.value = '工作站编号应为正整数'; return }
     pending.value = { requestId: crypto.randomUUID(), uncertain: false, mode, originalId: original.value?.id ?? null, executionCode: props.executionCode, nodeId: node.value.routingNodeId, form: { ...form, quantity: normalizedQuantityInput(form.quantity) }}
     sessionStorage.setItem(pendingKey(), JSON.stringify(pending.value))
   }

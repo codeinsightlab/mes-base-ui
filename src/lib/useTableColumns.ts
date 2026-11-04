@@ -8,7 +8,7 @@ import {
   onMounted,
   onActivated,
   onDeactivated,
-  onBeforeUnmount,
+  onBeforeUnmount
 } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { useAuth } from '@/stores/auth'
@@ -18,7 +18,7 @@ import { mergeColumns, preferencesOf } from '@/lib/tableColumns'
 import type { ColumnDefinition } from '@/lib/tableColumns'
 
 export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOrGetter<T[]>,
-                                                            tableKey: MaybeRefOrGetter<string | undefined>, url: MaybeRefOrGetter<string>) {
+  tableKey: MaybeRefOrGetter<string | undefined>, url: MaybeRefOrGetter<string>) {
   const auth = useAuth()
   const active = ref(false)
   onMounted(() => {
@@ -36,7 +36,7 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
   })
   const state = reactive({
     open: false, loading: false, busy: false, error: '',
-    draft: [] as (ColumnDefinition & { visible: boolean })[], saved: null as ColumnPreference[] | null,
+    draft: [] as (ColumnDefinition & { visible: boolean })[], saved: null as ColumnPreference[] | null
   })
   const available = computed(() => active.value && !!toValue(tableKey) && !!auth.token && !!auth.factoryId && !auth.factorySwitching)
   const identity = computed(() => JSON.stringify([active.value, auth.token, auth.username, auth.factoryId,
@@ -44,7 +44,7 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
   let generation = 0
   const columns = computed(() => mergeColumns(toValue(defaults), state.saved).filter(column => column.visible))
   const current = (version: number, captured: string) => available.value && version === generation && captured === identity.value
-  watch(identity, async () => {
+  watch(identity, async() => {
     const version = ++generation, captured = identity.value
     state.saved = null
     state.draft = []
@@ -59,7 +59,7 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
     try {
       const result = await tablePreferences.get(toValue(url), toValue(tableKey)!)
       if (current(version, captured)) state.saved = Array.isArray(result.columns) ? result.columns : null
-    } catch (error) {
+    } catch(error) {
       if (current(version, captured)) state.error = error instanceof Error ? error.message : '列配置读取失败，已使用默认列'
     } finally {
       if (current(version, captured)) state.loading = false
@@ -103,7 +103,7 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
         state.saved = reset ? null : value
         state.open = false
       }
-    } catch (error) {
+    } catch(error) {
       if (current(version, captured)) state.error = error instanceof Error ? error.message : '列配置保存失败'
     } finally {
       if (current(version, captured)) state.busy = false
@@ -114,6 +114,6 @@ export function useTableColumns<T extends ColumnDefinition>(defaults: MaybeRefOr
     state, columns, available, edit, move, save: () => persist(), reset: () => persist(true),
     cancel: () => {
       if (!state.busy) state.open = false
-    },
+    }
   }
 }

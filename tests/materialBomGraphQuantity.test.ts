@@ -78,7 +78,7 @@ it('reloads the current BOM revision after new or copied draft item edits before
   calls.detail.mockImplementation(async id => ({ id, revision: id === 'NEW' ? '2' : '6' }))
   calls.itemCreate.mockResolvedValue({ id: 'LINE' })
   calls.itemUpdate.mockResolvedValue({ id: 'LINE' })
-  calls.update.mockImplementation(async (_id, body) => ({ ...body, id: 'NEW', revision: '3' }))
+  calls.update.mockImplementation(async(_id, body) => ({ ...body, id: 'NEW', revision: '3' }))
   setup();await flushPromises()
   calls.refreshId = 'NEW'
   await calls.headerApi.create({ code: 'BOM', version: 'V1', baseQty: '1' })

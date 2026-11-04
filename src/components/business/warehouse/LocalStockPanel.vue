@@ -68,7 +68,7 @@ async function load() {
       if (scope !== generation || ticket !== attempt) return
       currentUnitId = rule.unitId ?? ''
       unitName.value = rule.unitName ?? ''
-    } catch (reason) {
+    } catch(reason) {
       if (scope === generation && ticket === attempt) unitError.value = reason instanceof Error ? reason.message : '物料单位读取失败'
     }
     const unitIds = [...new Set(actions.items.map(row => row.unitId))].filter(id => id !== currentUnitId)

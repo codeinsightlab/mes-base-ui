@@ -5,6 +5,7 @@
 ## 环境与常用命令
 
 Node.js 要求以 `package.json` 为准，当前为 >=22.18；`.nvmrc` 使用 Node 22。
+运行 lint、测试或构建前先执行 `nvm use` 并用 `node -v` 确认当前终端已切到 Node 22。用旧版 Node 启动 ESLint 10 会在加载配置时因缺少 `structuredClone` 失败，此时尚未检查源码。
 
 ```sh
 nvm use
