@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ApiError, request } from '@/lib/request'
+import { ApiError, cancelFactoryReads, request } from '@/lib/request'
 import { readSession, removeSession, saveSession } from '@/lib/sessionStorage'
 import type { PermissionScope } from '@/lib/request'
 import { routeMenus, type SourceRoute } from '@/lib/sourceMenus'
@@ -22,7 +22,7 @@ export interface Menu {
 }
 
 const restores = new WeakMap<object, Promise<void>>()
-const switches = new WeakMap<object, object>()
+const switches = new WeakMap<object, AbortController>()
 export const useAuth = defineStore('auth', {
   state: () => {
     const saved = readSession()
@@ -53,6 +53,8 @@ export const useAuth = defineStore('auth', {
       return (scope === 'platform' ? this.platformPermissions : this.factoryPermissions).includes(code)
     },
     clear() {
+      switches.get(this)?.abort()
+      switches.delete(this)
       this.factorySwitching = false
       this.factorySelectionRequired = false
       this.workspaceAccess = null
@@ -193,18 +195,19 @@ export const useAuth = defineStore('auth', {
       await this.restoreFactory()
     },
     async selectFactory(id: string, remember = true) {
-      if (this.factorySwitching) throw new ApiError('FACTORY_SWITCHING', '工厂切换正在进行')
+      switches.get(this)?.abort()
       this.factorySwitching = true
-      const switchMarker = {}
+      const switchMarker = new AbortController()
       switches.set(this, switchMarker)
       this.factoryMenus = []
       this.runtimeMode = null
       this.factoryPermissions = []
       const revision = ++this.revision
+      cancelFactoryReads()
       try {
         if (id && remember) {
           const context = await request<{ factoryId: string }>('/api/foundation/preference', {
-            method: 'PUT', body: { factoryId: id }, scope: 'platform'
+            method: 'PUT', body: { factoryId: id }, scope: 'platform', signal: switchMarker.signal
           })
           if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
           if (context.factoryId !== id) throw new ApiError('INVALID_RESPONSE', '工厂切换响应不一致')
@@ -216,7 +219,7 @@ export const useAuth = defineStore('auth', {
         this.persistSession()
         if (id) {
           const value = await request<{ permissions: string[]; menus: SourceRoute[]; runtimeMode?: 'LOCAL' | 'ERP' }>(
-            '/api/factory/navigation', { scope: 'factory' }
+            '/api/factory/navigation', { scope: 'factory', signal: switchMarker.signal }
           )
           if (selectedRevision !== this.revision || this.factoryId !== id) {
             throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')

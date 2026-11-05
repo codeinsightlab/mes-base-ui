@@ -9,6 +9,11 @@ function assertCurrent(snapshot: RequestContext) {
 }
 let unauthenticated: () => void = () => {}
 let factorySelectionRequired: () => void = () => {}
+const factoryReads = new Set<AbortController>()
+export function cancelFactoryReads() {
+  for (const controller of factoryReads) controller.abort()
+  factoryReads.clear()
+}
 export function configureRequests(provider: () => RequestContext, on401: () => void, onFactorySelection: () => void = () => {}) {
   context = provider
   unauthenticated = on401
@@ -25,6 +30,7 @@ async function send<T>(path: string, options: RequestOptions, consume: (response
   const multipart = options.body instanceof FormData
   if (options.body !== undefined && !multipart) headers.set('Content-Type', 'application/json')
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), Math.min(120000, Math.max(1000, options.timeoutMs ?? 15000)))
+  if (options.scope === 'factory' && (options.method ?? 'GET').toUpperCase() === 'GET') factoryReads.add(controller)
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal
   let response: Response | undefined
   const read = async <R>(operation: () => Promise<R>): Promise<R> => {
@@ -73,7 +79,7 @@ async function send<T>(path: string, options: RequestOptions, consume: (response
     const result = await consume(response, read)
     assertCurrent(snapshot)
     return result
-  } finally { clearTimeout(timer) }
+  } finally { clearTimeout(timer); factoryReads.delete(controller) }
 }
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   return send(path, options, async(response, read) => {

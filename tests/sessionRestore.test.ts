@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuth } from '../src/stores/auth'
-import { configureRequests } from '../src/lib/request'
+import { configureRequests, request } from '../src/lib/request'
 import { SESSION_KEY, readSession, saveSession } from '../src/lib/sessionStorage'
 
 const expiresAt = () => new Date(Date.now() + 3600000).toISOString()
@@ -22,6 +22,54 @@ function responses(factories = [{ factoryId: 'A', name: 'Factory A' }], factoryI
 }
 beforeEach(() => { localStorage.clear();vi.unstubAllGlobals() })
 describe('persisted login restoration', () => {
+  it('switches to B while A navigation hangs and rejects the late A response', async() => {
+    const auth = store(); auth.token = 'TEST'
+    let completeA!: (value: Response) => void
+    let aSignal!: AbortSignal
+    vi.stubGlobal('fetch', vi.fn(async(path: string, init: RequestInit) => {
+      if (path.includes('/preference')) return new Response(String(init.body))
+      if (new Headers(init.headers).get('X-Factory-Id') === 'A') {
+        aSignal = init.signal!
+        return new Promise<Response>(resolve => { completeA = resolve })
+      }
+      return new Response('{"menus":[],"permissions":["B:read"],"runtimeMode":"LOCAL"}')
+    }))
+    const first = auth.selectFactory('A')
+    const firstResult = expect(first).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
+    await vi.waitFor(() => expect(completeA).toBeDefined())
+    await auth.selectFactory('B')
+    await firstResult
+    expect(aSignal.aborted).toBe(true)
+    expect(auth.factorySwitching).toBe(false)
+    completeA(new Response('{"menus":[],"permissions":["A:read"]}'))
+    await Promise.resolve(); await Promise.resolve()
+    expect(auth.factoryId).toBe('B')
+    expect(auth.factoryPermissions).toEqual(['B:read'])
+    expect(readSession()?.factoryId).toBe('B')
+  })
+  it('cancels old factory reads when switching, without aborting submitted writes', async() => {
+    const auth = store(); auth.token = 'TEST'; auth.factoryId = 'A'
+    const signals = new Map<string, AbortSignal>()
+    let completeWrite!: (value: Response) => void
+    vi.stubGlobal('fetch', vi.fn(async(path: string, init: RequestInit) => {
+      if (path === '/api/TEST_ONLY/read' || path === '/api/TEST_ONLY/write') {
+        signals.set(path, init.signal!)
+        return new Promise<Response>(resolve => { if (path.endsWith('/write')) completeWrite = resolve })
+      }
+      return new Response(path.includes('/preference') ? String(init.body) : '{"menus":[],"permissions":["B:read"]}')
+    }))
+    const read = request('/api/TEST_ONLY/read', { scope: 'factory' })
+    const readResult = expect(read).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
+    const write = request('/api/TEST_ONLY/write', { scope: 'factory', method: 'POST', body: {}})
+    const writeResult = expect(write).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
+    await vi.waitFor(() => expect(signals.size).toBe(2))
+    await auth.selectFactory('B')
+    await readResult
+    expect(signals.get('/api/TEST_ONLY/read')!.aborted).toBe(true)
+    expect(signals.get('/api/TEST_ONLY/write')!.aborted).toBe(false)
+    completeWrite(new Response('{}')); await writeResult
+    expect(auth.factoryId).toBe('B')
+  })
   it('restores a fresh store, validating credentials and refreshing permissions from server', async() => {
     saveSession({ token: 'TEST_ONLY', factoryId: 'A' })
     const auth = store(), fetcher = responses()
@@ -74,13 +122,13 @@ describe('persisted login restoration', () => {
     expect(auth.factoryPermissions).toEqual([])
     expect(auth.factorySwitching).toBe(false)
   })
-  it('rejects simultaneous switches and ignores a preference response after logout', async() => {
+  it('ignores a preference response after logout', async() => {
     const auth = store()
     auth.token = 'TEST'
     let complete!: (value: Response) => void
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise<Response>(resolve => { complete = resolve })))
     const first = auth.selectFactory('2')
-    await expect(auth.selectFactory('10')).rejects.toMatchObject({ code: 'FACTORY_SWITCHING' })
+    await Promise.resolve(); await Promise.resolve()
     auth.clear()
     complete(new Response('{"factoryId":"2"}'))
     await expect(first).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
