@@ -206,11 +206,24 @@ export const useAuth = defineStore('auth', {
       cancelFactoryReads()
       try {
         if (id && remember) {
-          const context = await request<{ factoryId: string }>('/api/foundation/preference', {
-            method: 'PUT', body: { factoryId: id }, scope: 'platform', signal: switchMarker.signal
-          })
-          if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
-          if (context.factoryId !== id) throw new ApiError('INVALID_RESPONSE', '工厂切换响应不一致')
+          let confirmed = false
+          for (let attempt = 0; attempt < 5 && !confirmed; attempt++) {
+            const preference = await request<{ revision: string }>('/api/foundation/preference', {
+              scope: 'platform', signal: switchMarker.signal
+            })
+            if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+            try {
+              const context = await request<{ factoryId: string }>('/api/foundation/preference', {
+                method: 'PUT', body: { factoryId: id, revision: preference.revision }, scope: 'platform', signal: switchMarker.signal
+              })
+              if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+              if (context.factoryId !== id) throw new ApiError('INVALID_RESPONSE', '工厂切换响应不一致')
+              confirmed = true
+            } catch(error) {
+              if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
+              if (!(error instanceof ApiError) || error.code !== 'RESOURCE_CONFLICT' || attempt === 4) throw error
+            }
+          }
         }
         if (revision !== this.revision) throw new ApiError('CONTEXT_CHANGED', '上下文已切换，请重新加载')
         this.factoryId = id

@@ -22,11 +22,44 @@ function responses(factories = [{ factoryId: 'A', name: 'Factory A' }], factoryI
 }
 beforeEach(() => { localStorage.clear();vi.unstubAllGlobals() })
 describe('persisted login restoration', () => {
+  it.each(['B first', 'A first'])('persists B despite an already accepted late A write (%s)', async order => {
+    const auth = store(); auth.token = 'TEST'
+    let saved = '', version = 0
+    let finishA!: () => void
+    let bConflict = false
+    vi.stubGlobal('fetch', vi.fn(async(path: string, init: RequestInit) => {
+      if (path === '/api/foundation/preference') {
+        if (init.method !== 'PUT') return new Response(JSON.stringify({ factoryId: saved, revision: String(version) }))
+        const body = JSON.parse(String(init.body))
+        const apply = () => {
+          if (String(version) !== body.revision) return new Response('{"errorCode":"RESOURCE_CONFLICT"}', { status: 409 })
+          saved = body.factoryId; version++
+          return new Response(JSON.stringify({ factoryId: saved }))
+        }
+        if (body.factoryId === 'A') return new Promise<Response>(resolve => { finishA = () => resolve(apply()) })
+        if (order === 'A first' && !bConflict) { bConflict = true; finishA() }
+        return apply()
+      }
+      if (path.includes('/factories')) return new Response('[{"factoryId":"A","name":"A"},{"factoryId":"B","name":"B"}]')
+      if (path.includes('/context')) return new Response(JSON.stringify({ factoryId: saved }))
+      return new Response('{"menus":[],"permissions":["B:read"]}')
+    }))
+    const first = auth.selectFactory('A')
+    const firstResult = expect(first).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' })
+    await vi.waitFor(() => expect(finishA).toBeDefined())
+    await auth.selectFactory('B'); await firstResult
+    if (order === 'B first') finishA()
+    await auth.restoreFactory()
+    expect(saved).toBe('B'); expect(auth.factoryId).toBe('B')
+    expect(auth.factoryPermissions).toEqual(['B:read'])
+    expect(version).toBe(order === 'B first' ? 1 : 2)
+  })
   it('switches to B while A navigation hangs and rejects the late A response', async() => {
     const auth = store(); auth.token = 'TEST'
     let completeA!: (value: Response) => void
     let aSignal!: AbortSignal
     vi.stubGlobal('fetch', vi.fn(async(path: string, init: RequestInit) => {
+      if (path.includes('/preference') && init.method !== 'PUT') return new Response('{"revision":"0"}')
       if (path.includes('/preference')) return new Response(String(init.body))
       if (new Headers(init.headers).get('X-Factory-Id') === 'A') {
         aSignal = init.signal!
@@ -52,6 +85,7 @@ describe('persisted login restoration', () => {
     const signals = new Map<string, AbortSignal>()
     let completeWrite!: (value: Response) => void
     vi.stubGlobal('fetch', vi.fn(async(path: string, init: RequestInit) => {
+      if (path.includes('/preference') && init.method !== 'PUT') return new Response('{"revision":"0"}')
       if (path === '/api/TEST_ONLY/read' || path === '/api/TEST_ONLY/write') {
         signals.set(path, init.signal!)
         return new Promise<Response>(resolve => { if (path.endsWith('/write')) completeWrite = resolve })
@@ -98,9 +132,10 @@ describe('persisted login restoration', () => {
     auth.token = 'TEST'
     const fetcher = responses()
     fetcher.mockImplementation(async(path: string, init: RequestInit) => {
+      if (path.includes('/preference') && init.method !== 'PUT') return new Response('{"revision":"0"}')
       if (path.includes('/preference')) {
         expect(init.method).toBe('PUT')
-        expect(JSON.parse(String(init.body))).toEqual({ factoryId: '2' })
+        expect(JSON.parse(String(init.body))).toEqual({ factoryId: '2', revision: '0' })
         expect(new Headers(init.headers).has('X-Factory-Id')).toBe(false)
         return new Response('{"factoryId":"2"}')
       }
@@ -217,7 +252,7 @@ describe('persisted login restoration', () => {
     expect(readSession()?.factoryId).toBe('')
     await auth.loadFactoryOptions()
     expect(new Headers(fetcher.mock.calls.at(-1)![1].headers).has('X-Factory-Id')).toBe(false)
-    fetcher.mockImplementation(async(path: string) => new Response(path.includes('/preference') ? '{"factoryId":"B"}' : '{"menus":[],"permissions":["B:read"]}'))
+    fetcher.mockImplementation(async(path: string, init: RequestInit) => new Response(path.includes('/preference') ? (init.method === 'PUT' ? '{"factoryId":"B"}' : '{"revision":"0"}') : '{"menus":[],"permissions":["B:read"]}'))
     await auth.selectFactory('B')
     expect(auth.factorySelectionRequired).toBe(false)
     expect(auth.factoryId).toBe('B')
