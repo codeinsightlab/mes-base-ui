@@ -85,98 +85,149 @@ function windowConfirm() { return window.confirm('放弃未保存的整阶修改
 function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value[l.material] ?? l.material).split(' · ')[0]);nodes.value[n.key] = n;l.child = n.key }
 </script>
 <template>
-  <section v-loading="busy">
+  <section v-loading="busy" class="bom-editor" aria-label="整阶 BOM 编排">
     <MaterialPicker ref="picker" />
-    <el-alert v-if="error" :title="error" type="error" />
-    <el-button @click="!dirty || windowConfirm() ? emit('close') : undefined">返回版本列表</el-button>
+    <header class="editor-toolbar">
+      <el-button @click="!dirty || windowConfirm() ? emit('close') : undefined">返回版本列表</el-button>
+      <div class="editor-title"><h3>整阶编排</h3><span>维护多层组成，统一预览并保存草稿</span></div>
+      <span class="edit-state">{{ dirty ? '有未保存的修改' : '尚未修改' }}</span>
+    </header>
+    <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <template v-if="active">
-      <p>选择树中版本，编辑其直接组件。共享节点的修改应用于当前根内所有引用；仅改所选路径时先分开修订。</p>
       <div class="workspace">
-        <nav aria-label="BOM 结构">
-          <div v-for="r in tree()" :key="r.index.join('/')" class="tree-row" :style="{paddingLeft:r.index.length*12+'px'}">
-            <el-button v-if="r.leaf" class="node-label" link @click="selected=r.path;branch=r.index.slice(0,-1)">{{ names[r.leaf.material]??r.leaf.material }} × {{ r.leaf.quantity }}（叶项）</el-button>
-            <template v-else>
-              <el-button link :aria-label="collapsed.has(r.index.join('/'))?'展开':'折叠'" @click="collapsed.has(r.index.join('/'))?collapsed.delete(r.index.join('/')):collapsed.add(r.index.join('/'))">{{ collapsed.has(r.index.join('/'))?'▸':'▾' }}</el-button>
-              <el-button class="node-label" link :class="{changed:preview?.changes.some(c=>c.key===r.node.key && c.action!=='REUSE')}" @click="selected=r.path;branch=r.index">{{ names[r.node.product]??r.node.product }} · {{ r.node.version }}</el-button>
-            </template>
+        <nav class="structure-panel panel" aria-label="BOM 结构">
+          <div class="section-heading"><h4>组成结构</h4><span>选择节点编辑</span></div>
+          <div class="structure-tree">
+            <div v-for="r in tree()" :key="r.index.join('/')" class="tree-row" :class="{ 'is-active': !r.leaf && branch.join('/')===r.index.join('/') }" :style="{paddingLeft: `calc(var(--ui-space-2) + ${r.index.length * 16}px)`}">
+              <template v-if="r.leaf">
+                <span class="leaf-marker" aria-hidden="true">·</span>
+                <el-button class="node-label" link @click="selected=r.path;branch=r.index.slice(0,-1)"><span class="node-copy"><span>{{ names[r.leaf.material]??r.leaf.material }}</span><small>叶项 · 用量 {{ r.leaf.quantity }}</small></span></el-button>
+              </template>
+              <template v-else>
+                <el-button class="tree-toggle" link :aria-label="collapsed.has(r.index.join('/'))?'展开':'折叠'" :aria-expanded="!collapsed.has(r.index.join('/'))" @click="collapsed.has(r.index.join('/'))?collapsed.delete(r.index.join('/')):collapsed.add(r.index.join('/'))">{{ collapsed.has(r.index.join('/'))?'▸':'▾' }}</el-button>
+                <el-button class="node-label" link :aria-current="branch.join('/')===r.index.join('/') ? 'true' : undefined" :class="{changed:preview?.changes.some(c=>c.key===r.node.key && c.action!=='REUSE')}" @click="selected=r.path;branch=r.index"><span class="node-copy"><span>{{ names[r.node.product]??r.node.product }}</span><small>{{ r.node.version }} · {{ r.node.source ? '来源版本' : '新建草稿' }}</small></span></el-button>
+              </template>
+            </div>
           </div>
+          <p class="structure-note">共享节点的修改会应用于当前根内的所有引用。</p>
         </nav>
-        <main>
-          <div class="node-heading"><strong>{{ names[active.product]??active.product }}</strong><el-button v-if="branch.length" @click="split">仅此路径单独修订</el-button></div>
-          <label>BOM 编码 <el-input v-model="active.code" :disabled="!!active.source" />
-          </label>
-          <label>版本号 <el-input v-model="active.version" />
-          </label>
-          <label>产出基准 <QuantityInput v-model="active.base" semantic="bom-ratio" :material-id="active.product" />
-          </label>
-          <label>备注 <el-input v-model="active.remark" />
-          </label>
-          <el-table :data="active.lines">
-            <el-table-column label="组件" min-width="240">
-              <template #default="{row,$index}">
-                <el-button link @click="pick($index)">{{ names[row.material]??row.material }}</el-button>
-              </template>
+        <main class="node-editor panel">
+          <div class="node-heading">
+            <div><span class="eyebrow">当前编辑节点</span><h3>{{ names[active.product]??active.product }}</h3></div>
+            <el-button v-if="branch.length" @click="split">仅此路径单独修订</el-button>
+          </div>
+          <p v-if="branch.length" class="node-hint">只想修改当前分支？请先「仅此路径单独修订」，再编辑内容。</p>
+          <div class="version-fields">
+            <label>BOM 编码 <el-input v-model="active.code" :disabled="!!active.source" /></label>
+            <label>版本号 <el-input v-model="active.version" /></label>
+            <label>产出基准 <QuantityInput v-model="active.base" semantic="bom-ratio" :material-id="active.product" /></label>
+            <label class="remark-field">备注 <el-input v-model="active.remark" type="textarea" :autosize="{minRows:2,maxRows:4}" /></label>
+          </div>
+          <div class="section-heading components-heading"><div><h4>直接组件</h4><span>{{ active.lines.length }} 项 · 用量对应当前产出基准</span></div><el-button @click="pick()">添加组件</el-button></div>
+          <el-table :data="active.lines" class="components-table" empty-text="暂无组件，点击「添加组件」开始维护">
+            <el-table-column label="组件" min-width="170">
+              <template #default="{row,$index}"><el-button link @click="pick($index)">{{ names[row.material]??row.material }}</el-button></template>
             </el-table-column>
-            <el-table-column label="用量" min-width="260">
-              <template #default="{row}">
-                <QuantityInput v-model="row.quantity" semantic="bom-ratio" show-unit :material-id="row.material" />
-              </template>
+            <el-table-column label="用量" min-width="160">
+              <template #default="{row}"><QuantityInput v-model="row.quantity" semantic="bom-ratio" show-unit :material-id="row.material" /></template>
             </el-table-column>
             <el-table-column label="子版本" min-width="210">
               <template #default="{row}">
-                <span v-if="row.child">{{ nodes[row.child]?.version }} · {{ statuses[row.child]==='PUBLISHED'?'已发布':'草稿，须先发布' }} <el-button link @click="row.child=null">解除引用</el-button>
-                </span>
-                <template v-else>
-                  <BomVersionSelect allow-draft :material-id="row.material" @update:model-value="link(row,$event)" />
-                  <el-button link @click="createChild(row)">新建子草稿</el-button>
-                  <el-select v-if="Object.values(nodes).some(n=>n.product===row.material&&!n.source)" placeholder="复用本次草稿" @change="row.child=$event">
-                    <el-option v-for="n in Object.values(nodes).filter(n=>n.product===row.material&&!n.source)" :key="n.key" :value="n.key" :label="n.code+' · '+n.version" />
-                  </el-select>
-                </template>
+                <div class="child-version">
+                  <template v-if="row.child"><span>{{ nodes[row.child]?.version }} · {{ statuses[row.child]==='PUBLISHED'?'已发布':'草稿，须先发布' }}</span><el-button link @click="row.child=null">解除引用</el-button></template>
+                  <template v-else>
+                    <BomVersionSelect allow-draft placeholder="选择子版本（可不选）" :material-id="row.material" @update:model-value="link(row,$event)" />
+                    <el-button link @click="createChild(row)">新建子草稿</el-button>
+                    <el-select v-if="Object.values(nodes).some(n=>n.product===row.material&&!n.source)" placeholder="复用本次草稿" @change="row.child=$event">
+                      <el-option v-for="n in Object.values(nodes).filter(n=>n.product===row.material&&!n.source)" :key="n.key" :value="n.key" :label="n.code+' · '+n.version" />
+                    </el-select>
+                  </template>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="顺序" width="150">
-              <template #default="{row}">
-                <el-input-number v-model="row.sort" :min="0" controls-position="right" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
-              <template #default="{$index}">
-                <el-button link @click="active.lines.splice($index,1)">移除组件</el-button>
-              </template>
-            </el-table-column>
+            <el-table-column label="顺序" width="110"><template #default="{row}"><el-input-number v-model="row.sort" :min="0" controls-position="right" aria-label="组件顺序" /></template></el-table-column>
+            <el-table-column label="操作" width="96" fixed="right"><template #default="{$index}"><el-button link type="danger" @click="active.lines.splice($index,1)">移除组件</el-button></template></el-table-column>
           </el-table>
-          <el-button @click="pick()">添加组件</el-button>
         </main>
       </div>
-      <el-button type="primary" @click="review">预览整阶变更</el-button>
-      <template v-if="preview">
-        <p>新增 {{ preview.createdVersions }} 个版本，更新 {{ preview.editedVersions }} 个版本；明细新增 {{ preview.insertedLines }}、修改 {{ preview.updatedLines }}、移除 {{ preview.removedLines }}。保存只生成草稿；请先发布子版本，再发布父版本。</p>
-        <div v-for="c in preview.changes" :key="c.key">
-          <strong :class="{changed:c.action!=='REUSE'}">{{ c.ancestor ? '自动生成祖先草稿' : actions[c.action] }}：{{ nodes[c.key].code }} · {{ c.version }}</strong>
-          <label v-if="['COPY','CREATE','EDIT'].includes(c.action)">拟保存版本号（调整后重新预览）<el-input :model-value="c.version" maxlength="32" @change="adjustVersion(c.key,$event)" />
-          </label>
-          <p v-if="c.action!=='REUSE'">{{ summary(c.before) }} → {{ summary(c.after,true) }}<br>{{ metadata(c) }}</p>
+      <section v-if="preview" class="preview-panel panel" aria-label="整阶变更预览">
+        <div class="section-heading"><div><h4>变更预览</h4><span>确认以下变更后保存整阶草稿</span></div></div>
+        <div class="preview-summary">
+          <span>新增版本 <strong>{{ preview.createdVersions }}</strong></span><span>更新版本 <strong>{{ preview.editedVersions }}</strong></span>
+          <span>组件新增 <strong>{{ preview.insertedLines }}</strong></span><span>修改 <strong>{{ preview.updatedLines }}</strong></span><span>移除 <strong>{{ preview.removedLines }}</strong></span>
         </div>
-        <el-button type="primary" @click="save">确认保存整阶草稿</el-button>
-      </template>
+        <div class="change-list">
+          <div v-for="c in preview.changes" :key="c.key" class="change-row">
+            <div class="change-heading"><span class="change-action" :class="{changed:c.action!=='REUSE'}">{{ c.ancestor ? '自动生成祖先草稿' : actions[c.action] }}</span><strong>{{ nodes[c.key].code }} · {{ c.version }}</strong></div>
+            <label v-if="['COPY','CREATE','EDIT'].includes(c.action)" class="proposed-version">拟保存版本号（调整后重新预览）<el-input :model-value="c.version" maxlength="32" @change="adjustVersion(c.key,$event)" /></label>
+            <template v-if="c.action!=='REUSE'"><div class="change-comparison"><p><span>变更前</span>{{ summary(c.before) }}</p><p><span>变更后</span>{{ summary(c.after,true) }}</p></div><p v-if="metadata(c)" class="metadata">{{ metadata(c) }}</p></template>
+          </div>
+        </div>
+      </section>
+      <footer class="editor-footer">
+        <div class="save-note"><strong>{{ preview ? '已生成变更预览' : '编辑完成后，先预览变更' }}</strong><span>保存只生成草稿；请先发布子版本，再发布父版本。</span></div>
+        <div class="footer-actions"><el-button :type="preview ? 'default' : 'primary'" :disabled="busy" @click="review">预览整阶变更</el-button><el-button v-if="preview" type="primary" :disabled="busy" @click="save">确认保存整阶草稿</el-button></div>
+      </footer>
     </template>
   </section>
 </template>
 <style scoped>
-.changed { color: var(--el-color-primary); }
-.workspace { display: grid; grid-template-columns: minmax(240px, 28%) minmax(0, 1fr); gap: 12px; }
-.workspace nav, .workspace main { min-width: 0; overflow: auto; }
-.workspace label { display: inline-block; max-width: 200px; margin: 6px; }
-.tree-row { display: flex; align-items: flex-start; margin-bottom: 8px; }
-.node-label { min-width: 0; height: auto; white-space: normal; text-align: left; line-height: 1.5; }
+.bom-editor { display: flex; flex-direction: column; gap: var(--ui-space-5); container-type: inline-size; }
+.editor-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--ui-space-4); }
+h3, h4, p { margin: 0; }
+h3 { font-size: var(--ui-text-lg); color: var(--ui-text); line-height: 1.5; }
+h4 { font-size: var(--ui-text-base); color: var(--ui-text); }
+.editor-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--ui-space-3); }
+.editor-title span, .edit-state, .section-heading span, .eyebrow, .node-hint, .structure-note, .save-note span { font-size: var(--ui-text-xs); color: var(--ui-text-secondary); }
+.edit-state { margin-left: auto; }
+.workspace { display: grid; grid-template-columns: minmax(240px, 28%) minmax(0, 1fr); gap: var(--ui-space-4); align-items: start; }
+.structure-panel, .node-editor { min-width: 0; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-3); padding: var(--ui-space-4); border-bottom: 1px solid var(--ui-border-soft); }
+.section-heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--ui-space-2); }
+.structure-tree { padding: var(--ui-space-2); max-height: 56vh; overflow: auto; }
+.tree-row { display: flex; align-items: flex-start; border-radius: var(--ui-radius-sm); padding-top: var(--ui-space-2); padding-bottom: var(--ui-space-2); padding-right: var(--ui-space-2); gap: var(--ui-space-1); }
+.tree-row:hover { background: var(--ui-surface-soft); }
+.tree-row.is-active { background: var(--ui-running-bg); box-shadow: inset 2px 0 var(--ui-primary); }
+.tree-toggle, .leaf-marker { flex: 0 0 16px; height: 20px; text-align: center; color: var(--ui-text-muted); }
+.node-label { justify-content: flex-start; flex: 1; min-width: 0; height: auto; margin-left: 0; white-space: normal; text-align: left; line-height: 1.5; }
 .node-label :deep(span) { overflow-wrap: anywhere; }
-.workspace :deep(.el-table .el-button.is-link) { height: auto; white-space: normal; text-align: left; line-height: 1.5; overflow-wrap: anywhere; }
-.node-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; overflow-wrap: anywhere; }
-.workspace :deep(.quantity-input .el-input__wrapper) { min-width: 70px; }
-.workspace :deep(.quantity-input .el-input-group__append) { max-width: 130px; white-space: normal; overflow-wrap: anywhere; padding: 0 8px; }
-@media (max-width: 1280px) {
-  .workspace { grid-template-columns: minmax(0, 1fr); }
-  .workspace nav { max-height: 240px; }
-}
+.node-copy { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ui-space-1); }
+.node-copy small { color: var(--ui-text-muted); font-size: var(--ui-text-xs); font-weight: normal; }
+.is-active .node-label { color: var(--ui-primary); }
+.structure-note { padding: var(--ui-space-3) var(--ui-space-4); border-top: 1px solid var(--ui-border-soft); line-height: 1.6; }
+.node-editor { padding: var(--ui-space-4); }
+.node-heading { display: flex; align-items: flex-start; flex-wrap: wrap; justify-content: space-between; gap: var(--ui-space-3); overflow-wrap: anywhere; }
+.node-heading > div { flex: 1; min-width: 180px; }
+.eyebrow { display: block; margin-bottom: var(--ui-space-1); }
+.node-hint { margin-top: var(--ui-space-2); line-height: 1.6; }
+.version-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1fr); gap: var(--ui-space-4); margin: var(--ui-space-5) 0; }
+.version-fields label, .proposed-version { display: flex; flex-direction: column; gap: var(--ui-space-2); min-width: 0; font-size: var(--ui-text-sm); color: var(--ui-text-secondary); }
+.remark-field { grid-column: 1 / -1; }
+.components-heading { padding: var(--ui-space-3) 0; border-top: 1px solid var(--ui-border-soft); border-bottom: 0; }
+.components-table { width: 100%; }
+.components-table :deep(.el-button.is-link) { height: auto; white-space: normal; text-align: left; line-height: 1.5; overflow-wrap: anywhere; }
+.components-table :deep(.el-input-number) { width: 100%; }
+.child-version { display: flex; flex-direction: column; align-items: flex-start; gap: var(--ui-space-2); padding: var(--ui-space-1) 0; }
+.child-version :deep(.el-select) { width: 100%; }
+.preview-panel { overflow: hidden; }
+.preview-summary { display: flex; flex-wrap: wrap; gap: var(--ui-space-4); padding: var(--ui-space-3) var(--ui-space-4); background: var(--ui-surface-soft); font-size: var(--ui-text-sm); color: var(--ui-text-secondary); }
+.preview-summary strong { margin-left: var(--ui-space-2); color: var(--ui-text); font-variant-numeric: tabular-nums; }
+.change-list { padding: 0 var(--ui-space-4); }
+.change-row { padding: var(--ui-space-3) 0; }
+.change-row + .change-row { border-top: 1px solid var(--ui-border-soft); }
+.change-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--ui-space-3); font-size: var(--ui-text-sm); overflow-wrap: anywhere; }
+.change-action { color: var(--ui-text-secondary); }
+.changed { color: var(--ui-primary); }
+.proposed-version { max-width: 300px; margin-top: var(--ui-space-3); }
+.change-comparison { display: grid; gap: var(--ui-space-2); margin-top: var(--ui-space-3); font-size: var(--ui-text-sm); overflow-wrap: anywhere; }
+.change-comparison p { display: flex; align-items: baseline; gap: var(--ui-space-3); }
+.change-comparison p > span { flex-shrink: 0; color: var(--ui-text-muted); }
+.metadata { margin-top: var(--ui-space-2); font-size: var(--ui-text-xs); color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+.editor-footer { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--ui-space-4); padding: var(--ui-space-4) 0; border-top: 1px solid var(--ui-border); background: var(--ui-surface); }
+.save-note { display: flex; flex-direction: column; gap: var(--ui-space-1); }
+.save-note strong { font-size: var(--ui-text-sm); }
+.footer-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+.footer-actions .el-button + .el-button { margin-left: 0; }
+@container (max-width: 850px) { .workspace { grid-template-columns: minmax(0, 1fr); } .structure-tree { max-height: 240px; } }
+@container (max-width: 520px) { .version-fields { grid-template-columns: minmax(0, 1fr); } .editor-title { flex: 1; } .edit-state { width: 100%; margin-left: 0; } .footer-actions { width: 100%; } }
 </style>
