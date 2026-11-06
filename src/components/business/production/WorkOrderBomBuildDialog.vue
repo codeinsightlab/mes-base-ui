@@ -200,8 +200,8 @@ async function startNewAfterUnknown() {
           <el-table-column prop="path" label="BOM路径" />
           <el-table-column prop="ruleCode" label="工单编码规则" />
           <el-table-column prop="routingId" label="工艺ID" />
-          <el-table-column prop="plannedStartAt" label="计划开始" />
-          <el-table-column prop="plannedEndAt" label="计划结束" />
+          <el-table-column prop="plannedStartAt" label="计划开始"><template #default="{row}">{{ row.plannedStartAt?.slice(0,10) || '—' }}</template></el-table-column>
+          <el-table-column prop="plannedEndAt" label="计划结束"><template #default="{row}">{{ row.plannedEndAt?.slice(0,10) || '—' }}</template></el-table-column>
           <el-table-column prop="remark" label="备注" />
         </el-table>
       </div>
@@ -212,8 +212,8 @@ async function startNewAfterUnknown() {
           <el-form label-width="120px" class="choice-form">
             <el-form-item label="工单编码规则" required><el-select v-model="choices[order.path]!.ruleCode" :disabled="!!retryConfirmation" placeholder="请选择规则"><el-option v-for="rule in rules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode}）`" /></el-select><span v-if="order.defaultRuleCode" class="hint">物料默认：{{ order.defaultRuleCode }}</span></el-form-item>
             <el-form-item label="适用工艺" :required="order.routings.length > 0"><el-select v-model="choices[order.path]!.routingId" :disabled="!!retryConfirmation" clearable :placeholder="order.routings.length ? '请选择已发布工艺' : '无适用工艺' "><el-option v-for="route in order.routings" :key="route.id" :value="route.id" :label="`${route.code} / V${route.version} · ${route.name}`" /></el-select></el-form-item>
-            <el-form-item label="计划开始"><el-date-picker v-model="choices[order.path]!.plannedStartAt" :disabled="!!retryConfirmation" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
-            <el-form-item label="计划结束"><el-date-picker v-model="choices[order.path]!.plannedEndAt" :disabled="!!retryConfirmation" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
+            <el-form-item label="计划开始"><el-date-picker v-model="choices[order.path]!.plannedStartAt" :disabled="!!retryConfirmation" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
+            <el-form-item label="计划结束"><el-date-picker v-model="choices[order.path]!.plannedEndAt" :disabled="!!retryConfirmation" type="date" format="YYYY-MM-DD" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
             <el-form-item label="备注"><el-input v-model="choices[order.path]!.remark" :disabled="!!retryConfirmation" maxlength="500" /></el-form-item>
           </el-form>
           <el-table :data="order.materials" size="small"><el-table-column prop="code" label="直接用料编码" /><el-table-column prop="name" label="直接用料名称" /><el-table-column prop="quantity" label="需求数量" align="right" /></el-table>
