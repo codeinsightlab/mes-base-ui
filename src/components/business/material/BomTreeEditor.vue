@@ -39,8 +39,23 @@ function tree() {
   walk(root.value, [], [])
   return rows
 }
-const branch = ref<number[]>([])
-function split() { let n = nodes.value[root.value];const path = [n.key];for (const i of branch.value) { const l = n.lines[i], copy = JSON.parse(JSON.stringify(nodes.value[l.child!])) as Node;copy.key = crypto.randomUUID();l.child = copy.key;nodes.value[copy.key] = copy;n = copy;path.push(n.key) }selected.value = path }
+const branch = ref<number[]>([]), isolatedKeys = ref(new Set<string>())
+const pathIsolated = computed(() => !!active.value && isolatedKeys.value.has(active.value.key))
+function split() {
+  if (busy.value || !branch.value.length || pathIsolated.value) return
+  let n = nodes.value[root.value]
+  const path = [n.key]
+  for (const i of branch.value) {
+    const l = n.lines[i], copy = JSON.parse(JSON.stringify(nodes.value[l.child!])) as Node
+    copy.key = crypto.randomUUID()
+    l.child = copy.key
+    nodes.value[copy.key] = copy
+    isolatedKeys.value.add(copy.key)
+    n = copy
+    path.push(n.key)
+  }
+  selected.value = path
+}
 async function pick(i?:number) { const n = active.value;const m = await picker.value?.choose();if (!m) return;names.value[m.id] = m.code + ' · ' + m.name;if (i === undefined)n.lines.push({ material: m.id, quantity: '1', sort: n.lines.length, child: null });else Object.assign(n.lines[i], { material: m.id, child: null }) }
 async function link(l:Line, k:string | null) { if (!k) { l.child = null;return } await run(async() => { if (!nodes.value[k])install(await readBomTree(k));l.child = k }) }
 function plan():Plan { const keys = new Set<string>();function visit(k:string) { if (keys.has(k)) return;keys.add(k);for (const l of nodes.value[k].lines) if (l.child)visit(l.child) }visit(root.value);return { root: root.value, nodes: [...keys].map(k => nodes.value[k]) } }
@@ -105,7 +120,7 @@ function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value
               </template>
               <template v-else>
                 <el-button class="tree-toggle" link :aria-label="collapsed.has(r.index.join('/'))?'展开':'折叠'" :aria-expanded="!collapsed.has(r.index.join('/'))" @click="collapsed.has(r.index.join('/'))?collapsed.delete(r.index.join('/')):collapsed.add(r.index.join('/'))">{{ collapsed.has(r.index.join('/'))?'▸':'▾' }}</el-button>
-                <el-button class="node-label" link :aria-current="branch.join('/')===r.index.join('/') ? 'true' : undefined" :class="{changed:preview?.changes.some(c=>c.key===r.node.key && c.action!=='REUSE')}" @click="selected=r.path;branch=r.index"><span class="node-copy"><span>{{ names[r.node.product]??r.node.product }}</span><small>{{ r.node.version }} · {{ r.node.source ? '来源版本' : '新建草稿' }}</small></span></el-button>
+                <el-button class="node-label" link :aria-current="branch.join('/')===r.index.join('/') ? 'true' : undefined" :class="{changed:preview?.changes.some(c=>c.key===r.node.key && c.action!=='REUSE')}" @click="selected=r.path;branch=r.index"><span class="node-copy"><span>{{ names[r.node.product]??r.node.product }}</span><small>{{ r.node.version }} · {{ isolatedKeys.has(r.node.key) ? '当前路径独立' : r.node.source ? '来源版本' : '新建草稿' }}</small></span></el-button>
               </template>
             </div>
           </div>
@@ -114,9 +129,10 @@ function createChild(l:Line) { const n = fresh(l.material, 'BOM-' + (names.value
         <main class="node-editor panel">
           <div class="node-heading">
             <div><span class="eyebrow">当前编辑节点</span><h3>{{ names[active.product]??active.product }}</h3></div>
-            <el-button v-if="branch.length" @click="split">仅此路径单独修订</el-button>
+            <el-button v-if="branch.length" :disabled="busy || pathIsolated" @click="split">{{ pathIsolated ? '已独立修订' : '仅此路径单独修订' }}</el-button>
           </div>
-          <p v-if="branch.length" class="node-hint">只想修改当前分支？请先「仅此路径单独修订」，再编辑内容。</p>
+          <p v-if="pathIsolated" class="node-hint isolated-hint" role="status">当前节点已在此路径独立。现在可修改版本号、用量和直接组件，不影响其他路径中的原节点；下层子 BOM 仍保留原引用。完成后请预览并保存草稿。</p>
+          <p v-else-if="branch.length" class="node-hint">仅修改当前节点在这条路径中的组成？请先「仅此路径单独修订」。点击只拆分编辑草稿，不会自动改版本号或保存。</p>
           <div class="version-fields">
             <label>BOM 编码 <el-input v-model="active.code" :disabled="!!active.source" /></label>
             <label>版本号 <el-input v-model="active.version" /></label>
@@ -200,6 +216,7 @@ h4 { font-size: var(--ui-text-base); color: var(--ui-text); }
 .node-heading > div { flex: 1; min-width: 180px; }
 .eyebrow { display: block; margin-bottom: var(--ui-space-1); }
 .node-hint { margin-top: var(--ui-space-2); line-height: 1.6; }
+.isolated-hint { padding: var(--ui-space-3); border-radius: var(--ui-radius-sm); background: var(--ui-running-bg); color: var(--ui-primary); }
 .version-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1fr); gap: var(--ui-space-4); margin: var(--ui-space-5) 0; }
 .version-fields label, .proposed-version { display: flex; flex-direction: column; gap: var(--ui-space-2); min-width: 0; font-size: var(--ui-text-sm); color: var(--ui-text-secondary); }
 .remark-field { grid-column: 1 / -1; }
