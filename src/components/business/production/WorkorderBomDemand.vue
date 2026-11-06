@@ -4,7 +4,6 @@ import { structure, type BomGraph, type BomNode } from '@/api/basic/materialBom'
 import { api as workorders, type RoutingOption } from '@/api/production/workorder'
 import { useAuth } from '@/stores/auth'
 import CodeText from '@/components/CodeText.vue'
-import StatusTag from '@/components/StatusTag.vue'
 import QuantityText from './QuantityText.vue'
 
 const props = defineProps<{
@@ -69,17 +68,15 @@ onBeforeUnmount(clear)
 <template>
   <section aria-label="多层BOM需求与闭环核对">
     <div class="table-toolbar">
-      <strong>多层BOM需求与闭环核对</strong>
+      <strong>多层BOM结构</strong>
       <el-button :disabled="!allowed || !bomId || loading" :loading="loading" @click="load">刷新多层需求</el-button>
-      <StatusTag label="闭环待确认" tone="warning" />
     </div>
-    <p class="secondary">本视图辅助查看多层BOM结构。普通工单只采用当前阶段的直接材料需求；已有合法库存可直接领用，无需递归制造子件。</p>
-    <el-alert title="本视图不计算实际库存、领用分配或生产完成情况。入库量和缺口待确认，不作为当前工单领料或入库的准入依据。" type="info" :closable="false" />
+    <p class="secondary">仅供分析，不计算实时库存或完成情况，不影响当前工单领料。子件无需重新制造；入库量与缺口待确认。</p>
     <el-alert v-if="!allowed" title="当前账号或工厂上下文不允许读取BOM需求与工艺，请核对物料查询及工单查询权限。" type="info" :closable="false" />
     <el-alert v-else-if="error" :title="error" type="error" :closable="false"><el-button @click="load">重试多层需求</el-button></el-alert>
     <el-empty v-else-if="!bomId" description="保存工单BOM用料后，可按当前计划展开到叶项" />
     <template v-if="graph">
-      <p class="secondary">需求依据：已保存BOM {{ graph.bomId }} × 当前计划 <QuantityText :value="graph.outputQty" />。这是当前结构计算，不能替代首次领料固定依据或实际履约。叶项表示没有显式子BOM，不代表无工艺或已具备库存。</p>
+      <p class="secondary">需求依据：已保存BOM {{ graph.bomId }} × 当前计划 <QuantityText :value="graph.outputQty" />。叶项表示未关联子BOM，不代表已有库存或没有工艺。</p>
       <el-table :data="rows" row-key="path" :tree-props="{ children: 'children' }" :expand-row-keys="['$root']" border>
         <el-table-column label="物料 / 层级" min-width="250">
           <template #default="{ row }"><CodeText :value="row.code" /><div class="secondary">{{ row.name }} · {{ row.path === '$root' ? '顶层' : row.childBomId ? '子BOM' : '叶项' }}</div></template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { businessSourceLabel } from '@/lib/businessSource'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import { computed, ref } from 'vue'
 import { useAuth } from '@/stores/auth'
@@ -16,7 +17,7 @@ const metrics = computed(() => [
   { title: '待执行状态记录', resource: ready, note: '含历史工单记录，不代表均可开工', unit: '张' },
   { title: '执行中单', resource: running, note: '当前工厂 · 执行中状态', unit: '张' }
 ])
-const sourceLabel = (source?: string | null) => ({ LOCAL: '本地', EXTERNAL: 'ERP 同步' }[source ?? ''] ?? '来源待核实')
+const sourceLabel = businessSourceLabel
 const readyTasks = computed(() => ready.value?.items.filter(row => row.workorderStatus === 'RELEASED') || [])
 const progress = ref<{ reload: () => Promise<void>; loading: boolean } | null>(null)
 function refreshWorkspace() { void reload(); void progress.value?.reload() }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { businessSourceLabel } from '@/lib/businessSource'
 import E10SyncPreview from '@/components/business/E10SyncPreview.vue'
 import CrudPage from '@/components/CrudPage.vue'
 import { api, warehouseTypeOptions, warehouseTypeText } from '@/api/wm/wmWarehouse'
@@ -114,7 +115,7 @@ const fields: Field[] = [
     id-key="id"
   >
     <template #cell-warehouseType="{ row }"><span>{{ row.warehouseTypeLabel || warehouseTypeText(row.warehouseType) }}</span></template>
-    <template #cell-source="{ row }"><span>{{ row.source === 'LOCAL' ? '本地' : row.source === 'EXTERNAL' ? '外部ERP（库存仅参考）' : '历史待核实' }}</span></template>
+    <template #cell-source="{ row }"><span>{{ businessSourceLabel(row.source) + (row.source === 'EXTERNAL' ? '（库存仅参考）' : '') }}</span></template>
     <template #toolbar>
       <span class="secondary">来源由可信创建入口确定；ERP仓库仅由同步维护，库存镜像仅供参考。</span>
       <E10SyncPreview kind="warehouse" permission="business:wm:warehouse:sync" @completed="page?.load()" />

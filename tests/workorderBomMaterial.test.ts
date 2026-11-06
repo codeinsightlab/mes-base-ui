@@ -80,6 +80,8 @@ it('shows default lookup failure separately from no default', async() => {
 it('keeps saved material facts visible when the auxiliary recursive view fails', async() => {
   calls.get.mockResolvedValue({ workorderId: '1', bomId: '10', revision: '2', frozenAt: null, items: [{ id: '9', materialId: '2', unitId: '1', totalRequiredQty: '250', standardRequiredQty: '200', manuallyAdjusted: true }] })
   const { pinia } = authState(); wrapper = mount(Panel, { props: { workorderId: '1', productId: '8', plannedQty: '100' }, global: { plugins: [pinia, ElementPlus], stubs }}); await flushPromises()
+  expect(calls.structure).not.toHaveBeenCalled()
+  await wrapper.get('.el-collapse-item__header').trigger('click'); await flushPromises()
   expect(wrapper.text()).toContain('250'); expect(wrapper.text()).toContain('人工新增'); expect(wrapper.text()).toContain('分析读取失败')
 })
 it('prevents editing a basis frozen by formal input', async() => {

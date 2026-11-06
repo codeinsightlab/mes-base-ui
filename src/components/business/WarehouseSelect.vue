@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { businessSourceLabel } from '@/lib/businessSource'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { api, type WmWarehouseVo } from '@/api/wm/wmWarehouse'
 import { useAuth } from '@/stores/auth'
@@ -85,7 +86,7 @@ onBeforeUnmount(clear)
       placeholder="搜索仓库名称"
       @update:model-value="!disabled && emit('update:modelValue', $event || null)"
     >
-      <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name} · ${row.source}`" :value="row.id" />
+      <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name} · ${businessSourceLabel(row.source)}`" :value="row.id" />
     </el-select>
     <el-button v-if="rows.length < total" link :disabled="loading || disabled" @click="search(keyword, true)">加载更多</el-button>
     <el-button :disabled="disabled" v-if="error" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>

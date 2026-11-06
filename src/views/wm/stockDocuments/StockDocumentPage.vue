@@ -189,7 +189,7 @@ const headerFields = computed<Field[]>(() => [
 const itemFields:Field[] = [
   { key: 'lineNo', label: '行号', kind: 'number', readonly: true },
   { key: 'materialId', label: '物料 / 产品', kind: 'text', required: true },
-  { key: 'warehouseId', label: 'LOCAL仓库', kind: 'text', required: true },
+  { key: 'warehouseId', label: '本地仓库', kind: 'text', required: true },
   { key: 'stockId', label: '确切库存来源', kind: 'text', required: true },
   { key: 'batchNo', label: '批次', kind: 'text' }, { key: 'binCode', label: '库位', kind: 'text' },
   { key: 'unitId', label: '基本单位ID', kind: 'text', required: true },

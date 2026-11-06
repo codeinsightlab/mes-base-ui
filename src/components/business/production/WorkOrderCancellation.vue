@@ -10,15 +10,15 @@ import { useClosureCommand } from '@/composables/useClosureCommand'
 import { api, type Order, type Cancellation, type CancelCommand } from '@/api/production/workorder'
 const ElMessageBox = usePageMessageBox()
 
-const props = defineProps<{ order: Order;history?: boolean }>(), emit = defineEmits<{ changed: [] }>()
+const props = defineProps<{ order: Order;history?: boolean; readonly?: boolean }>(), emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), visible = ref(false), reason = ref(''), fact = ref<Cancellation | null>(null), historyError = ref('')
 const allowed = computed(() => auth.hasPermission('production:workorder:cancel', 'factory'))
 const command = useClosureCommand<CancelCommand>(() => `workorder-cancel:${auth.username}:${auth.factoryId}:${props.order.id}`)
-const canCancel = computed(() => allowed.value && (!!command.pending.value || (props.order.source !== 'EXTERNAL' && auth.runtimeMode === 'LOCAL' && ['DRAFT', 'RELEASED'].includes(props.order.status))))
+const canCancel = computed(() => !props.readonly && allowed.value && (!!command.pending.value || (props.order.source !== 'EXTERNAL' && auth.runtimeMode === 'LOCAL' && ['DRAFT', 'RELEASED'].includes(props.order.status))))
 let generation = 0
 watch(() => [auth.factoryId, auth.revision, auth.username, allowed.value, props.order.id], () => {
   generation++;visible.value = false;fact.value = null;historyError.value = '';reason.value = '';command.clear()
-  if (allowed.value)command.restore()
+  if (allowed.value && !props.readonly)command.restore()
 }, { immediate: true, flush: 'sync' })
 watch(() => [props.order.status, props.order.id, auth.factoryId, auth.revision], async() => {
   const g = ++generation;fact.value = null

@@ -21,7 +21,7 @@
 | BOM版本 `BomVersionSelect` | [BomVersionSelect.vue](../src/components/business/material/BomVersionSelect.vue) | BOM ID、所属物料ID、禁用状态；按物料选择已发布版本，返回选中版本及revision并补查当前已选项以支持跨页回显；只显示默认标记，不自行应用默认。子BOM未选仍表示叶项 | [BOM组成](../src/components/business/material/MaterialBomPanel.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
 | 工单BOM选择 `WorkorderBomSelect` | [WorkorderBomSelect.vue](../src/components/business/material/WorkorderBomSelect.vue) | 当前产出物料、已选BOM及禁用状态；复用BomVersionSelect与默认接口，有默认已发布版本则预选，无默认由用户选择，手选/清空及已有版本不被迟到默认覆盖 | [工单创建编辑](../src/views/production/workorder/index.vue)、[用料维护](../src/components/business/production/WorkorderMaterialPanel.vue)经共享用料编辑器复用 |
 | 数量输入 `QuantityInput` | [QuantityInput.vue](../src/components/business/material/QuantityInput.vue) | 只负责录入、单位规则读取和有效性校验；错误提示在用户编辑或离开字段后显示，父表单仍可即时阻止无效提交。默认 `physical`；BOM基准/组件系数显式 `semantic="bom-ratio"`；`showUnit` 按同次读取的正式单位显示后缀。精度豁免只能使用已定义的可信原值/余量契约 | [质量申报](../src/components/business/quality/DefectDeclarationPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue)、[销售订单](../src/views/sales/order/index.vue) |
-| 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态及可选状态筛选；按编码或名称前缀远程检索，分页、回显及上下文保护在组件内维护；分页按钮位于候选底部，保留搜索词并继续当前候选 | [工单产出物料](../src/views/production/workorder/index.vue)、[销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
+| 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态及可选状态筛选；按编码或名称前缀远程检索，分页、回显及上下文保护在组件内维护；分页按钮位于候选底部，保留搜索词并继续当前候选；disabled时仅展示已选物料文本，不查询候选 | [工单产出物料](../src/views/production/workorder/index.vue)、[销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
 | 仓库 `WarehouseSelect` | [WarehouseSelect.vue](../src/components/business/WarehouseSelect.vue) | 仓库ID、可信来源及已有历史读取语义；保留LOCAL/EXTERNAL来源约束，不由页面另写候选算法 | [工单用料](../src/components/business/production/WorkorderMaterialPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 库存来源 `StockSourceSelect` | [StockSourceSelect.vue](../src/components/business/warehouse/StockSourceSelect.vue) | 当前物料、仓库和库存身份；选择具体库存来源，不等同于选择仓库或选择物料 | [库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 工作站 `WorkstationSelect` | [WorkstationSelect.vue](../src/components/business/WorkstationSelect.vue) | 工作站ID；共享检索、分页和回显；页面不根据设备/报工用途重复实现同义工作站选择 | [设备维护](../src/views/basic/equipment/index.vue) |
@@ -58,9 +58,11 @@
 | 富文本 `Editor` | [Editor/index.vue](../src/components/Editor/index.vue) | 公共编辑器适配，文件上传沿用私有接口；通过systemPlugin注册，具体数据权限由使用业务决定 |
 | 图标选择 `IconSelect` | [IconSelect/index.vue](../src/components/IconSelect/index.vue) | 系统菜单图标选择，使用已有图标资源；不另建页面级图标选择实现 |
 
+单位选择器`UnitMeasureSelect`的分页位于下拉面板底部；禁用时只回显已选单位，不查询候选、不显示“加载更多”。回显失败保留ID与重试入口，不用空白代替失败。
+
 ## 已知统一缺口
 
-- **分页交互：** 单位、物料、仓库、工作站、客户等选择器已有分页，但多处“加载更多”在下拉面板外。这是现状，不是推荐设计；应在组件层统一面板内分页交互，保留完整检索、失败重试和迟到响应保护，不能简单只取第一页或改成无界全量加载。
+- **分页交互：** 单位、物料的分页已收进下拉面板；仓库、工作站、客户等选择器已有分页，但多处“加载更多”在下拉面板外。这是现状，不是推荐设计；应在组件层统一面板内分页交互，保留完整检索、失败重试和迟到响应保护，不能简单只取第一页或改成无界全量加载。
 - **单位回显：** 物料页仍有独立loadUnitNames查询；已复用单位选择器不等于所有单位名称读取都已统一。后续按统一引用读取与缓存规则治理，不再复制页面查询。
 - **物料对话框：** BOM面板内部仍使用MaterialPicker，与公共MaterialSelect的交互/读取需要核对并统一同义规则。该局部实现不作为另一个推荐公共入口，不能未经边界分析就复制到新页面。
 - **执行选择：** ExecutionSelect与ProductionExecutionSelect尚未统一；先明确记录查询、单据选择、可信状态候选和扫码定位的差异，再收敛共同选择能力。不能仅为减少文件而删除必要准入，也不能以不同组件名长期维护相同业务规则。

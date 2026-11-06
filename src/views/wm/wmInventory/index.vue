@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { businessSourceLabel } from '@/lib/businessSource'
 // EXTRA_CODE_REASON: inventory needs Material/Warehouse reference selection.
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
@@ -157,7 +158,7 @@ const fields: Field[] = [
     <template #field-warehouseId="{ draft }">
       <WarehouseSelect source="LOCAL" :model-value="draft.warehouseId ? String(draft.warehouseId) : null" @update:model-value="draft.warehouseId = $event" />
     </template>
-    <template #cell-warehouseSource="{row}">{{ row.warehouseSource==='LOCAL'?'本地':row.warehouseSource==='EXTERNAL'?'外部ERP（库存仅参考）':'历史待核实' }}</template>
+    <template #cell-warehouseSource="{row}">{{ businessSourceLabel(row.warehouseSource) + (row.warehouseSource === 'EXTERNAL' ? '（库存仅参考）' : '') }}</template>
     <template #cell-quantity="{row}"><QuantityText :value="row.quantity" /></template>
     <template #cell-availableQuantity="{row}"><QuantityText :value="row.availableQuantity" /></template>
     <template #cell-createTime="{row}"><DateTimeText :value="row.createTime" /></template>

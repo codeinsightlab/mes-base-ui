@@ -37,6 +37,7 @@ async function search(value: string, more = false) {
   }
 }
 async function hydrate() {
+  error.value = ''
   const current = ++detailVersion
   selected.value = null
   if (!props.modelValue || !allowed.value) return
@@ -62,15 +63,17 @@ function clear() {
 watch(() => [auth.factoryId, auth.revision, allowed.value], (_, previous) => {
   clear()
   if (previous && props.modelValue) emit('update:modelValue', null)
-  if (allowed.value) { void search(''); void hydrate() }
+  if (allowed.value) { if (!props.disabled) void search(''); void hydrate() }
 }, { immediate: true })
 watch(() => props.modelValue, hydrate)
 onBeforeUnmount(clear)
 </script>
 
 <template>
-  <div>
+  <div class="unit-measure-select">
+    <span v-if="disabled" class="reference-text" :title="selected ? `${selected.code} · ${selected.name}` : modelValue || ''">{{ selected ? `${selected.code} · ${selected.name}` : modelValue ? `待确认（${modelValue}）` : '—' }}</span>
     <el-select
+      v-else
       :model-value="modelValue"
       clearable
       filterable
@@ -82,8 +85,13 @@ onBeforeUnmount(clear)
       @update:model-value="!disabled && emit('update:modelValue', $event || null)"
     >
       <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name}`" :value="row.id" />
+      <template #footer><el-button v-if="rows.length < total" link :disabled="loading" @mousedown.prevent @click="search(keyword, true)">加载更多</el-button></template>
     </el-select>
-    <el-button v-if="rows.length < total" link :disabled="loading || disabled" @click="search(keyword, true)">加载更多</el-button>
-    <el-button v-if="error" :disabled="disabled" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
+    <el-button v-if="error" link type="danger" @click="disabled ? hydrate() : search(keyword)">{{ error }}，重试</el-button>
   </div>
 </template>
+
+<style scoped>
+.unit-measure-select { width: 100%; min-width: 0; }
+.reference-text { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+</style>

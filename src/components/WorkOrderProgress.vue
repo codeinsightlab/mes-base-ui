@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { businessSourceLabel } from '@/lib/businessSource'
 import QueryForm from '@/components/QueryForm.vue'
 
 import QuantityText from '@/components/business/production/QuantityText.vue'
@@ -26,7 +27,7 @@ defineExpose({ reload: load, loading })
     <WorkspaceReadState :resource="result" loading-overlay @retry="load">
       <el-table :data="result.value?.items || []" row-key="id" empty-text="未找到匹配工单" style="width: 100%">
         <el-table-column label="工单 / 产品" min-width="200"><template #default="{ row }"><CodeText :value="row.code" /><div class="secondary">{{ row.productName || row.productCode || '产品名称未提供' }}</div></template></el-table-column>
-        <el-table-column label="状态 / 来源" min-width="120"><template #default="{ row }"><StatusTag :label="orderStatus(row.status)" /><div class="secondary">{{ row.source === 'LOCAL' ? '本地' : row.source === 'EXTERNAL' ? 'ERP 同步' : '来源待核实' }}</div></template></el-table-column>
+        <el-table-column label="状态 / 来源" min-width="120"><template #default="{ row }"><StatusTag :label="orderStatus(row.status)" /><div class="secondary">{{ businessSourceLabel(row.source) }}</div></template></el-table-column>
         <el-table-column label="计划数量" min-width="160" align="right"><template #default="{ row }"><QuantityText :value="row.plannedQty" /><div class="secondary">{{ row.unitName || '单位未提供' }}</div></template></el-table-column>
         <el-table-column label="入库收尾贡献（含不良损失）" min-width="160" align="right"><template #default="{ row }"><QuantityText :value="row.completedQty" /></template></el-table-column>
 

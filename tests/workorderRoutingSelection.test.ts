@@ -8,8 +8,8 @@ import ElementPlus from 'element-plus'
 import WorkOrders from '../src/views/production/workorder/index.vue'
 import { useAuth } from '../src/stores/auth'
 const confirmed = Object.assign('confirm' as const, { value: '', action: 'confirm' as const })
-const { list, routings, materials, recall, numberingRules } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn(), recall: vi.fn(), numberingRules: vi.fn() }))
-vi.mock('../src/api/production/workorder', () => ({ api: { list, routings, recall, numberingRules }}))
+const { list, routings, materials, recall, release, numberingRules } = vi.hoisted(() => ({ list: vi.fn(), routings: vi.fn(), materials: vi.fn(), recall: vi.fn(), release: vi.fn(), numberingRules: vi.fn() }))
+vi.mock('../src/api/production/workorder', () => ({ api: { list, routings, recall, release, numberingRules }}))
 vi.mock('../src/api/basic/material', () => ({ api: { list: materials }}))
 type State = { create: () => void; form: { productId: string; routingId: string }; productChanged: (value: string) => Promise<void>; searchRoutes: (s?: string) => Promise<void>; routeOptions: { id: string }[]; routesLoading: boolean; dialog: boolean; hasPublishedRoutes: boolean | null }
 let wrapper: ReturnType<typeof mount>
@@ -110,8 +110,21 @@ it('explains unallocated execution quantity, removes excess allocation, and keep
     allocation: { allocatedTargetQty: '110', remainingTargetQty: '-10', excessTargetQty: '10' }}], total: 1 })
   await setup()
   expect(wrapper.text()).toContain('未分配执行数量')
-  expect(wrapper.text()).toContain('计划数量－有效执行目标合计')
+  expect(wrapper.findAllComponents({ name: 'ElTooltip' }).some(tip => tip.props('content') === '未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量。')).toBe(true)
   expect(wrapper.text()).not.toContain('尚未分配')
   expect(wrapper.text()).not.toContain('超额分配')
   expect(wrapper.find('span[title="-10"]').text()).toBe('-10')
+})
+
+it('releases from the list with the original revision and blocks an external order', async() => {
+  const { auth } = await setup()
+  auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = ['workorder:list', 'workorder:release']
+  await flushPromises()
+  const row = { id: '9007199254740993', code: 'WO', source: 'LOCAL', status: 'DRAFT', revision: 7 } as Order
+  release.mockResolvedValue({ workorder: { ...row, status: 'RELEASED', revision: 8 }})
+  const state = wrapper.vm as unknown as { release: (row: Order) => Promise<void> }
+  await state.release(row)
+  expect(release).toHaveBeenCalledExactlyOnceWith(row.id, 7)
+  await state.release({ ...row, source: 'EXTERNAL' })
+  expect(release).toHaveBeenCalledOnce()
 })

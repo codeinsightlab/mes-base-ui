@@ -15,10 +15,11 @@ const auth = useAuth(), messageBox = usePageMessageBox()
 const data = ref<WorkorderMaterial | null>(null), form = ref(emptyMaterialDemand()), error = ref(''), busy = ref(false), editing = ref(false)
 const editor = ref<InstanceType<typeof WorkorderMaterialEditor> | null>(null)
 const confirmingSave = ref(false)
+const showBomAnalysis = ref(false)
 const canRead = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission('workorder:query', 'factory'))
 const canWrite = computed(() => canRead.value && !props.readonly && auth.hasPermission('workorder:material:update', 'factory'))
 let generation = 0
-function clear() { generation++; data.value = null; form.value = emptyMaterialDemand(); error.value = ''; busy.value = false; editing.value = false }
+function clear() { generation++; data.value = null; form.value = emptyMaterialDemand(); error.value = ''; busy.value = false; editing.value = false; showBomAnalysis.value = false }
 async function load() {
   if (!canRead.value) return
   const current = ++generation; busy.value = true; error.value = ''
@@ -51,25 +52,26 @@ onBeforeUnmount(clear)
 </script>
 <template>
   <section class="panel" aria-label="工单BOM用料">
-    <div class="table-toolbar"><strong>工单BOM用料</strong><el-button :disabled="busy" @click="load">刷新用料</el-button><el-button v-if="canWrite" :disabled="busy || !!data?.frozenAt" @click="edit">维护工单用料</el-button></div>
+    <div class="table-toolbar"><strong>材料需求</strong><el-button :disabled="busy" @click="load">刷新用料</el-button><el-button v-if="canWrite" :disabled="busy || !!data?.frozenAt" @click="edit">维护工单用料</el-button></div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <template v-if="data">
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="BOM版本ID">{{ data.bomId || '尚未选择' }}</el-descriptions-item>
+        <el-descriptions-item label="BOM版本引用">{{ data.bomId || '尚未选择' }}</el-descriptions-item>
         <el-descriptions-item label="用料依据">{{ data.frozenAt ? '已固定 · ' + data.frozenAt : '首次正式领料前可调整' }}</el-descriptions-item>
         <el-descriptions-item label="工作中心">{{ data.workCenter || '尚未设置' }}</el-descriptions-item>
-        <el-descriptions-item label="允许领料仓库">{{ data.warehouseIds || '尚未设置' }}</el-descriptions-item>
-        <el-descriptions-item label="用料修订号">{{ data.revision }}</el-descriptions-item>
+        <el-descriptions-item label="允许领料仓库">{{ data.warehouseIds && data.warehouseIds !== '[]' ? data.warehouseIds : '不限仓库' }}</el-descriptions-item>
       </el-descriptions>
       <el-table :data="data.items" row-key="id">
-        <el-table-column label="材料" min-width="240"><template #default="{ row }"><MaterialSelect :model-value="row.materialId" disabled /></template></el-table-column>
-        <el-table-column label="基本单位" min-width="140"><template #default="{ row }"><UnitMeasureSelect :model-value="row.unitId" disabled /></template></el-table-column>
-        <el-table-column label="BOM标准量" min-width="125"><template #default="{ row }"><QuantityText :value="row.standardRequiredQty" /></template></el-table-column>
-        <el-table-column label="实际需求量" min-width="125"><template #default="{ row }"><QuantityText :value="row.totalRequiredQty" /></template></el-table-column>
+        <el-table-column label="材料" min-width="320"><template #default="{ row }"><MaterialSelect :model-value="row.materialId" disabled /></template></el-table-column>
+        <el-table-column label="基本单位" width="130"><template #default="{ row }"><UnitMeasureSelect :model-value="row.unitId" disabled /></template></el-table-column>
+        <el-table-column label="BOM标准量" min-width="125" align="right"><template #default="{ row }"><QuantityText :value="row.standardRequiredQty" /></template></el-table-column>
+        <el-table-column label="实际需求量" min-width="125" align="right"><template #default="{ row }"><QuantityText :value="row.totalRequiredQty" /></template></el-table-column>
         <el-table-column label="来源" width="100"><template #default="{ row }">{{ row.manuallyAdjusted ? (row.bomItemId ? '人工调整' : '人工新增') : row.bomItemId ? 'BOM带出' : '原有用料' }}</template></el-table-column>
       </el-table>
-      <p class="secondary">MES扫码领料按本工单全部实际需求计算，支持多材料及人工调整后的用量；原料批次由材料组合码确定。</p>
-      <WorkorderBomDemand v-if="data.bomId" :key="workorderId" :bom-id="data.bomId" :product-id="productId" :product-code="productCode || productId" :product-name="productName || '顶层产出'" :planned-qty="plannedQty || '0'" />
+      <p class="secondary">领料按实际需求量计算；原料批次在打码时确定。</p>
+      <el-collapse v-if="data.bomId" @change="showBomAnalysis = true"><el-collapse-item title="多层BOM分析（辅助查询）" name="bom-analysis">
+        <WorkorderBomDemand v-if="showBomAnalysis" :key="workorderId" :bom-id="data.bomId" :product-id="productId" :product-code="productCode || productId" :product-name="productName || '顶层产出'" :planned-qty="plannedQty || '0'" />
+      </el-collapse-item></el-collapse>
     </template>
     <PageDialog v-model="editing" title="维护工单用料" width="min(1220px,96vw)" append-to-body :before-close="closeEditor">
       <WorkorderMaterialEditor v-if="editing" ref="editor" v-model="form" :product-id="productId" :planned-qty="plannedQty || '0'" :disabled="busy" />
@@ -77,3 +79,7 @@ onBeforeUnmount(clear)
     </PageDialog>
   </section>
 </template>
+
+<style scoped>
+.panel { padding: var(--ui-space-5); }
+</style>

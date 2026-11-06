@@ -50,8 +50,8 @@ function print() {
 }
 </script>
 <template>
-  <el-button v-if="allowed" link type="primary" @click="open">材料组合码</el-button>
-  <PageDialog v-model="visible" title="材料批次组合二维码" width="760px">
+  <slot name="trigger" :open="open"><el-button v-if="allowed" link type="primary" @click="open">材料组合码</el-button></slot>
+  <PageDialog v-model="visible" title="材料批次组合二维码" width="760px" append-to-body>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-form label-position="top"><el-form-item label="本次希望规划的产出数量"><QuantityInput v-model="quantity" :material-id="order.productId" required positive :disabled="busy" @validity="valid=$event" /></el-form-item></el-form>
     <el-button type="primary" :disabled="!valid || busy || auth.runtimeMode !== 'LOCAL' || !['DRAFT','RELEASED'].includes(order.status)" :loading="busy" @click="generate">计算并生成组合码</el-button>

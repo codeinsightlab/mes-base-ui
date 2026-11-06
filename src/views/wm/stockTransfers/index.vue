@@ -125,7 +125,7 @@ onBeforeUnmount(clear)
 </script>
 <template>
   <div>
-    <el-alert title="本厂LOCAL库存同步调拨：保持物料、基本单位、批次；选择源库存、目标仓库及可选库位；目标物料、基本单位、批次继承源库存。保存自动解析目标身份或建立零余额身份及双边草稿，审核原子记账。" type="info" :closable="false" />
+    <el-alert title="本厂本地库存同步调拨：保持物料、基本单位、批次；选择源库存、目标仓库及可选库位；目标物料、基本单位、批次继承源库存。保存自动解析目标身份或建立零余额身份及双边草稿，审核原子记账。" type="info" :closable="false" />
     <el-alert v-if="error || intent.error.value" :title="error || intent.error.value" type="error" :closable="false" />
     <el-button v-if="pendingCreate" :loading="busy" @click="recoverCreate">核实上次调拨创建结果</el-button>
     <MasterDetailDocument

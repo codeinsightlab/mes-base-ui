@@ -135,11 +135,11 @@ defineExpose({ validateAndConfirm, confirmReset })
     </DocumentFields>
     <el-alert v-if="error" :title="error" type="error" :closable="false"><el-button link @click="recalculate">重新读取BOM</el-button></el-alert>
     <el-alert v-if="confirmationPending" title="产量已变化，人工调整及新增行保留原数量，保存前需要确认。" type="warning" :closable="false" />
-    <div class="table-toolbar"><el-button :disabled="disabled || loading || !modelValue.bomId || modelValue.items.length >= 100" @click="add">增加材料</el-button><span class="secondary">初始数量＝产出数量×组件用量÷BOM基数。标准量按BOM原组件基本单位计算；调整只影响当前工单。</span></div>
+    <div class="table-toolbar"><el-button :disabled="disabled || loading || !modelValue.bomId || modelValue.items.length >= 100" @click="add">增加材料</el-button><span class="secondary">按BOM带出标准量，可调整当前工单需求。</span></div>
     <el-table v-loading="loading" :data="modelValue.items" :row-key="key" :empty-text="loading ? '正在读取BOM直接组件' : error ? 'BOM明细读取失败，修复后重试' : '选择BOM并填写产量后带出材料'">
-      <el-table-column label="材料" min-width="240"><template #default="{ row, $index }"><MaterialSelect :model-value="row.materialId" :disabled="disabled" @update:model-value="value => materialChanged($index, value)" /></template></el-table-column>
-      <el-table-column label="基本单位" min-width="140"><template #default="{ row }"><UnitMeasureSelect :model-value="row.unitId" disabled /></template></el-table-column>
-      <el-table-column label="BOM标准量" min-width="125"><template #default="{ row }"><QuantityText :value="row.standardRequiredQty" /></template></el-table-column>
+      <el-table-column label="材料" min-width="320"><template #default="{ row, $index }"><MaterialSelect :model-value="row.materialId" :disabled="disabled" @update:model-value="value => materialChanged($index, value)" /></template></el-table-column>
+      <el-table-column label="基本单位" width="130"><template #default="{ row }"><UnitMeasureSelect :model-value="row.unitId" disabled /></template></el-table-column>
+      <el-table-column label="BOM标准量" min-width="125" align="right"><template #default="{ row }"><QuantityText :value="row.standardRequiredQty" /></template></el-table-column>
       <el-table-column label="实际需求量" min-width="180"><template #default="{ row, $index }"><QuantityInput :model-value="row.totalRequiredQty" :material-id="row.materialId" required positive :disabled="disabled || !!materialLoading[key(row)]" @update:model-value="value => updateRow($index, { totalRequiredQty: value, manuallyAdjusted: true })" @validity="value => validity[key(row)] = value" /></template></el-table-column>
       <el-table-column label="来源" width="100"><template #default="{ row }">{{ row.manuallyAdjusted ? (row.bomItemId ? '人工调整' : '人工新增') : 'BOM带出' }}</template></el-table-column>
       <el-table-column label="操作" width="90"><template #default="{ row, $index }"><el-button v-if="!row.bomItemId" link type="danger" :disabled="disabled" @click="patch({ items: modelValue.items.filter((_, index) => index !== $index) })">删除</el-button></template></el-table-column>
