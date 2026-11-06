@@ -58,7 +58,7 @@ it('queries stock numbering rules with the explicit document direction', async()
 it('reads production allowance through the inbound document API without creating handover', async() => { mocks.request.mockResolvedValue({ remaining: '40' });await stockDocuments.productionBasis('9007199254740999');expect(mocks.request).toHaveBeenCalledWith('/api/wm/inbound-documents/executions/9007199254740999/basis', { scope: 'factory' }) })
 
 it('keeps unsupported source categories as drafts without attempting approval', async() => {
-  const { s } = setup();await wrapper!.setProps({ row: { id: '1', revision: '0', documentType: 'PURCHASE_RECEIPT', status: 'DRAFT' }})
+  const { s } = setup();await wrapper!.setProps({ row: { id: '1', revision: '0', documentType: 'OUTSOURCE_RECEIPT', status: 'DRAFT' }})
   await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('禁止审核')
 })
 
@@ -152,4 +152,15 @@ it('approves a material draft without a post UUID and replays only its independe
   expect(approvals[1]![1].body).toEqual(first)
   expect(refresh).toHaveBeenCalledOnce()
   expect(s.intent.pending.value).toBeNull()
+})
+
+it('sends supplier snapshots and uses the formal purchase receipt approval', async() => {
+  const { aggregateApi } = stockDocumentApis(undefined, () => 'IN')
+  mocks.request.mockResolvedValue({ document: { id: '15' }, lines: [] })
+  await aggregateApi.create({ ruleCode: 'PURCHASE_RECEIPT', documentType: 'PURCHASE_RECEIPT', supplierName: '测试供应商', supplierDocumentNo: 'DELIVERY-01', reason: '实物清点', items: [{ materialId: '2', quantity: '3' }] })
+  expect(mocks.request.mock.calls[0]![1].body.header).toMatchObject({ supplierName: '测试供应商', supplierDocumentNo: 'DELIVERY-01', ruleCode: 'PURCHASE_RECEIPT' })
+  mocks.request.mockClear()
+  const { s } = setup(); await wrapper!.setProps({ row: { id: '15', revision: '2', direction: 'IN', documentType: 'PURCHASE_RECEIPT', status: 'DRAFT' }})
+  await s.approve()
+  expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/inbound-documents/15/actions/approve')
 })

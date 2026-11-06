@@ -169,7 +169,7 @@ async function loadNumberingRules(documentType: unknown, draft?: Row) {
     if (draft && !draft.id) draft.ruleCode = rule.ruleCode
   } catch(e) { if (attempt === numberingAttempt) numberingRulesError.value = e instanceof Error ? e.message : '编码规则读取失败' } finally { if (attempt === numberingAttempt) numberingRulesLoading.value = false }
 }
-function documentTypeChanged(draft: Row) { draft.sourceExecutionCode = null;draft.ruleCode = null;void loadNumberingRules(draft.documentType, draft) }
+function documentTypeChanged(draft: Row) { draft.sourceExecutionCode = null;draft.supplierName = null;draft.supplierDocumentNo = null;draft.ruleCode = null;void loadNumberingRules(draft.documentType, draft) }
 const documentTitle = computed(() => direction.value === 'IN' ? '入库单' : '出库单')
 const headerFields = computed<Field[]>(() => [
   { key: 'isNew', label: '新建状态', kind: 'text', readonly: true, hidden: true, defaultValue: 'Y' },
@@ -180,6 +180,8 @@ const headerFields = computed<Field[]>(() => [
   { key: 'status', label: '状态', kind: 'select', readonly: true, searchable: true, options: [{ value: 'DRAFT', label: '草稿', tone: 'warning' }, { value: 'POSTED', label: '已审核', tone: 'success' }, { value: 'CANCELLED', label: '已作废', tone: 'info' }] },
   { key: 'sourceExecutionCode', label: '生产来源执行单元', kind: 'text', defaultValue: typeof route.query.executionCode === 'string' ? route.query.executionCode : undefined },
   { key: 'sourceWorkorderId', label: '工单来源', kind: 'text', readonly: true },
+  { key: 'supplierName', label: '供应商名称', kind: 'text', maxLength: 200, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
+  { key: 'supplierDocumentNo', label: '供应商送货单号', kind: 'text', maxLength: 128, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
   { key: 'reason', label: '处理原因 / 实物依据', kind: 'textarea', required: true, maxLength: 500 },
   { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 },
   { key: 'postedBy', label: '审核人ID', kind: 'text', readonly: true },
@@ -242,7 +244,7 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
       <template #items="{ header, items, writable, saving, add, remove }">
         <el-alert v-if="header.documentType === 'MATERIAL_ISSUE' && !canIssueLines" title="当前账号没有领料明细列表权限。" type="info" :closable="false" />
         <template v-else>
-          <div class="document-toolbar"><el-button type="primary" plain :disabled="!writable" @click="add({materialId:null,warehouseId:null,stockId:null,unitId:null,batchNo:null,binCode:null,quantity:'',remark:''})">添加明细</el-button><span class="secondary">选择明确库存来源，数量使用物料基本单位。</span></div>
+          <div class="document-toolbar"><el-button type="primary" plain :disabled="!writable" @click="add({materialId:null,warehouseId:null,stockId:null,unitId:null,batchNo:null,binCode:null,quantity:'',remark:''})">添加明细</el-button><span class="secondary">选择物料与仓库后，可选已有库存身份或建立新批次的零余额身份；审核后才增加库存。</span></div>
           <el-table :data="items" border stripe>
             <el-table-column type="index" label="#" width="60" />
             <el-table-column label="物料 / 产品" min-width="190"><template #default="{row}"><MaterialSelect v-if="writable" v-model="row.materialId" @update:model-value="resetIdentity(row)" /><span v-else>{{ row.materialId || '待确认' }}</span></template></el-table-column>

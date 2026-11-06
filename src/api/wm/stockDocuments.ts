@@ -5,7 +5,7 @@ export type StockDocumentType = 'PURCHASE_RECEIPT' | 'PRODUCTION_RECEIPT' | 'OUT
 export interface StockDocumentTypeOption { value: StockDocumentType; direction: StockDocumentDirection; label: string; origin: string; requiredDocuments: string; approvalAvailable: boolean; qualityReceipt: boolean; enabled: boolean }
 export interface NumberingRuleOption { typeKey: StockDocumentType; ruleCode: string; ruleName: string | null; prefix: string | null; preview: string | null; available: boolean; issue: string | null }
 const semantics: Partial<Record<StockDocumentType, { origin: string;basis: string;approvalAvailable: boolean }>> = {
-  PURCHASE_RECEIPT: { origin: '供应商交货', basis: '采购订单、收货单', approvalAvailable: false }, PRODUCTION_RECEIPT: { origin: '工单生产完成', basis: '工单、Execution、报工及质量数量依据', approvalAvailable: true },
+  PURCHASE_RECEIPT: { origin: '供应商直接交货', basis: '供应商、实物清点及送货凭据（无需采购订单）', approvalAvailable: true }, PRODUCTION_RECEIPT: { origin: '工单生产完成', basis: '工单、Execution、报工及质量数量依据', approvalAvailable: true },
   OUTSOURCE_RECEIPT: { origin: '外协厂加工完成', basis: '委外单、委外发料记录', approvalAvailable: false }, MATERIAL_RETURN_RECEIPT: { origin: '生产领料后退回', basis: '原领料单、工单', approvalAvailable: false },
   REWORK_RECEIPT: { origin: '返工完成并检验合格', basis: '原不良记录、返工任务及检验依据', approvalAvailable: false }, SALES_RETURN_RECEIPT: { origin: '客户退回产品', basis: '销售出库单、退货单', approvalAvailable: false },
   DEFECT_RECEIPT: { origin: '不良品转入不良品仓', basis: '原不良记录、处置流水', approvalAvailable: true }, SCRAP_RECEIPT: { origin: '不良品转入报废品仓', basis: '原不良记录、处置流水', approvalAvailable: true },
@@ -17,6 +17,7 @@ export const stockDocumentPurpose = (value:unknown) => typeof value === 'string'
 export const stockDocumentPermission = 'business:wm:stock:document'
 export interface Header extends Row {
   id: string; documentNo: string; direction: StockDocumentDirection; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED';
+  supplierName?: string | null; supplierDocumentNo?: string | null;
   reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionCode: string | null; postRequestId: string | null; createRequestId?: string | null
 }
 export interface Line extends Row { demandLineId?: string | null; id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
@@ -78,6 +79,7 @@ export function stockDocumentApis(access: { issueListOnly: () => boolean; issueQ
     const b = raw as Row
     if (!Array.isArray(b.items)) throw Error('请填写单据明细')
     return { header: { documentType: b.documentType, reason: b.reason, remark: b.remark,
+      supplierName: b.supplierName, supplierDocumentNo: b.supplierDocumentNo,
       sourceWorkorderId: b.sourceWorkorderId, sourceExecutionCode: b.sourceExecutionCode,
       ruleCode: b.ruleCode, expectedRevision: b.revision }, productionIssue: b.productionIssue, items: b.items.map((value:unknown) => {
       const line = value as Row
