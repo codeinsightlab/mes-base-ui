@@ -19,13 +19,13 @@ beforeEach(() => {
 })
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
 async function setup() {
-  const pinia = createPinia(), auth = useAuth(pinia); auth.factoryId = 'A'; auth.factoryPermissions = ['workorder:list', 'workorder:create', 'workorder:query']
+  const pinia = createPinia(), auth = useAuth(pinia); auth.factoryId = 'A'; auth.factoryPermissions = ['workorder:list', 'workorder:create', 'workorder:query', 'business:material:list']
   wrapper = mount(WorkOrders, { global: { plugins: [pinia, ElementPlus], stubs: { WorkorderMaterialEditor: defineComponent({ setup(_, { expose }) { expose({ confirmReset: async() => true }); return () => null } }) }}}); await flushPromises()
   const state = wrapper.vm as unknown as State; state.create(); await flushPromises(); return { state, auth }
 }
 it('requires a product before choosing its published routes without restricting the output material type', async() => {
   const { state } = await setup(); await state.searchRoutes()
-  expect(routings).not.toHaveBeenCalled(); expect(materials).toHaveBeenCalledWith({ name: '', status: 'ENABLED', limit: 100 })
+  expect(routings).not.toHaveBeenCalled(); expect(materials).toHaveBeenCalledWith({ keyword: '', status: 'ENABLED', offset: 0, limit: 20 })
   const selects = wrapper.findAllComponents({ name: 'ElSelect' })
   expect(selects.find(s => s.props('placeholder') === '请先选择产出物料')?.props('disabled')).toBe(true)
   state.form.productId = '101'; await state.searchRoutes('装配')

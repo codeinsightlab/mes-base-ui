@@ -6,7 +6,7 @@ describe('Base request contract', () => {
   it('sends identity and selected factory, with no response fallback', async() => { const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [], total: 0, offset: 0, limit: 20 }), { headers: { 'Content-Type': 'application/json' }}));vi.stubGlobal('fetch', fetcher);const result = await request('/api/demo', { query: { offset: 0, limit: 20 }});expect(result).toEqual({ items: [], total: 0, offset: 0, limit: 20 });const [url, options] = fetcher.mock.calls[0]!;expect(url).toBe('/api/demo?offset=0&limit=20');expect(options.headers.get('X-Factory-Id')).toBe('A');expect(options.headers.get('Authorization')).toBe('Bearer TEST-ONLY-token') })
   it('platform calls carry selected Factory without changing scope', async() => { const fetcher = vi.fn().mockResolvedValue(new Response('{}'));vi.stubGlobal('fetch', fetcher);await request('/api/system/user/list', { scope: 'platform' });expect(fetcher.mock.calls[0]![1].headers.get('X-Factory-Id')).toBe('A') })
   it('public login omits credentials from old identity', async() => { const fetcher = vi.fn().mockResolvedValue(new Response('{}'));vi.stubGlobal('fetch', fetcher);await request('/api/session', { public: true, scope: 'platform', method: 'POST', body: { username: 'TEST', password: 'TEST ONLY' }});expect(fetcher.mock.calls[0]![1].headers.has('Authorization')).toBe(false) })
-  it('401 clears identity and retains safe request correlation', async() => { vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'UNAUTHENTICATED', message: 'Authentication required', requestId: 'TEST-ID' }), { status: 401 })));try { await request('/api/demo');throw new Error('expected error') } catch(e) { expect(e).toBeInstanceOf(ApiError);expect((e as ApiError).requestId).toBe('TEST-ID');expect((e as Error).message).toContain('重新登录') }expect(unauthorized).toHaveBeenCalledOnce() })
+  it('401 clears identity and retains safe request correlation', async() => { vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'UNAUTHENTICATED', message: 'Authentication required', requestId: 'TEST-ID' }), { status: 401 })));try { await request('/api/demo');throw new Error('expected error') } catch(e) { expect(e).toBeInstanceOf(ApiError);expect((e as ApiError).requestId).toBe('TEST-ID');expect((e as Error).message).toBe('Authentication required') }expect(unauthorized).toHaveBeenCalledOnce() })
   it('403 remains a failure even when body resembles legacy AjaxResult', async() => { vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"code":200}', { status: 403 })));await expect(request('/api/demo')).rejects.toMatchObject({ status: 403 }) })
   it('rejects stale data after factory change', async() => { vi.stubGlobal('fetch', vi.fn().mockImplementation(async() => { revision++;return new Response('{}') }));await expect(request('/api/demo')).rejects.toMatchObject({ code: 'CONTEXT_CHANGED' }) })
   it('rejects A after a switch during body consumption while B succeeds', async() => {
@@ -65,7 +65,7 @@ describe('Base request contract', () => {
   it('ERP not configured is explicit and does not trigger factory recovery', async() => {
     const recover = vi.fn()
     configureRequests(() => ({ token: 'TEST', factoryId: 'A', revision }), unauthorized, recover)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"errorCode":"ERP_SYNC_NOT_CONFIGURED"}', { status: 422 })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'ERP_SYNC_NOT_CONFIGURED', message: '暂未配置 ERP 同步数据来源' }), { status: 422 })))
     await expect(request('/api/material/material/actions/sync', { method: 'POST' })).rejects.toMatchObject({
       code: 'ERP_SYNC_NOT_CONFIGURED', message: '暂未配置 ERP 同步数据来源', status: 422
     })
@@ -85,7 +85,7 @@ describe('Base request contract', () => {
   ])('keeps identity and factory for production error %s', async(code, status, message) => {
     const recover = vi.fn()
     configureRequests(() => ({ token: 'TEST', factoryId: 'A', revision }), unauthorized, recover)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: code }), { status })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: code, message }), { status })))
     await expect(request('/api/production/routing')).rejects.toMatchObject({ code, status, message })
     expect(recover).not.toHaveBeenCalled()
     expect(unauthorized).not.toHaveBeenCalled()
@@ -130,7 +130,7 @@ describe('warehouse and inventory business errors', () => {
   ])('shows an explicit safe message for %s', async(code, status, message) => {
     const recover = vi.fn()
     configureRequests(() => ({ token: 'TEST ONLY', factoryId: 'A', revision }), unauthorized, recover)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: code, message: 'SQL INTERNAL SECRET', requestId: 'TEST' }), { status: status as number })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: code, message, requestId: 'TEST' }), { status: status as number })))
     await expect(request('/api/wm/wm-inventory')).rejects.toMatchObject({ code, status, message })
     expect(recover).not.toHaveBeenCalled()
     expect(unauthorized).not.toHaveBeenCalled()
@@ -145,7 +145,12 @@ it('preserves reviewed quantity conflict details instead of suggesting a refresh
   await expect(request('/api/production/reports/261205/adjustments', { method: 'POST', body: {}})).rejects.toMatchObject({ code: 'REPORT_QUANTITY_CONFLICT', status: 409, message, requestId: 'TEST-QUANTITY' })
 })
 
-it('does not expose an unreviewed conflict response message', async() => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'RESOURCE_CONFLICT', message: 'TEST ONLY database diagnostic' }), { status: 409 })))
-  await expect(request('/api/demo')).rejects.toMatchObject({ code: 'RESOURCE_CONFLICT', status: 409, message: '数据冲突，请刷新后重试' })
+it('preserves the server conflict message without a competing client mapping', async() => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'RESOURCE_CONFLICT', message: '选厂偏好已变化，请重新选择' }), { status: 409 })))
+  await expect(request('/api/demo')).rejects.toMatchObject({ code: 'RESOURCE_CONFLICT', status: 409, message: '选厂偏好已变化，请重新选择' })
+})
+
+it.each([undefined, '', '   '])('uses the HTTP fallback when the server message is absent or blank: %s', async message => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'RESOURCE_CONFLICT', message }), { status: 409 })))
+  await expect(request('/api/demo')).rejects.toMatchObject({ code: 'RESOURCE_CONFLICT', status: 409, message: '数据已变化或与当前状态冲突，请刷新后重新确认' })
 })

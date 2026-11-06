@@ -5,17 +5,24 @@
 ## 环境与常用命令
 
 Node.js 要求以 `package.json` 为准，当前为 >=22.18；`.nvmrc` 使用 Node 22。
-运行 lint、测试或构建前先执行 `nvm use` 并用 `node -v` 确认当前终端已切到 Node 22。用旧版 Node 启动 ESLint 10 会在加载配置时因缺少 `structuredClone` 失败，此时尚未检查源码。
+macOS 使用 nvm 时先执行 `nvm use`；Windows 使用 nvm-windows 或 Node.js 安装程序选择 Node 22（至少22.18）。运行 lint、测试或构建前用 `node -v` 确认版本。用旧版 Node 启动 ESLint 10 会在加载配置时因缺少 `structuredClone` 失败，此时尚未检查源码。
 
 ```sh
-nvm use
 npm ci
+npm run verify
 npm run dev
-npm run test
-npm run build
 ```
 
 依赖未变化时不必重复安装。单元测试使用 Vitest/jsdom，不能代替真实后端、浏览器或目标服务器验收。
+
+### Windows / macOS 与 CI 一致性
+
+- `npm run verify` 依次执行 lint、全部正式测试及生产构建；提交前在当前平台执行，CI在Linux、macOS、Windows上使用同一命令独立验证，任何一个失败都会保留失败结果。
+- CI通过`.nvmrc`选择Node 22，并通过已提交的`package-lock.json`执行`npm ci`。依赖变更同时提交`package.json`与锁文件；不要跨平台复制`node_modules`，也不要删除锁文件规避安装错误。Vite原生依赖由npm按运行平台安装。
+- `.gitattributes`规定文本检出与提交使用LF，避免Windows的`core.autocrlf`与ESLint的LF检查冲突；编辑器同时遵守`.editorconfig`。已有Windows工作区更新规则后若仍保留CRLF，先保存未提交修改，再将相关文件按LF保存，避免强制重置丢失修改。
+- 单元测试只收集`tests/`中的正式`*.test.*`与`*.spec.*`；`.local/`验收探针和构建输出不参与CI。每次最多4个测试工作进程，减少不同机器核心数导致的内存差异。
+- import路径大小写须与文件名完全一致；Linux检查用于发现大小写不敏感文件系统可能掩盖的问题。提交来源平台不改变验证标准，失败时按CI实际失败步骤修复，不能跳过测试或放宽类型检查。
+
 
 ## API 地址
 

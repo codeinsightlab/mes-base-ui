@@ -44,6 +44,6 @@ export default defineConfig(({ command, mode }) => {
         '/v3/api-docs/open-api': { target: apiTarget }
       } : undefined
     },
-    test: { environment: 'jsdom', restoreMocks: true }
+    test: { include: ['tests/**/*.{test,spec}.{ts,tsx,js,jsx}'], environment: 'jsdom', restoreMocks: true, maxWorkers: 4 }
   }
 })

@@ -74,7 +74,7 @@ describe('stock reference selection', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('物料一')
     expect(wrapper.text()).toContain('一号仓')
-    expect(wrapper.text()).toContain('12,345,678,901,234.1234')
+    expect(wrapper.text()).toContain('12345678901234.1234')
     expect(wrapper.findAll('button').map(b => b.text())).not.toContain('同步')
     auth.factoryPermissions.push('business:wm:inventory:sync'); auth.runtimeMode = 'ERP'
     await flushPromises()
