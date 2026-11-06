@@ -29,6 +29,7 @@ const props = withDefaults(defineProps<{
   hideRefresh?: boolean;
   managedEditing?: boolean;
   creatable?: boolean;
+  appendOnly?: boolean;
   beforeCreate?: () => Promise<Row | null>;
   editorWidth?: string;
   actionColumnWidth?: number;
@@ -74,7 +75,7 @@ const editable = computed(() => props.fields.filter(f => !f.readonly && !(f.key 
 const selectedIds = ref<string[]>([])
 const deleting = ref(false)
 watch(() => columns.value.map(column => column.key).join('|'), () => { selectedIds.value = [] })
-const can = (action: string) => auth.hasPermission(props.permissionOverrides?.[action] ?? props.permission + ':' + action, resolvedPermissionScope.value)
+const can = (action: string) => !(props.appendOnly && ['update', 'delete'].includes(action)) && auth.hasPermission(props.permissionOverrides?.[action] ?? props.permission + ':' + action, resolvedPermissionScope.value)
 const writeAllowed = computed(() => editId.value ? can('update') : props.creatable !== false && can('create'))
 
 async function load() {

@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "purchase:purchaseReferencePrice",
+  "name": "参考报价历史",
+  "path": "/basic/purchaseReferencePrice",
+  "component": "purchase/purchaseReferencePrice/index",
+  "permission": "business:purchase:reference:price:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

@@ -17,10 +17,10 @@ export const stockDocumentPurpose = (value:unknown) => typeof value === 'string'
 export const stockDocumentPermission = 'business:wm:stock:document'
 export interface Header extends Row {
   id: string; documentNo: string; direction: StockDocumentDirection; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED';
-  supplierName?: string | null; supplierDocumentNo?: string | null;
+  supplierId?: string | null; businessDate?: string | null; currency?: string | null; supplierName?: string | null; supplierDocumentNo?: string | null;
   reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionCode: string | null; postRequestId: string | null; createRequestId?: string | null
 }
-export interface Line extends Row { demandLineId?: string | null; id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
+export interface Line extends Row { unitPrice?: string | null;amount?: string | null;referencePriceId?: string | null;referenceUnitPrice?: string | null; demandLineId?: string | null; id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
 export interface MaterialIssueBasis { requestId: string;code: string;workorderId: string;outputQty: string;routingId: string;routingNodeIds: string[] }
 export interface ProductionInputBasis { combinationId: string | null; allocations: import('@/api/production/productionCombination').Allocation[];
   requestId: string;inputKind: string;sourceMode: string;executionCode: string;workorderId: string;workorderCode: string;
@@ -79,12 +79,12 @@ export function stockDocumentApis(access: { issueListOnly: () => boolean; issueQ
     const b = raw as Row
     if (!Array.isArray(b.items)) throw Error('请填写单据明细')
     return { header: { documentType: b.documentType, reason: b.reason, remark: b.remark,
-      supplierName: b.supplierName, supplierDocumentNo: b.supplierDocumentNo,
+      supplierId: b.supplierId, businessDate: b.businessDate, currency: b.currency, supplierName: b.supplierName, supplierDocumentNo: b.supplierDocumentNo,
       sourceWorkorderId: b.sourceWorkorderId, sourceExecutionCode: b.sourceExecutionCode,
       ruleCode: b.ruleCode, expectedRevision: b.revision }, productionIssue: b.productionIssue, items: b.items.map((value:unknown) => {
       const line = value as Row
       return { id: line.id ?? null, stockId: line.stockId, materialId: line.materialId, warehouseId: line.warehouseId,
-        unitId: line.unitId, batchNo: line.batchNo, binCode: line.binCode, quantity: line.quantity, remark: line.remark }
+        unitId: line.unitId, batchNo: line.batchNo, binCode: line.binCode, quantity: line.quantity, unitPrice: line.unitPrice, remark: line.remark }
     }) }
   }
   const aggregateApi = {

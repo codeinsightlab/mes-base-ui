@@ -157,8 +157,11 @@ it('approves a material draft without a post UUID and replays only its independe
 it('sends supplier snapshots and uses the formal purchase receipt approval', async() => {
   const { aggregateApi } = stockDocumentApis(undefined, () => 'IN')
   mocks.request.mockResolvedValue({ document: { id: '15' }, lines: [] })
-  await aggregateApi.create({ ruleCode: 'PURCHASE_RECEIPT', documentType: 'PURCHASE_RECEIPT', supplierName: '测试供应商', supplierDocumentNo: 'DELIVERY-01', reason: '实物清点', items: [{ materialId: '2', quantity: '3' }] })
-  expect(mocks.request.mock.calls[0]![1].body.header).toMatchObject({ supplierName: '测试供应商', supplierDocumentNo: 'DELIVERY-01', ruleCode: 'PURCHASE_RECEIPT' })
+  await aggregateApi.create({ ruleCode: 'PURCHASE_RECEIPT', documentType: 'PURCHASE_RECEIPT', supplierId: '9007199254740999', businessDate: '2026-11-06', currency: 'CNY', supplierName: '测试供应商', supplierDocumentNo: 'DELIVERY-01', reason: '实物清点', items: [{ materialId: '2', quantity: '3', unitPrice: '1.005', amount: '999', referencePriceId: 'fake' }] })
+  expect(mocks.request.mock.calls[0]![1].body.header).toMatchObject({ supplierId: '9007199254740999', businessDate: '2026-11-06', currency: 'CNY', supplierName: '测试供应商', supplierDocumentNo: 'DELIVERY-01', ruleCode: 'PURCHASE_RECEIPT' })
+  expect(mocks.request.mock.calls[0]![1].body.items[0]).toMatchObject({ unitPrice: '1.005' })
+  expect(mocks.request.mock.calls[0]![1].body.items[0]).not.toHaveProperty('amount')
+  expect(mocks.request.mock.calls[0]![1].body.items[0]).not.toHaveProperty('referencePriceId')
   mocks.request.mockClear()
   const { s } = setup(); await wrapper!.setProps({ row: { id: '15', revision: '2', direction: 'IN', documentType: 'PURCHASE_RECEIPT', status: 'DRAFT' }})
   await s.approve()

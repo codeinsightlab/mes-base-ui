@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "purchase:purchaseSupplier",
+  "name": "供应商",
+  "path": "/basic/purchaseSupplier",
+  "component": "purchase/purchaseSupplier/index",
+  "permission": "business:purchase:supplier:list",
+  "permissionScope": "factory",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

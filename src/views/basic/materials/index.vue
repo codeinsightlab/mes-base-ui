@@ -132,6 +132,7 @@ onBeforeUnmount(clear)
       <aside class="panel categories" aria-label="物料分类">
         <div class="table-toolbar"><strong>物料分类</strong><router-link v-if="can('category','list')" to="/basic/materialCategory">管理分类</router-link></div>
         <el-input v-model="categoryKeyword" clearable placeholder="搜索分类" aria-label="搜索分类" />
+        <div class="category-scope"><el-button v-for="category in categoryRows.filter(row=>['原材料','半成品','成品'].includes(row.name))" :key="category.id" link :type="selected===category.id?'primary':'default'" @click="selected=category.id">{{ category.name }}</el-button></div>
         <div class="category-scope"><el-button :type="selected==='all'?'primary':'default'" link @click="selected='all'">全部物料</el-button><el-button :type="selected==='uncategorized'?'primary':'default'" link @click="selected='uncategorized'">未分类</el-button></div>
         <el-alert v-if="!can('category','list')" title="没有分类读取权限，仍可读取已授权的物料。" type="info" :closable="false" />
         <el-alert v-if="categoryError" :title="categoryError" type="error" :closable="false" /><el-button v-if="categoryError" link @click="loadCategories">重试分类</el-button>
