@@ -15,6 +15,8 @@ const canStartVoid = computed(() => available.value && (!props.basis || props.ba
 const canReconcile = computed(() => available.value && (!props.basis
   || props.basis.voidOperationId != null && ['UNKNOWN', 'SUBMITTING'].includes(String(props.basis.voidResultStatus))))
 const messageBox = usePageMessageBox()
+const resultLabels: Record<string, string> = { DRAFT: '草稿', POSTED: '已审核', CANCELLED: '已作废', VOIDED: '已撤销', SUBMITTING: '提交中', SUCCEEDED: '成功', REJECTED: '已拒绝', UNKNOWN: '待核实' }
+function resultLabel(value: string | null) { if (!value) return '待确认'; return resultLabels[value] ?? '状态待核实' }
 let generation = 0
 function clear() { generation++;busy.value = false;error.value = '';result.value = null }
 watch(() => [props.row.id, auth.revision, auth.factoryId, auth.runtimeMode, allowed.value], clear, { flush: 'sync' })
@@ -46,8 +48,7 @@ async function run(reconcile: boolean) {
     <el-button v-if="canReconcile" :loading="busy" :disabled="dirty" @click="run(true)">核实原撤销</el-button>
   </template>
   <div v-if="result && allowed" role="status">
-    <span>单据状态：{{ result.documentStatus || '待确认' }}；生产投入状态：{{ result.productionInputStatus || '待确认' }}；撤销结果：{{ result.voidResultStatus || '待确认' }}</span>
-    <span v-if="result.voidOperationId">原撤销操作：{{ result.voidOperationId }}</span>
+    <span>单据状态：{{ resultLabel(result.documentStatus) }}；生产投入状态：{{ resultLabel(result.productionInputStatus) }}；撤销结果：{{ resultLabel(result.voidResultStatus) }}</span>
     <span v-if="result.voidRequestedAt">请求时间：{{ result.voidRequestedAt }}</span><span v-if="result.voidFinishedAt">完成时间：{{ result.voidFinishedAt }}</span>
     <span v-if="result.message">{{ result.message }}</span>
   </div>

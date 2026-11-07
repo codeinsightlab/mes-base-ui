@@ -59,3 +59,39 @@ it('requires conditional purchase fields only while the purchase type is active'
   Object.assign(s.draft, { supplierId: '20', businessDate: '2026-11-07' });await s.save()
   expect(header.create).toHaveBeenCalledTimes(2)
 })
+
+it('keeps the list mounted behind a dialog and closes without accepting a late detail response', async() => {
+  const { s } = await setup({ presentation: 'dialog', documentNumberKey: 'documentNo' })
+  let finish!: (value: unknown) => void
+  header.detail.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const opening = s.open({ id: parent });await flushPromises()
+  expect(wrapper.findComponent(CrudPage).exists()).toBe(true)
+  expect(s.opened).toBe(true)
+  await s.back();finish({ id: parent, documentNo: 'LATE-DOCUMENT', reason: 'late' });await opening;await flushPromises()
+  expect(s.opened).toBe(false);expect(s.draft.documentNo).toBeUndefined()
+  expect(header.list).toHaveBeenCalledTimes(2)
+})
+
+it('preserves unsaved dialog edits when dismissal is cancelled', async() => {
+  const { ElMessageBox } = await import('element-plus')
+  const confirmation = vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel').mockResolvedValueOnce(undefined as never)
+  try {
+    const { s } = await setup({ presentation: 'dialog', documentNumberKey: 'documentNo' })
+    await s.open();s.draft.reason = '未保存的实物清点'
+    const done = vi.fn();await s.closeDialog(done)
+    expect(s.opened).toBe(true);expect(s.draft.reason).toBe('未保存的实物清点');expect(done).not.toHaveBeenCalled()
+    await s.closeDialog(done)
+    expect(s.opened).toBe(false);expect(done).toHaveBeenCalledTimes(1)
+  } finally { confirmation.mockRestore() }
+})
+
+it('keeps hidden request identities out of the form while preserving the command whitelist', async() => {
+  const { s } = await setup({ headerFields: [
+    { key: 'reason', label: '依据', kind: 'text' },
+    { key: 'requestId', label: '内部请求标识', kind: 'text', hidden: true, defaultValue: 'PRIVATE-REQUEST' }
+  ] })
+  header.create.mockResolvedValue({ id: parent, reason: 'QA' })
+  await s.open();await flushPromises()
+  expect(wrapper.text()).not.toContain('内部请求标识');expect(wrapper.html()).not.toContain('PRIVATE-REQUEST')
+  await s.save();expect(header.create).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'PRIVATE-REQUEST' }))
+})

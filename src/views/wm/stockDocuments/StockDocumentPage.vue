@@ -3,24 +3,20 @@ import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import PageDialog from '@/components/page/PageDialog.vue'
 
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
-import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { formatQuantity } from '@/lib/quantity'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import StockActionDialog from './StockActionDialog.vue'
+import StockDocumentLines from './StockDocumentLines.vue'
+import DocumentFields from '@/components/document/DocumentFields.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import SupplierSelect from '@/components/business/SupplierSelect.vue'
-import PurchasePriceInput from '@/components/business/purchase/PurchasePriceInput.vue'
-import MaterialSelect from '@/components/business/MaterialSelect.vue'
-import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
 import { useRoute, useRouter } from 'vue-router'
-import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
 import { stockDocumentApis, stockDocumentPermission as p, stockDocuments, type NumberingRuleOption, type StockDocumentDirection, type StockDocumentTypeOption } from '@/api/wm/stockDocuments'
 import { useAuth } from '@/stores/auth'
-import { request } from '@/lib/request'
-import type { StockAction } from '@/api/wm/localStock'
 import type { ProductionInputBasis } from '@/api/wm/stockDocuments'
-import type { Field, Row } from '@/lib/crud'
+import { formatValue, type Field, type Row } from '@/lib/crud'
 const route = useRoute(), router = useRouter()
 const props = defineProps<{ direction: StockDocumentDirection }>()
 const direction = computed(() => props.direction)
@@ -60,6 +56,7 @@ async function readIssueLine(documentId: unknown) {
     if (attempt === lineAttempt) lineError.value = error instanceof Error ? error.message : '明细读取失败'
   } finally { if (attempt === lineAttempt) lineLoading.value = false }
 }
+function closeDirectLines(value: boolean) { if (!value) { directDocumentId.value = ''; directLines.value = []; selectedLine.value = null; lineAttempt++ } }
 async function readDirectLines() {
   if (!/^[1-9]\d*$/.test(directDocumentId.value) || !canIssueLines.value) return
   const attempt = ++lineAttempt, factory = auth.factoryId, revision = auth.revision
@@ -99,7 +96,7 @@ const initialSearch = computed<Record<string, string>>((): Record<string, string
   ...(issueListOnly.value && direction.value === 'OUT' ? { documentType: 'MATERIAL_ISSUE' } : {}),
   ...(typeof route.query.documentType === 'string' && typeOptions.value.some(t => t.value === route.query.documentType)
     ? { documentType: route.query.documentType } : {}) }))
-const action = ref<StockAction | null>(null), actionVisible = ref(false), actionError = ref('')
+const actionDialog = ref<InstanceType<typeof StockActionDialog> | null>(null)
 let linkAttempt = 0, typeAttempt = 0
 async function loadTypes() {
   const attempt = ++typeAttempt, factory = auth.factoryId, revision = auth.revision
@@ -114,6 +111,16 @@ async function openLinkedDocument() {
   const requestId = route.query.requestId
   const hasDocument = typeof id === 'string' && /^[1-9]\d*$/.test(id)
   if (!hasDocument && (typeof requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId))) return
+  if (hasDocument && !canStockQuery.value && !issueQueryOnly.value) {
+    directDocumentId.value = id
+    if (canIssueLines.value) void readDirectLines()
+    const linkedLine = route.query.lineId
+    if (canIssueLine.value && typeof linkedLine === 'string' && /^[1-9]\d*$/.test(linkedLine)) {
+      lineId.value = linkedLine
+      void readIssueLine(id)
+    }
+    return
+  }
   const attempt = ++linkAttempt, factory = auth.factoryId, revision = auth.revision
   try {
     const detail = hasDocument
@@ -132,15 +139,11 @@ onMounted(() => { void loadTypes();void openLinkedDocument() })
 watch(() => props.direction, () => { void loadTypes(); if (!route.query.documentId) void document.value?.back() })
 watch(() => [route.query.documentId, route.query.requestId], openLinkedDocument)
 watch(() => route.query.documentType, () => { if (!route.query.documentId) void document.value?.back() })
-let generation = 0, numberingAttempt = 0
-function reset() { linkAttempt++;lineAttempt++; directDocumentId.value = ''; directLines.value = []; directBasis.value = null; lineId.value = ''; selectedLine.value = null; lineError.value = ''; lineLoading.value = false; originalLines.clear();pendingDocument.value = null;generation++;numberingAttempt++;numberingRules.value = [];selectedNumberRule.value = null;numberingRulesLoading.value = false;numberingRulesError.value = '';action.value = null;actionVisible.value = false;actionError.value = '' }
+let numberingAttempt = 0
+function reset() { linkAttempt++;lineAttempt++; directDocumentId.value = ''; directLines.value = []; directBasis.value = null; lineId.value = ''; selectedLine.value = null; lineError.value = ''; lineLoading.value = false; originalLines.clear();pendingDocument.value = null;numberingAttempt++;numberingRules.value = [];selectedNumberRule.value = null;numberingRulesLoading.value = false;numberingRulesError.value = '';actionDialog.value?.clear() }
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { reset();void loadTypes() })
 onBeforeUnmount(reset)
-async function showAction(id:unknown) {
-  if (!id || !auth.hasPermission('business:wm:stock:action:query', 'factory')) return
-  const g = ++generation;action.value = null;actionError.value = '';actionVisible.value = true
-  try { const result = await request<StockAction>('/api/wm/wm-stock-action/' + encodeURIComponent(String(id)), { scope: 'factory' });if (g === generation)action.value = result } catch(e) { if (g === generation)actionError.value = e instanceof Error ? e.message : '动作读取失败' }
-}
+function showAction(id: unknown) { void actionDialog.value?.open(id) }
 const manualDocumentTypes = computed(() => typeOptions.value.filter(t => t.enabled && t.approvalAvailable
   && !t.value.startsWith('TRANSFER_')))
 const ruleCodeVisibility: Field['showWhen'] = Object.freeze({
@@ -175,56 +178,55 @@ function documentTypeChanged(draft: Row) { draft.sourceExecutionCode = null;draf
 const documentTitle = computed(() => direction.value === 'IN' ? '入库单' : '出库单')
 const headerFields = computed<Field[]>(() => [
   { key: 'isNew', label: '新建状态', kind: 'text', readonly: true, hidden: true, defaultValue: 'Y' },
-  { key: 'ruleCode', label: '编码规则', kind: 'select', showWhen: ruleCodeVisibility },
-  { key: 'documentNo', label: '单号', kind: 'text', readonly: true, searchable: true, columnMinWidth: 240 },
+  { key: 'ruleCode', label: '单据编号', columnVisible: false, defaultValue: typeof route.query.executionCode === 'string' ? 'PRODUCTION_RECEIPT' : direction.value === 'IN' ? 'OTHER_RECEIPT' : 'OTHER_ISSUE', kind: 'select', showWhen: ruleCodeVisibility },
+  { key: 'documentNo', label: '单号', kind: 'text', readonly: true, searchable: true, columnMinWidth: 200 },
   { key: 'direction', label: '方向', kind: 'text', readonly: true, defaultValue: direction.value, hidden: true },
   { key: 'documentType', label: '单据类型', kind: 'select', required: true, defaultValue: typeof route.query.executionCode === 'string' ? 'PRODUCTION_RECEIPT' : direction.value === 'IN' ? 'OTHER_RECEIPT' : 'OTHER_ISSUE', searchable: true, options: typeOptions.value.map(t => ({ value: t.value, label: t.label })) },
   { key: 'status', label: '状态', kind: 'select', readonly: true, searchable: true, options: [{ value: 'DRAFT', label: '草稿', tone: 'warning' }, { value: 'POSTED', label: '已审核', tone: 'success' }, { value: 'CANCELLED', label: '已作废', tone: 'info' }] },
-  { key: 'sourceExecutionCode', label: '生产来源执行单元', kind: 'text', defaultValue: typeof route.query.executionCode === 'string' ? route.query.executionCode : undefined },
-  { key: 'sourceWorkorderId', label: '工单来源', kind: 'text', readonly: true },
+  { key: 'sourceExecutionCode', label: '生产来源', kind: 'text', columnVisible: false, showWhen: { key: 'documentType', value: 'PRODUCTION_RECEIPT' }, defaultValue: typeof route.query.executionCode === 'string' ? route.query.executionCode : undefined },
+  { key: 'sourceWorkorderId', label: '工单来源', kind: 'text', readonly: true, hidden: true },
   { key: 'supplierId', label: '供应商', kind: 'text', required: true, columnVisible: false, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
-  { key: 'supplierName', label: '单据供应商名称', kind: 'text', readonly: true, columnMinWidth: 200, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
-  { key: 'businessDate', label: '采购业务日期', kind: 'date', required: true, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
-  { key: 'currency', label: '币种', kind: 'select', required: true, options: [{ value: 'CNY', label: '人民币 CNY' }], showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
-  { key: 'supplierDocumentNo', label: '供应商送货单号', kind: 'text', maxLength: 128, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
-  { key: 'reason', label: '处理原因 / 实物依据', kind: 'textarea', required: true, maxLength: 500 },
-  { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 },
-  { key: 'postedBy', label: '审核人ID', kind: 'text', readonly: true },
-  { key: 'postRequestId', label: '审核请求UUID', kind: 'text', readonly: true, columnMinWidth: 260 },
+  { key: 'supplierName', label: '供应商', columnVisible: direction.value === 'IN', kind: 'text', readonly: true, columnMinWidth: 200, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
+  { key: 'businessDate', label: '业务日期', columnVisible: direction.value === 'IN', kind: 'date', required: true, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
+  { key: 'currency', label: '币种', columnVisible: false, kind: 'select', required: true, options: [{ value: 'CNY', label: '人民币 CNY' }], showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
+  { key: 'supplierDocumentNo', label: '送货单号', columnVisible: false, kind: 'text', maxLength: 128, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
+  { key: 'reason', label: '收发原因', kind: 'textarea', required: true, maxLength: 500 },
+  { key: 'remark', label: '备注', kind: 'textarea', columnVisible: false, maxLength: 500 },
+  { key: 'postedBy', label: '审核人', kind: 'text', readonly: true, hidden: true },
+  { key: 'postRequestId', label: '审核请求', kind: 'text', readonly: true, hidden: true, columnMinWidth: 260 },
   { key: 'postedAt', label: '审核时间', kind: 'datetime', readonly: true, columnMinWidth: 180 }
 ])
 const itemFields:Field[] = [
   { key: 'lineNo', label: '行号', kind: 'number', readonly: true },
   { key: 'materialId', label: '物料 / 产品', kind: 'text', required: true },
   { key: 'warehouseId', label: '本地仓库', kind: 'text', required: true },
-  { key: 'stockId', label: '确切库存来源', kind: 'text', required: true },
+  { key: 'stockId', label: '批次 / 库位', kind: 'text', required: true },
   { key: 'batchNo', label: '批次', kind: 'text' }, { key: 'binCode', label: '库位', kind: 'text' },
-  { key: 'unitId', label: '基本单位ID', kind: 'text', required: true },
-  { key: 'quantity', label: '本次收发数量', kind: 'decimal', required: true, format: value => formatQuantity(value as string) },
+  { key: 'unitId', label: '基本单位', kind: 'text', required: true },
+  { key: 'quantity', label: '数量', kind: 'decimal', required: true, format: value => formatQuantity(value as string) },
   { key: 'unitPrice', label: '实际成交单价', kind: 'decimal' },
-  { key: 'remark', label: '明细 / 实物清点依据', kind: 'textarea', maxLength: 500 },
+  { key: 'remark', label: '备注', kind: 'textarea', maxLength: 500 },
   { key: 'stockActionId', label: '库存动作', kind: 'text', readonly: true, columnMinWidth: 260 }
 ]
-function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;draft.binCode = null;draft.unitId = null }
+
 </script>
 <template>
   <div class="stock-documents">
-    <router-link v-if="transferPath" :to="transferPath">办理库存调拨</router-link>
+    <div class="stock-document-links"><router-link v-if="transferPath" :to="transferPath">库存调拨</router-link><router-link v-if="direction==='OUT' && productionInputPath && auth.hasPermission('business:mes:material:issue:update','factory')" :to="productionInputPath">扫码领料</router-link></div>
     <el-alert v-if="typeOptionsError" :title="typeOptionsError" type="error" :closable="false" />
-    <el-alert :title="direction==='IN'?'新建入库单先保存草稿，审核通过后才增加库存。未接入来源的类型禁止审核。':'新建出库单先保存草稿，审核通过后才扣减库存。通用出库不产生生产投入；生产领料请使用 MES 扫码入口。'" type="info" :closable="false" />
-    <router-link v-if="direction==='OUT' && productionInputPath && auth.hasPermission('business:mes:material:issue:update','factory')" :to="productionInputPath">扫码投产并领料</router-link>
-    <section v-if="!canStockList && !canStockQuery && !issueListOnly && !issueQueryOnly && (canIssueLines || canIssueLine)">
-      <h3>读取生产领料明细</h3>
-      <el-input v-model="directDocumentId" aria-label="领料单据 ID" placeholder="单据 ID" />
-      <el-button v-if="canIssueLines" :loading="lineLoading" @click="readDirectLines">读取明细列表</el-button>
-      <template v-if="canIssueLine"><el-input v-model="lineId" aria-label="独立领料明细 ID" placeholder="明细 ID" /><el-button :loading="lineLoading" @click="readIssueLine(directDocumentId)">读取指定明细</el-button></template>
-      <el-alert v-if="lineError" :title="lineError" type="error" :closable="false" />
-      <el-table v-if="directLines.length" :data="directLines"><el-table-column prop="id" label="明细 ID" /><el-table-column prop="materialId" label="物料" /><el-table-column prop="warehouseId" label="仓库" /><el-table-column label="数量"><template #default="{row}">{{ formatQuantity(row.quantity) }}</template></el-table-column></el-table>
-      <p v-if="selectedLine">明细 {{ selectedLine.id }}：物料 {{ selectedLine.materialId }}，数量 {{ formatQuantity(selectedLine.quantity) }}</p>
-      <p v-if="directBasis">工单 {{ directBasis.workorderCode }}，投入 {{ formatQuantity(directBasis.outputQty) }}，领料 {{ formatQuantity(directBasis.issueQty) }}</p>
-    </section>
+    <template v-if="!canStockList && !canStockQuery && !issueListOnly && !issueQueryOnly && (canIssueLines || canIssueLine)">
+      <p v-if="!directDocumentId" class="secondary">请从生产领料记录打开需要查看的明细。</p>
+      <PageDialog :model-value="!!directDocumentId" title="生产领料明细" width="min(1280px, 96vw)" @update:model-value="closeDirectLines">
+        <el-alert v-if="lineError" :title="lineError" type="error" :closable="false" />
+        <StockDocumentLines v-if="directLines.length" :header="{id:directDocumentId,direction:'OUT',documentType:'MATERIAL_ISSUE'}" :items="directLines" :writable="false" :saving="false" :can-issue-line="canIssueLine" :original-lines="originalLines" @show-action="showAction" @read-line="row=>{lineId=String(row.id);readIssueLine(directDocumentId)}" />
+        <p v-if="selectedLine">数量 {{ formatQuantity(selectedLine.quantity as string) }}；批次 {{ selectedLine.batchNo || '无批次' }}；库位 {{ selectedLine.binCode || '无库位' }}</p>
+        <p v-if="directBasis">工单 {{ directBasis.workorderCode }}，投入 {{ formatQuantity(directBasis.outputQty) }}</p>
+      </PageDialog>
+    </template>
     <MasterDetailDocument
       ref="document"
+      presentation="dialog"
+      document-number-key="documentNo"
       :deletable="false"
       revision-field="revision"
       :initial-search="initialSearch"
@@ -242,56 +244,60 @@ function resetIdentity(draft:Row) { draft.stockId = null;draft.batchNo = null;dr
       :items-readonly="row=>String(row.documentType).startsWith('TRANSFER_')||row.documentType==='MATERIAL_ISSUE'"
       :header-readonly="row=>String(row.documentType).startsWith('TRANSFER_')||row.documentType==='MATERIAL_ISSUE'||row.status!=='DRAFT'||auth.runtimeMode!=='LOCAL'||pendingDocument===row.id"
       :item-permission-overrides="{list:p+':query',query:p+':query',create:p+':update',update:p+':update',delete:p+':update'}"
+      @back="reset"
     >
-      <template #field-supplierId="{draft,disabled}"><span v-if="disabled">{{ draft.supplierName || '—' }}</span><div v-else><SupplierSelect v-model="draft.supplierId" status="ENABLED" /><small v-if="draft.supplierName">单据名称：{{ draft.supplierName }}</small></div></template>
       <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
-      <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>documentTypeChanged(draft)"><el-option v-for="type in draft.id?typeOptions:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value" :disabled="!type.enabled" /></el-select></template>
-      <template #field-ruleCode="{draft,disabled}"><div @vue:mounted="!draft.id && loadNumberingRules(draft.documentType,draft)"><el-alert v-if="numberingRulesError" :title="numberingRulesError" type="error" :closable="false" /><el-select v-model="draft.ruleCode as string" :disabled="disabled||!!draft.id||numberingRules.length!==1" :loading="numberingRulesLoading" placeholder="请选择与单据类型 key 对应的编码规则" @visible-change="(visible: boolean)=>visible&&numberingRules.length===0&&!numberingRulesLoading&&loadNumberingRules(draft.documentType,draft)"><el-option v-for="rule in numberingRules" :key="rule.ruleCode" :value="rule.ruleCode" :label="`${rule.ruleName}（${rule.ruleCode} · ${rule.prefix}）`" /></el-select><span v-if="selectedNumberRule" class="secondary">规则 {{ selectedNumberRule.ruleCode }}；实际前缀 {{ selectedNumberRule.prefix }}；本次预览 {{ selectedNumberRule.preview }}。单号仅在正式保存时取号。</span><span v-else class="secondary">业务类型 key 与规则编码一一对应；不能改选其他类型规则。</span></div></template>
-      <template #field-sourceExecutionCode="{draft,disabled}"><ProductionExecutionSelect v-model="(draft.sourceExecutionCode as string|null)" :statuses="['RUNNING']" :disabled="disabled||!!draft.id||draft.documentType!=='PRODUCTION_RECEIPT'" /></template>
+      <template #header-fields="{draft,disabled}">
+        <template v-if="disabled">
+          <el-descriptions :column="draft.documentType==='PURCHASE_RECEIPT' ? 3 : 2" border>
+            <el-descriptions-item label="单据类型">{{ typeOptions.find(type=>type.value===draft.documentType)?.label || '类型待确认' }}</el-descriptions-item>
+            <el-descriptions-item v-if="draft.documentType==='PURCHASE_RECEIPT'" label="供应商">{{ draft.supplierName || '—' }}</el-descriptions-item>
+            <el-descriptions-item v-if="draft.businessDate" label="业务日期">{{ draft.businessDate }}</el-descriptions-item>
+            <el-descriptions-item v-if="draft.currency" label="币种">{{ draft.currency==='CNY' ? '人民币' : draft.currency }}</el-descriptions-item>
+            <el-descriptions-item v-if="draft.supplierDocumentNo" label="送货单号">{{ draft.supplierDocumentNo }}</el-descriptions-item>
+            <el-descriptions-item v-if="draft.postedAt" label="审核时间">{{ formatValue(draft.postedAt, 'datetime') }}</el-descriptions-item>
+            <el-descriptions-item label="收发原因" :span="draft.documentType==='PURCHASE_RECEIPT' ? 3 : 2">{{ draft.reason || '—' }}</el-descriptions-item>
+            <el-descriptions-item v-if="draft.remark" label="备注" :span="draft.documentType==='PURCHASE_RECEIPT' ? 3 : 2">{{ draft.remark }}</el-descriptions-item>
+          </el-descriptions>
+        </template>
+        <template v-else>
+          <section v-for="group in [{title:'',keys:['documentType','ruleCode','sourceExecutionCode']},{title:'采购信息',keys:['supplierId','businessDate','currency','supplierDocumentNo']},{title:'收发说明',keys:['reason','remark']}] .filter(group=>group.title!=='采购信息'||draft.documentType==='PURCHASE_RECEIPT')" :key="group.title" class="header-field-group">
+            <h3 v-if="group.title">{{ group.title }}</h3>
+            <DocumentFields :fields="group.keys.flatMap(key=>headerFields.filter(field=>field.key===key))" :draft="draft" :disabled="disabled">
+              <template #field-supplierId="{draft,disabled}"><span v-if="disabled">{{ draft.supplierName || '—' }}</span><div v-else><SupplierSelect v-model="draft.supplierId as string | null" status="ENABLED" /></div></template>
+
+              <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>documentTypeChanged(draft)"><el-option v-for="type in draft.id?typeOptions:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value" :disabled="!type.enabled" /></el-select></template>
+              <template #field-ruleCode="{draft}"><div @vue:mounted="!draft.id && loadNumberingRules(draft.documentType,draft)"><el-alert v-if="numberingRulesError" :title="numberingRulesError" type="error" :closable="false" /><span class="secondary">{{ numberingRulesLoading ? '读取编号…' : selectedNumberRule?.preview || '保存时自动生成' }}</span></div></template>
+              <template #field-sourceExecutionCode="{draft,disabled}"><ProductionExecutionSelect v-model="(draft.sourceExecutionCode as string|null)" :statuses="['RUNNING']" :disabled="disabled||!!draft.id||draft.documentType!=='PRODUCTION_RECEIPT'" /></template>
+
+            </DocumentFields>
+          </section>
+        </template>
+      </template>
       <template #items="{ header, items, writable, saving, add, remove }">
         <el-alert v-if="header.documentType === 'MATERIAL_ISSUE' && !canIssueLines" title="当前账号没有领料明细列表权限。" type="info" :closable="false" />
         <template v-else>
-          <div class="document-toolbar"><el-button type="primary" plain :disabled="!writable" @click="add({materialId:null,warehouseId:null,stockId:null,unitId:null,batchNo:null,binCode:null,quantity:'',remark:''})">添加明细</el-button><span class="secondary">选择物料与仓库后，可选已有库存身份或建立新批次的零余额身份；审核后才增加库存。</span></div>
-          <el-table :data="items" border stripe>
-            <el-table-column type="index" label="#" width="60" />
-            <el-table-column label="物料 / 产品" min-width="190"><template #default="{row}"><MaterialSelect v-if="writable" v-model="row.materialId" @update:model-value="resetIdentity(row)" /><span v-else>{{ row.materialId || '待确认' }}</span></template></el-table-column>
-            <el-table-column label="仓库" min-width="180"><template #default="{row}"><WarehouseSelect v-if="writable" v-model="row.warehouseId" source="LOCAL" @update:model-value="resetIdentity(row)" /><span v-else>{{ row.warehouseId || '待确认' }}</span></template></el-table-column>
-            <el-table-column label="库存来源" min-width="200"><template #default="{row}"><StockSourceSelect v-if="writable" v-model="row.stockId" :material-id="(row.materialId as string | null)" :warehouse-id="(row.warehouseId as string | null)" :receipt="header.direction==='IN'" @selected="(s,unit)=>{row.materialId=s.materialId;row.warehouseId=s.warehouseId;row.batchNo=s.batchNo;row.binCode=s.binCode;row.unitId=unit}" /><span v-else>{{ row.stockId || '待确认' }}</span></template></el-table-column>
-            <el-table-column label="批次 / 库位" min-width="180"><template #default="{row}">{{ row.batchNo || '—' }} / {{ row.binCode || '—' }}</template></el-table-column>
-            <el-table-column label="基本单位" width="120"><template #default="{row}">{{ row.unitId || '待确认' }}</template></el-table-column>
-            <el-table-column label="数量" min-width="160"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" :material-id="(row.materialId as string | null)" required positive :unchanged-value="originalLines.get(String(row.id))?.materialId===row.materialId && originalLines.get(String(row.id))?.stockId===row.stockId && originalLines.get(String(row.id))?.unitId===row.unitId ? originalLines.get(String(row.id))?.quantity as string : null" @validity="setQuantityValidity(row,$event)" /><span v-else>{{ formatQuantity(row.quantity as string) }}</span></template></el-table-column>
-            <el-table-column v-if="header.documentType==='PURCHASE_RECEIPT'" label="成交单价 / 参考价" min-width="220"><template #default="{row}"><PurchasePriceInput :header="header" :row="row" :disabled="!writable" @change="Object.assign(row,$event)" /></template></el-table-column>
-            <el-table-column v-if="header.documentType==='PURCHASE_RECEIPT'" label="成交金额（元）" min-width="150"><template #default="{row}">{{ row.amount ?? '—' }}</template></el-table-column>
-            <el-table-column label="备注" min-width="180"><template #default="{row}"><el-input v-if="writable" v-model="row.remark" maxlength="500" /><span v-else>{{ row.remark || '—' }}</span></template></el-table-column>
-            <el-table-column label="库存动作" min-width="220"><template #default="{row}"><el-button v-if="row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="showAction(row.stockActionId)">{{ row.stockActionId }}</el-button><span v-else>{{ row.stockActionId || '—' }}</span></template></el-table-column>
-            <el-table-column v-if="writable || header.documentType === 'MATERIAL_ISSUE' && canIssueLine" label="操作" width="100" fixed="right"><template #default="{row,$index}"><el-button v-if="writable" link type="danger" :disabled="saving" @click="remove($index)">移除</el-button><el-button v-else-if="row.id" link type="primary" @click="lineId=String(row.id);readIssueLine(header.id)">查看明细</el-button></template></el-table-column>
-          </el-table>
+          <div class="document-toolbar"><el-button v-if="writable" type="primary" plain :disabled="saving" @click="add({materialId:null,warehouseId:null,stockId:null,unitId:null,batchNo:null,binCode:null,quantity:'',remark:''})">添加明细</el-button><span class="secondary">{{ items.length }} 条明细<span v-if="header.status==='POSTED'"> · 已审核，库存已更新</span><span v-else-if="writable"> · 保存草稿后审核生效</span></span></div>
+          <StockDocumentLines :header="header" :items="items" :writable="writable" :saving="saving" :can-issue-line="canIssueLine" :original-lines="originalLines" @validity="setQuantityValidity" @remove="remove" @show-action="showAction" @read-line="row=>{lineId=String(row.id);readIssueLine(header.id)}" />
         </template>
-        <div v-if="header.documentType === 'MATERIAL_ISSUE' && !canIssueLines && canIssueLine" class="document-toolbar">
-          <el-input v-model="lineId" placeholder="输入明细 ID" aria-label="领料明细 ID" />
-          <el-button :loading="lineLoading" @click="readIssueLine(header.id)">读取明细</el-button>
-        </div>
+        <p v-if="header.documentType === 'MATERIAL_ISSUE' && !canIssueLines && canIssueLine" class="secondary">请从领料记录打开指定明细。</p>
         <el-alert v-if="lineError" :title="lineError" type="error" :closable="false" />
         <el-descriptions v-if="selectedLine && header.documentType === 'MATERIAL_ISSUE'" :column="2" border>
-          <el-descriptions-item label="明细 ID">{{ selectedLine.id }}</el-descriptions-item>
-          <el-descriptions-item label="物料">{{ selectedLine.materialId }}</el-descriptions-item>
-          <el-descriptions-item label="仓库">{{ selectedLine.warehouseId || '待确认' }}</el-descriptions-item>
           <el-descriptions-item label="批次">{{ selectedLine.batchNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="数量">{{ formatQuantity(selectedLine.quantity as string) }}</el-descriptions-item>
-          <el-descriptions-item label="单位">{{ selectedLine.unitId || '待确认' }}</el-descriptions-item>
         </el-descriptions>
       </template>
     </MasterDetailDocument>
 
-    <PageDialog v-model="actionVisible" title="不可变库存动作" width="720px" @closed="generation++;action=null;actionError=''">
-      <el-alert v-if="actionError" :title="actionError" type="error" :closable="false" />
-      <el-descriptions v-if="action" :column="2" border><el-descriptions-item label="动作UUID">{{ action.id }}</el-descriptions-item><el-descriptions-item label="审核UUID">{{ action.operationId||'—' }}</el-descriptions-item><el-descriptions-item label="单据明细ID">{{ action.documentLineId||'—' }}</el-descriptions-item><el-descriptions-item label="业务来源">{{ action.sourceType }} / {{ action.sourceId }}</el-descriptions-item><el-descriptions-item label="库存来源">{{ action.stockId }}</el-descriptions-item><el-descriptions-item label="批次 / 库位">{{ action.batchNo }} / {{ action.binCode }}</el-descriptions-item><el-descriptions-item label="变动量">{{ formatQuantity(action.quantityDelta) }}</el-descriptions-item><el-descriptions-item label="前 / 后余额">{{ formatQuantity(action.quantityBefore) }} / {{ formatQuantity(action.quantityAfter) }}</el-descriptions-item><el-descriptions-item label="操作人">{{ action.operatorUserId }}</el-descriptions-item><el-descriptions-item label="原因">{{ action.reason }}</el-descriptions-item></el-descriptions>
-    </PageDialog>
+    <StockActionDialog ref="actionDialog" />
   </div>
 </template>
 
 <style scoped>
 .document-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.stock-document-links { display: flex; justify-content: flex-end; gap: var(--ui-space-4); padding: 0 var(--ui-space-4); }
+.header-field-group + .header-field-group { border-top: 1px solid var(--ui-border-soft); margin-top: var(--ui-space-4); padding-top: var(--ui-space-4); }
+.header-field-group h3 { font-size: 14px; font-weight: 500; margin: 0 0 var(--ui-space-3); }
 .stock-documents :deep(.page-header) { flex-wrap: wrap; }
 .stock-documents :deep(.page-header h1) { white-space: nowrap; }
 .stock-documents :deep(.page-header-actions) { flex: 1 1 100%; min-width: 0; max-width: 100%; justify-content: flex-start; }

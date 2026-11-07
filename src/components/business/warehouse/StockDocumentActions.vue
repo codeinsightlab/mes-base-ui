@@ -40,10 +40,10 @@ watch(() => [auth.factoryId, auth.revision, auth.runtimeMode, auth.factoryPermis
 watch(() => [props.row.sourceWorkorderId, props.row.sourceExecutionCode], () => void loadBasis())
 async function approve() {
   if (!canApprove.value || intent.busy.value) return
-  if (props.dirty && !intent.pending.value) { error.value = '请先保存主单，再核对并审核';return }
+  if (props.dirty && !intent.pending.value) { error.value = '请先保存草稿，再审核';return }
   if (!stockDocumentPurpose(props.row.documentType)?.approvalAvailable) { error.value = '来源业务尚未接通，禁止审核；草稿可继续保存';return }
   const g = generation
-  try { await ElMessageBox.confirm(`${props.row.direction === 'IN' ? '增加' : '减少'}所选库存。审核通过后在同一事务执行全部明细；成功后单据与库存事实不可编辑。`, '审核单据', { type: 'warning', confirmButtonText: '确认审核', cancelButtonText: '取消' }) } catch { return }
+  try { await ElMessageBox.confirm(`${props.row.direction === 'IN' ? '增加' : '减少'}所选库存。审核通过后，全部明细生效且不可直接修改。`, '审核单据', { type: 'warning', confirmButtonText: '确认审核', cancelButtonText: '取消' }) } catch { return }
   if (g !== generation || !canApprove.value) return
   await intent.run(() => ({ requestId: crypto.randomUUID(), expectedRevision: String(props.row.revision) }), c => props.row.documentType === 'PRODUCTION_RECEIPT' && props.row.sourceExecutionCode ? stockDocuments.approveProduction(String(props.row.id), c) : stockDocuments.approve(String(props.row.id), c, String(props.row.direction) === 'IN' ? 'IN' : 'OUT'), async() => { await props.refresh();await loadBasis() })
 }
@@ -59,21 +59,27 @@ onBeforeUnmount(clear)
 </script>
 <template>
   <div class="stock-document-actions">
-    <p v-if="stockDocumentPurpose(row.documentType)">业务来源：{{ stockDocumentPurpose(row.documentType)?.origin }}；关联依据：{{ stockDocumentPurpose(row.documentType)?.basis }}<span v-if="!stockDocumentPurpose(row.documentType)?.approvalAvailable">。来源业务尚未接通，禁止审核。</span></p>
-    <el-alert v-if="row.materialIssueBasisError" :title="String(row.materialIssueBasisError)" type="error" :closable="false" />
-    <details v-if="materialIssueBasis"><summary>冻结领料依据</summary><p>本次产出投入：<QuantityText :value="materialIssueBasis.outputQty" />（产出基本单位）；工单：{{ materialIssueBasis.workorderId }}</p><p>扫码原文：{{ materialIssueBasis.code }}</p><p>工艺版本ID：{{ materialIssueBasis.routingId }}；实际路径节点：{{ materialIssueBasis.routingNodeIds.join(' → ') }}</p><p>原请求UUID：{{ materialIssueBasis.requestId }}</p></details>
-    <details v-if="inputBasis"><summary>生产投入与BOM/路径依据</summary><p>工单 {{ inputBasis.workorderCode }}（{{ inputBasis.workorderId }}），Execution {{ inputBasis.executionCode }}；产出投入 <QuantityText :value="inputBasis.outputQty" />；材料出库数量请查看单据明细</p><p v-if="inputBasis.materialId">物料 {{ inputBasis.materialCode }}（{{ inputBasis.materialId }}），仓库 {{ inputBasis.warehouseId }}，单位 {{ inputBasis.unitId }}，批次 {{ inputBasis.batchNo }}</p><p v-if="inputBasis.bomId">BOM {{ inputBasis.bomId }}：基础数量 <QuantityText :value="inputBasis.bomBaseQty" />，组件数量 <QuantityText :value="inputBasis.bomComponentQty" /></p><p>路径版本 {{ inputBasis.pathRevision ?? '未记录' }}；实际节点 {{ inputBasis.routingNodeIds?.join(' → ') || '当前无可读取节点' }}</p><p>领料业务时间 {{ inputBasis.businessOccurredAt ?? '未提供' }}；投入确认 {{ inputBasis.confirmedAt ?? '未确认' }}；库存已生效 {{ inputBasis.stockApplied ? '是' : '否' }}；撤销结果 {{ inputBasis.voidResultStatus ?? '无' }}；原请求UUID {{ inputBasis.requestId }}</p><p v-if="inputBasis.pathError">{{ inputBasis.pathError }}</p></details>
-    <details v-if="row.sourceDeclarationId"><summary>质量来源</summary><p>不良记录：{{ row.sourceDeclarationId }}</p><p>处置流水：{{ row.sourceTreatmentId }}</p></details>
     <el-tag v-if="row.status" :type="row.status==='POSTED'?'success':row.status==='CANCELLED'?'info':'warning'">{{ row.status==='POSTED'?'已审核':row.status==='CANCELLED'?'已作废':'草稿' }}</el-tag>
-    <span v-if="row.documentNo">{{ row.documentNo }}</span>
+
     <el-button v-if="row.id" :disabled="intent.busy.value||cancelBusy" @click="refresh">刷新单据</el-button>
     <el-button v-if="row.status==='DRAFT'&&canCancel" type="danger" plain :disabled="dirty||!!intent.pending.value" :loading="cancelBusy" @click="cancel">作废草稿</el-button>
     <el-button v-if="canApprove" :disabled="!stockDocumentPurpose(row.documentType)?.approvalAvailable" type="primary" :loading="intent.busy.value" @click="approve">{{ intent.pending.value?'核实上次审核结果':'审核单据' }}</el-button>
     <MaterialIssueVoidAction v-if="row.documentType==='MATERIAL_ISSUE' && (materialIssueBasis || inputBasis)" :row="row" :basis="inputBasis" :refresh="refresh" :dirty="dirty" />
-    <router-link v-if="row.sourceWorkorderId" :to="{path:'/production/workorder',query:{workorderId:String(row.sourceWorkorderId)}}">查看关联工单 {{ row.sourceWorkorderId }}</router-link>
-    <p v-if="production">生产有效产出 {{ production.effective }}，累计已入库 {{ production.received }}，当前可入库 {{ production.remaining }}。{{ production.blockedReason }}</p>
-    <p v-if="basis">历史补录依据：已交接 {{ basis.handedOver }}，已实际接收 {{ basis.accepted }}，已人工补入 {{ basis.manuallyReceived }}，本次可补上限 {{ basis.remaining }}。仍须逐行填写实际清点依据。</p>
+    <router-link v-if="row.sourceWorkorderId" :to="{path:'/production/workorder',query:{workorderId:String(row.sourceWorkorderId)}}">查看关联工单</router-link>
+    <p v-if="production">可用产出 {{ production.effective }}，已入库 {{ production.received }}，当前可入库 {{ production.remaining }}。{{ production.blockedReason }}</p>
+    <p v-if="basis">补入库依据：已交接 {{ basis.handedOver }}，已实际接收 {{ basis.accepted }}，已人工补入 {{ basis.manuallyReceived }}，本次可补上限 {{ basis.remaining }}。</p>
+    <el-alert v-if="row.materialIssueBasisError" :title="String(row.materialIssueBasisError)" type="error" :closable="false" />
+    <details v-if="materialIssueBasis || inputBasis || row.sourceDeclarationId" class="document-basis">
+      <summary>来源依据</summary>
+      <p v-if="inputBasis?.workorderCode">工单：{{ inputBasis.workorderCode }}；确认投入：<QuantityText :value="inputBasis.outputQty" />；领料明细见下表。</p>
+      <p v-if="materialIssueBasis">确认投入：<QuantityText :value="materialIssueBasis.outputQty" />；扫码内容：{{ materialIssueBasis.code }}</p>
+      <p v-if="inputBasis?.batchNo">材料批次：{{ inputBasis.batchNo }}</p>
+      <p v-if="inputBasis?.confirmedAt">投入确认时间：{{ inputBasis.confirmedAt }}</p>
+      <p v-if="inputBasis?.stockApplied != null">库存生效：{{ inputBasis.stockApplied ? '已生效' : '未生效' }}</p>
+      <p v-if="inputBasis?.pathError" role="alert">{{ inputBasis.pathError }}</p>
+      <p v-if="row.sourceDeclarationId">由质量处置生成。</p>
+    </details>
     <el-alert v-if="error||intent.error.value" :title="error||intent.error.value" type="error" :closable="false" />
   </div>
 </template>
-<style scoped>.stock-document-actions{flex:1;min-width:0;max-width:100%;display:flex;align-items:center;flex-wrap:wrap;gap:8px}.stock-document-actions p{flex-basis:100%;max-width:100%;white-space:normal;overflow-wrap:anywhere;margin:var(--ui-space-1) 0}</style>
+<style scoped>.stock-document-actions{flex:1;min-width:0;max-width:100%;display:flex;align-items:center;flex-wrap:wrap;gap:8px}.document-basis{flex-basis:100%;padding:var(--ui-space-3) 0;border-top:1px solid var(--ui-border-soft)}.document-basis summary{cursor:pointer;color:var(--ui-text-secondary)}.stock-document-actions p{flex-basis:100%;max-width:100%;white-space:normal;overflow-wrap:anywhere;margin:var(--ui-space-1) 0}</style>

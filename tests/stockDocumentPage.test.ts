@@ -13,7 +13,7 @@ vi.mock('vue-router', () => ({ useRoute: () => ({ query: mocks.query }), useRout
 const Document = defineComponent({
   props: ['aggregateApi', 'headerFields', 'itemFields'],
   setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft } },
-  template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="field-documentType" :draft="draft" :disabled="false"/><slot name="field-ruleCode" :draft="draft" :disabled="false"/><slot name="field-sourceExecutionCode" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
+  template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="header-fields" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
 })
 const RouterLinkStub = defineComponent({ name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' })
 const ExecutionSelect = defineComponent({ props: ['modelValue', 'disabled', 'statuses'], emits: ['update:modelValue'], template: '<div />' })
@@ -27,7 +27,7 @@ it('creates production inbound from the ordinary menu with a selectable executio
   expect(type.findAllComponents({ name: 'ElOption' }).map(option => option.props('value'))).toContain('PRODUCTION_RECEIPT')
   expect(type.findAllComponents({ name: 'ElOption' }).map(option => option.props('value'))).not.toContain('DEFECT_RECEIPT')
   expect(type.findAllComponents({ name: 'ElOption' }).map(option => option.props('value'))).not.toContain('SCRAP_RECEIPT')
-  expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(true)
+  expect(wrapper.findComponent(ExecutionSelect).exists()).toBe(false)
   type.vm.$emit('update:modelValue', 'PRODUCTION_RECEIPT');type.vm.$emit('change', 'PRODUCTION_RECEIPT');await flushPromises()
   const state = (document.vm.$ as unknown as { setupState: { draft: Record<string, unknown> }}).setupState;state.draft.ruleCode = 'IN_RULE'
   expect(wrapper.findComponent(ExecutionSelect).props('disabled')).toBe(false)

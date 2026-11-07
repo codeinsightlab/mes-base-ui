@@ -14,7 +14,7 @@ export const stockTransfers = {
   cancel: (id: string, expectedRevision: string) => request<TransferDetail>(path(id) + '/actions/cancel', { method: 'POST', body: { expectedRevision }, scope: 'factory' })
 }
 export function transferView(pair: TransferDetail) {
-  return { header: { ...pair.outbound.document, targetDocumentId: pair.inbound.document.id, targetDocumentNo: pair.inbound.document.documentNo },
+  return { header: { ...pair.outbound.document, targetDocumentId: pair.inbound.document.id, targetDocumentNo: pair.inbound.document.documentNo, inboundLines: pair.inbound.lines },
     items: pair.outbound.lines.map(line => ({ ...line, sourceStockId: line.stockId, sourceWarehouseId: line.warehouseId, targetWarehouseId: pair.inbound.lines.find(target => target.lineNo === line.lineNo)?.warehouseId, targetStockId: pair.inbound.lines.find(target => target.lineNo === line.lineNo)?.stockId, targetBinCode: pair.inbound.lines.find(target => target.lineNo === line.lineNo)?.binCode })) }
 }
 export function transferCommand(raw: unknown): TransferCommand {

@@ -11,7 +11,7 @@ import { useAuth } from '@/stores/auth'
 import { formatQuantity } from '@/lib/quantity'
 const ElMessageBox = usePageMessageBox()
 
-const props = defineProps<{ modelValue?: string | null;materialId?: string | null;warehouseId?: string | null;disabled?: boolean;receipt?: boolean }>()
+const props = defineProps<{ modelValue?: string | null;batchNo?: string | null;binCode?: string | null;materialId?: string | null;warehouseId?: string | null;disabled?: boolean;receipt?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [string | null];selected: [WmInventoryVo, string] }>()
 const auth = useAuth(), rows = ref<WmInventoryVo[]>([]), loading = ref(false), error = ref(''), offset = ref(0), total = ref(0)
 const creating = ref(false), batch = ref(''), bin = ref('')
@@ -43,16 +43,16 @@ watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|'), p
 onBeforeUnmount(clear)
 </script>
 <template>
-  <div><el-select :model-value="modelValue" :disabled="disabled||!allowed" :loading="loading" placeholder="选择确切库存来源" clearable @visible-change="(v:boolean)=>v&&load()" @update:model-value="selected">
-         <el-option v-if="modelValue&&!rows.some(r=>r.id===modelValue)" :value="modelValue" :label="'库存 '+modelValue" />
-         <el-option v-for="r in rows" :key="r.id" :value="r.id" :label="`${r.id} · ${r.batchNo||'无批次'} / ${r.binCode||'无库位'} · 可用 ${formatQuantity(r.availableQuantity??r.quantity)}`" />
+  <div><el-select :model-value="modelValue" :disabled="disabled||!allowed" :loading="loading" placeholder="选择批次 / 库位" clearable @visible-change="(v:boolean)=>v&&load()" @update:model-value="selected">
+         <el-option v-if="modelValue&&!rows.some(r=>r.id===modelValue)" :value="modelValue" :label="`${batchNo||'无批次'} / ${binCode||'无库位'}`" />
+         <el-option v-for="r in rows" :key="r.id" :value="r.id" :label="`${r.batchNo||'无批次'} / ${r.binCode||'无库位'} · 可用 ${formatQuantity(r.availableQuantity??r.quantity)}`" />
+         <template #footer><el-button v-if="rows.length<total" link :disabled="loading" @mousedown.prevent @click="load(true)">加载更多</el-button></template>
        </el-select>
-    <el-button v-if="rows.length<total" link :disabled="loading" @click="load(true)">加载更多</el-button>
-    <el-button v-if="receipt&&allowed&&auth.hasPermission('business:wm:inventory:create','factory')" link :disabled="disabled" @click="creating=true">建立零余额来源</el-button>
+    <el-button v-if="receipt&&allowed&&auth.hasPermission('business:wm:inventory:create','factory')" link :disabled="disabled" @click="creating=true">新增批次 / 库位</el-button>
     <el-text v-if="error" type="danger">{{ error }}</el-text>
-    <PageDialog v-model="creating" title="建立零余额库存来源" width="480px" append-to-body :before-close="close" @closed="batch='';bin=''">
-      <el-alert title="这里只建立库存身份，余额为0；正式过账成功后才增加库存。" :closable="false" type="info" />
+    <PageDialog v-model="creating" title="新增批次 / 库位" width="480px" append-to-body :before-close="close" @closed="batch='';bin=''">
+      <el-alert title="新增批次和库位后，审核单据才会增加库存。" :closable="false" type="info" />
       <el-form label-position="top"><el-form-item label="实际批次"><el-input v-model="batch" maxlength="128" /></el-form-item><el-form-item label="实际库位"><el-input v-model="bin" maxlength="64" /></el-form-item></el-form>
-      <template #footer><el-button @click="close()">取消</el-button><el-button type="primary" :loading="loading" @click="create">建立来源</el-button></template>
+      <template #footer><el-button @click="close()">取消</el-button><el-button type="primary" :loading="loading" @click="create">确认</el-button></template>
     </PageDialog></div>
 </template>

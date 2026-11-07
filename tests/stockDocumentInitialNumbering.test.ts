@@ -16,7 +16,7 @@ const Document = defineComponent({
     const draft = reactive(Object.fromEntries(props.headerFields.map((field: { key: string; defaultValue?: unknown }) => [field.key, field.defaultValue ?? null])))
     return { draft, opened: ref(false) }
   },
-  template: '<section><button @click="opened=true">新增草稿</button><div v-if="opened"><slot name="field-ruleCode" :draft="draft" :disabled="false"/></div></section>'
+  template: '<section><button @click="opened=true">新增草稿</button><div v-if="opened"><slot name="header-fields" :draft="draft" :disabled="false"/></div></section>'
 })
 let wrapper: ReturnType<typeof mount> | undefined
 beforeEach(() => {
@@ -47,8 +47,8 @@ it.each([
   const state = (wrapper.findComponent(Document).vm.$ as unknown as { setupState: { draft: Record<string, unknown> }}).setupState
   expect(state.draft.documentType).toBe(type)
   expect(state.draft.ruleCode).toBe(type)
-  expect(wrapper.text()).toContain(`实际前缀 ${prefix}`)
-  expect(wrapper.text()).toContain(`本次预览 ${preview}`)
+  expect(wrapper.text()).toContain(preview)
+  expect(wrapper.text()).not.toContain('业务类型 key')
   expect(wrapper.text()).not.toContain('WRONG001')
   expect(mocks.request.mock.calls.filter(([url]) => url.endsWith('/numbering-rules'))).toEqual([
     [`/api/wm/${direction === 'IN' ? 'inbound' : 'outbound'}-documents/numbering-rules`, { scope: 'factory' }]

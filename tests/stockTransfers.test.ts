@@ -14,6 +14,7 @@ it('joins paired lines by line number and sends only transfer identity and exact
   const pair = { outbound: { document: { id: '9007199254740999', createRequestId: 'original', revision: '3', reason: '移库' }, lines: [{ id: '7', lineNo: 1, stockId: '11', materialId: '4', warehouseId: '2', quantity: '0.000001' }] }, inbound: { document: { id: '9007199254740998', documentNo: 'TI-1' }, lines: [{ lineNo: 1, stockId: '12', warehouseId: '3', binCode: ' 0001 ' }] }} as unknown as TransferDetail
   const view = transferView(pair), command = transferCommand({ ...view.header, items: view.items })
   expect(view.header.targetDocumentId).toBe('9007199254740998')
+  expect(view.header.inboundLines).toEqual(pair.inbound.lines)
   expect(command).toMatchObject({ requestId: 'original', expectedRevision: '3', items: [{ sourceStockId: '11', targetStockId: '12', targetWarehouseId: '3', targetBinCode: ' 0001 ', quantity: '0.000001' }] })
   expect(command.items[0]).not.toHaveProperty('materialId')
 })

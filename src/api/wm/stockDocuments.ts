@@ -29,6 +29,7 @@ export interface ProductionInputBasis { combinationId: string | null; allocation
   routingNodeIds: string[];businessOccurredAt: string | null;confirmedAt: string | null;stockApplied: boolean | null;voidOperationId: string | null;
   voidResultStatus: string | null;pathError: string | null
 }
+export interface LineLabel { lineId: string; materialCode: string | null; materialName: string | null; warehouseCode: string | null; warehouseName: string | null; warehouseSource: string | null; unitName: string | null }
 export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionCode: string } | null }
 export interface ProductionReceiptCommand { requestId: string; stockId: string; quantity: string; reason: string }
 export interface ApprovalIntent { requestId: string;expectedRevision: string }
@@ -43,6 +44,7 @@ const path = (id:string, direction: StockDocumentDirection = 'OUT') => root(dire
 export const stockDocuments = {
   types: (direction: StockDocumentDirection) => request<StockDocumentTypeOption[]>(root(direction) + '/types', { scope: 'factory' }),
   list: (query:Record<string, string | number>, direction:StockDocumentDirection = 'OUT') => request<{ items: Header[];total: number;offset: number;limit: number }>(root(direction), { query, scope: 'factory' }),
+  lineLabels: (id:string, direction: StockDocumentDirection, materialIssueOnly = false) => request<LineLabel[]>(path(id, direction) + '/line-labels', { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
   detail: (id:string, direction: StockDocumentDirection = 'OUT', materialIssueOnly = false) => request<Detail>(path(id, direction), { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
   byRequest: (requestId:string) => request<Detail>(root('OUT') + '/by-request/' + encodeURIComponent(requestId), { scope: 'factory' }),
   productionInputBasis: (id:string, materialIssueOnly = false) => request<ProductionInputBasis | null>(path(id) + '/production-input-basis', { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),

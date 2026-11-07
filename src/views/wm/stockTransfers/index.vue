@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import DocumentFields from '@/components/document/DocumentFields.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
+import StockActionDialog from '../stockDocuments/StockActionDialog.vue'
+import StockDocumentLines from '../stockDocuments/StockDocumentLines.vue'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
@@ -17,6 +20,7 @@ import { logPendingRequest } from '@/lib/requestDiagnostics'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import type { WmInventoryVo } from '@/api/wm/wmInventory'
 import type { CrudApi, Field, Row } from '@/lib/crud'
+const actionDialog = ref<InstanceType<typeof StockActionDialog> | null>(null)
 const document = ref<InstanceType<typeof MasterDetailDocument> | null>(null), pendingCreate = ref<TransferCommand | null>(null)
 const auth = useAuth(), message = usePageMessageBox(), error = ref(''), busy = ref(false), currentId = ref('')
 const intent = useClosureCommand<ApprovalIntent>(() => `stock-transfer-post:${auth.username}:${auth.factoryId}:${currentId.value}`)
@@ -125,11 +129,13 @@ onBeforeUnmount(clear)
 </script>
 <template>
   <div>
-    <el-alert title="本厂本地库存同步调拨：保持物料、基本单位、批次；选择源库存、目标仓库及可选库位；目标物料、基本单位、批次继承源库存。保存自动解析目标身份或建立零余额身份及双边草稿，审核原子记账。" type="info" :closable="false" />
+    <el-alert title="选择调出库存和目标仓库，审核后完成调拨。" type="info" :closable="false" />
     <el-alert v-if="error || intent.error.value" :title="error || intent.error.value" type="error" :closable="false" />
     <el-button v-if="pendingCreate" :loading="busy" @click="recoverCreate">核实上次调拨创建结果</el-button>
     <MasterDetailDocument
       ref="document"
+      presentation="dialog"
+      document-number-key="documentNo"
       :creatable="!pendingCreate"
       title="库存调拨"
       :header-api="headerApi"
@@ -146,25 +152,41 @@ onBeforeUnmount(clear)
       :items-readonly="row => readonly || !!row.status && row.status !== 'DRAFT' || !!intent.pending.value"
       :validate-aggregate-items="validate"
     >
+      <template #header-fields="{draft,disabled}">
+        <el-descriptions v-if="disabled" :column="1" border>
+          <el-descriptions-item label="调拨依据">{{ draft.reason || '—' }}</el-descriptions-item>
+          <el-descriptions-item v-if="draft.remark" label="备注">{{ draft.remark }}</el-descriptions-item>
+        </el-descriptions>
+        <DocumentFields v-else :fields="fields" :draft="draft" />
+      </template>
       <template #header-actions="{row, refresh, dirty}">
-        <span v-if="row.targetDocumentId">关联入库单 {{ row.targetDocumentNo }}（{{ row.targetDocumentId }}）</span>
+        <span v-if="row.targetDocumentId">关联入库单 {{ row.targetDocumentNo }}</span>
         <el-button v-if="row.id" :disabled="busy" @click="refresh">刷新双边单据</el-button>
         <el-button v-if="row.status==='DRAFT' && auth.hasPermission(p+':post','factory')" type="primary" :loading="busy" :disabled="dirty || readonly" @click="act(row,refresh,dirty)">{{ intent.pending.value ? '核实上次审核结果' : '审核调拨' }}</el-button>
         <el-button v-if="row.status==='DRAFT' && auth.hasPermission(p+':cancel','factory')" type="danger" plain :disabled="busy || dirty || readonly || !!intent.pending.value" @click="act(row,refresh,dirty,true)">作废草稿</el-button>
       </template>
-      <template #items="{items,writable,add,remove,saving}">
-        <el-button :disabled="!writable" @click="add({materialId:null,sourceWarehouseId:null,targetWarehouseId:null,sourceStockId:null,targetStockId:null,targetBinCode:null,quantity:'',remark:''})">添加调拨明细</el-button>
-        <el-table :data="items">
-          <el-table-column label="物料" min-width="180"><template #default="{row}"><MaterialSelect v-if="writable" v-model="row.materialId" @update:model-value="resetStock(row)" /><span v-else>{{ row.materialId }}</span></template></el-table-column>
-          <el-table-column label="源仓库 / 库存" min-width="240"><template #default="{row}"><template v-if="writable"><WarehouseSelect v-model="row.sourceWarehouseId" source="LOCAL" @update:model-value="resetStock(row)" /><StockSourceSelect v-model="row.sourceStockId" :material-id="row.materialId" :warehouse-id="row.sourceWarehouseId" @selected="(stock,unit)=>sourceSelected(row,stock,unit)" /></template><span v-else>{{ row.warehouseId }} / {{ row.sourceStockId }}</span></template></el-table-column>
-          <el-table-column label="源批次 / 基本单位" min-width="150"><template #default="{row}">{{ row.sourceStockId ? row.batchNo ?? '无批次' : '未选来源' }} / {{ row.unitId ?? '未选来源' }}</template></el-table-column>
-          <el-table-column label="目标仓库 / 库位" min-width="240"><template #default="{row}"><template v-if="writable"><WarehouseSelect v-model="row.targetWarehouseId" source="LOCAL" @update:model-value="targetWarehouseChanged(row)" /><el-input v-model="row.targetBinCode" :disabled="!!row.targetStockId" maxlength="64" placeholder="目标库位（可选）" /></template><span v-else>{{ row.targetWarehouseId }} / {{ row.targetBinCode || '无库位' }}</span></template></el-table-column>
-          <el-table-column label="已有目标库存（可选）" min-width="240"><template #default="{row}"><template v-if="writable"><StockSourceSelect v-model="row.targetStockId" :material-id="row.materialId" :warehouse-id="row.targetWarehouseId" :disabled="!row.sourceStockId" @selected="stock=>targetSelected(row,stock)" /><span class="secondary">留空时保存自动解析目标身份；无需手工预建零库存。</span></template><span v-else>{{ row.targetStockId }}</span></template></el-table-column>
-          <el-table-column label="数量（基本单位）" min-width="160"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" :material-id="row.materialId" required positive @validity="validities.set(row,$event)" /><QuantityText v-else :value="row.quantity" /></template></el-table-column>
-          <el-table-column label="备注" min-width="160"><template #default="{row}"><el-input v-if="writable" v-model="row.remark" maxlength="500" /><span v-else>{{ row.remark }}</span></template></el-table-column>
-          <el-table-column v-if="writable" label="操作" width="80"><template #default="{$index}"><el-button link type="danger" :disabled="saving" @click="remove($index)">移除</el-button></template></el-table-column>
-        </el-table>
+      <template #items="{header,items,writable,add,remove,saving}">
+        <template v-if="!writable">
+          <h3>调出明细</h3>
+          <StockDocumentLines :header="{...header,direction:'OUT'}" :items="items" :writable="false" :saving="false" :can-issue-line="false" :original-lines="new Map()" @show-action="id=>actionDialog?.open(id)" />
+          <h3>调入明细</h3>
+          <StockDocumentLines :header="{id:header.targetDocumentId,direction:'IN',revision:header.revision}" :items="(header.inboundLines as Row[]) || []" :writable="false" :saving="false" :can-issue-line="false" :original-lines="new Map()" @show-action="id=>actionDialog?.open(id)" />
+        </template>
+        <template v-else>
+          <el-button :disabled="!writable" @click="add({materialId:null,sourceWarehouseId:null,targetWarehouseId:null,sourceStockId:null,targetStockId:null,targetBinCode:null,quantity:'',remark:''})">添加调拨明细</el-button>
+          <el-table :data="items">
+            <el-table-column label="物料" min-width="340"><template #default="{row}"><MaterialSelect v-if="writable" v-model="row.materialId" @update:model-value="resetStock(row)" /><span v-else>{{ row.materialId }}</span></template></el-table-column>
+            <el-table-column label="调出仓库 / 批次" min-width="280"><template #default="{row}"><template v-if="writable"><WarehouseSelect v-model="row.sourceWarehouseId" source="LOCAL" @update:model-value="resetStock(row)" /><StockSourceSelect v-model="row.sourceStockId" :material-id="row.materialId" :warehouse-id="row.sourceWarehouseId" :batch-no="row.batchNo" :bin-code="row.binCode" @selected="(stock,unit)=>sourceSelected(row,stock,unit)" /></template><span v-else>{{ row.warehouseId }} / {{ row.sourceStockId }}</span></template></el-table-column>
+            <el-table-column label="调出批次" min-width="150"><template #default="{row}">{{ row.sourceStockId ? row.batchNo ?? '无批次' : '未选来源' }}</template></el-table-column>
+            <el-table-column label="目标仓库 / 库位" min-width="240"><template #default="{row}"><template v-if="writable"><WarehouseSelect v-model="row.targetWarehouseId" source="LOCAL" @update:model-value="targetWarehouseChanged(row)" /><el-input v-model="row.targetBinCode" :disabled="!!row.targetStockId" maxlength="64" placeholder="目标库位（可选）" /></template><span v-else>{{ row.targetWarehouseId }} / {{ row.targetBinCode || '无库位' }}</span></template></el-table-column>
+            <el-table-column label="已有目标库存（可选）" min-width="240"><template #default="{row}"><template v-if="writable"><StockSourceSelect v-model="row.targetStockId" :material-id="row.materialId" :warehouse-id="row.targetWarehouseId" :batch-no="row.batchNo" :bin-code="row.targetBinCode" :disabled="!row.sourceStockId" @selected="stock=>targetSelected(row,stock)" /><span class="secondary">留空时按目标仓库、批次和库位自动匹配。</span></template><span v-else>{{ row.targetStockId }}</span></template></el-table-column>
+            <el-table-column label="数量" min-width="320"><template #default="{row}"><QuantityInput v-if="writable" v-model="row.quantity" show-unit :material-id="row.materialId" required positive @validity="validities.set(row,$event)" /><QuantityText v-else :value="row.quantity" /></template></el-table-column>
+            <el-table-column label="备注" min-width="160"><template #default="{row}"><el-input v-if="writable" v-model="row.remark" maxlength="500" /><span v-else>{{ row.remark }}</span></template></el-table-column>
+            <el-table-column v-if="writable" label="操作" width="80"><template #default="{$index}"><el-button link type="danger" :disabled="saving" @click="remove($index)">移除</el-button></template></el-table-column>
+          </el-table>
+        </template>
       </template>
     </MasterDetailDocument>
+    <StockActionDialog ref="actionDialog" />
   </div>
 </template>

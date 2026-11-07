@@ -32,7 +32,7 @@ it('freezes original post UUID/revision across UNKNOWN and later 403; scope chan
   let release!:(v:unknown) => void;mocks.request.mockImplementationOnce(() => new Promise(r => release = r));const waiting = s.approve();await flushPromises();auth.factoryId = 'B';await flushPromises();release({});await waiting;expect(refresh).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
 })
 it('query permission cannot post; unsaved header blocks new commands', async() => {
-  const { s, auth } = setup(false);await s.approve();expect(mocks.request).not.toHaveBeenCalled();auth.factoryPermissions.push('business:wm:stock:document:post');await wrapper!.setProps({ dirty: true });await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('保存主单')
+  const { s, auth } = setup(false);await s.approve();expect(mocks.request).not.toHaveBeenCalled();auth.factoryPermissions.push('business:wm:stock:document:post');await wrapper!.setProps({ dirty: true });await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('保存草稿')
 })
 it('saves one aggregate command with exact quantities and server-owned parent identity', async() => {
   const { aggregateApi } = stockDocumentApis()
@@ -79,7 +79,7 @@ it('keeps the safe material issue basis visible to the draft approver without ex
   const { aggregateApi } = stockDocumentApis();mocks.request.mockResolvedValue({ document: { id: '1', documentType: 'MATERIAL_ISSUE' }, lines: [], materialIssueBasis: basis })
   const { header } = await aggregateApi.detail('1');expect(header.materialIssueBasis).toEqual(basis);expect(header).not.toHaveProperty('sourceRequestJson')
   const { s } = setup();await wrapper!.setProps({ row: { ...header, status: 'DRAFT', revision: '0' }});await flushPromises()
-  expect(wrapper!.text()).toContain('10');expect(wrapper!.text()).toContain('11 → 12');expect(wrapper!.text()).toContain('WO:M#0001')
+  expect(wrapper!.text()).toContain('10');expect(wrapper!.text()).not.toContain('11 → 12');expect(wrapper!.text()).toContain('WO:M#0001')
   expect(s.materialIssueBasis.code).toBe('WO:M#0001 ')
 })
 
@@ -89,7 +89,7 @@ it('shows an unreadable material issue basis as a local error while preserving t
   const { header, items } = await aggregateApi.detail('1')
   expect(header.documentNo).toBe('QA-RAW');expect(header.reason).toBe('原始依据');expect(items).toEqual(raw.lines)
   const { s, auth } = setup();auth.factoryPermissions.push('business:mes:material:issue:update', 'business:wm:stock:document:create', 'business:wm:stock:document:update')
-  await wrapper!.setProps({ row: header });await flushPromises();expect(wrapper!.text()).toContain('冻结领料依据无法解析');expect(wrapper!.text()).toContain('QA-RAW')
+  await wrapper!.setProps({ row: header });await flushPromises();expect(wrapper!.text()).toContain('冻结领料依据无法解析')
   expect(s.materialIssueBasis).toBeNull();expect(s.canApprove).toBe(false)
   mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
 })

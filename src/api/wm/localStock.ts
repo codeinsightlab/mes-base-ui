@@ -17,6 +17,7 @@ export const stockOperations: { value: StockOperation; label: string }[] = [
   { value: 'correction', label: '业务纠错（有符号增减量）' }, { value: 'return', label: '生产退料' }
 ]
 export const localStock = {
+  action: (id: string) => request<StockAction>('/api/wm/wm-stock-action/' + encodeURIComponent(id), { scope: 'factory' }),
   execute: (operation: StockOperation, body: StockCommand) => request<StockAction>('/api/wm/local-stock/' + operation, { method: 'POST', body, scope: 'factory' }),
   actions: (stockId: string, offset = 0) => request<{ items: StockAction[]; total: number }>('/api/wm/wm-stock-action', { query: { stockId, offset, limit: 20 }, scope: 'factory' })
 }

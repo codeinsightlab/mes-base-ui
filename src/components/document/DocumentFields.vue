@@ -6,7 +6,7 @@ defineEmits<{ submit: [] }>()
 <template>
   <el-form label-position="top" class="form-grid" :disabled="disabled" @submit.prevent="$emit('submit')">
     <el-form-item
-      v-for="field in fields.filter(f => !f.readonly && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value))"
+      v-for="field in fields.filter(f => !f.hidden && !f.readonly && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value))"
       :key="field.key"
       :label="field.label"
       :required="field.required"

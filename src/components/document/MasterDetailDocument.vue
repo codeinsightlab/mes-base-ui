@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import CrudPage from '@/components/CrudPage.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import PageDialog from '@/components/page/PageDialog.vue'
 import DocumentFields from './DocumentFields.vue'
 import { commandFromDraft } from '@/lib/crud'
 import type { CrudApi, Field, Row } from '@/lib/crud'
@@ -13,6 +14,8 @@ const ElMessageBox = usePageMessageBox()
 const emit = defineEmits<{ back: [] }>()
 
 const props = withDefaults(defineProps<{
+  presentation?: 'page' | 'dialog';
+  documentNumberKey?: string;
   creatable?: boolean;
   deletable?: boolean;
   title: string; headerApi: Omit<CrudApi, 'create' | 'update'> & { create(body:unknown):Promise<Row>; update(id:string, body:unknown):Promise<Row> }; itemApi: CrudApi;
@@ -32,7 +35,8 @@ const props = withDefaults(defineProps<{
   itemsReadonlyWhenDirty?: boolean;
   itemVersionField?: string;
   itemBeforeCreate?: () => Promise<Row | null>;
-}>(), { creatable: true, deletable: true, headerActionColumnWidth: 180 })
+}>(), { presentation: 'page', creatable: true, deletable: true, headerActionColumnWidth: 180 })
+const list = ref<InstanceType<typeof CrudPage> | null>(null)
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
 const draft = reactive<Row>({})
@@ -69,14 +73,24 @@ function clear() {
   savedDraft = snapshot()
 }
 async function back() {
+  if (saving.value) return
   const current = generation
   if (snapshot() !== savedDraft) {
     try {
-      await ElMessageBox.confirm('主单有未保存的修改，确认返回列表并放弃这些修改？', '未保存的修改', { confirmButtonText: '放弃修改', cancelButtonText: '继续编辑', type: 'warning' })
+      await ElMessageBox.confirm('有未保存的修改，确认关闭并放弃修改？', '未保存的修改', { confirmButtonText: '放弃修改', cancelButtonText: '继续编辑', type: 'warning' })
     } catch { return }
   }
-  if (current === generation) { clear(); emit('back') }
+  if (current === generation) { clear(); emit('back'); if (props.presentation === 'dialog') void list.value?.load() }
 }
+async function closeDialog(done: () => void) {
+  await back()
+  if (!opened.value) done()
+}
+const editorTitle = computed(() => {
+  if (!id.value) return '新增' + props.title
+  const number = props.documentNumberKey && draft[props.documentNumberKey]
+  return number ? props.title + ' · ' + number : props.title
+})
 async function open(row?: Row) {
   if (row ? !can('query') : props.creatable === false || !can('create')) return
   clear()
@@ -159,7 +173,7 @@ async function save() {
       Object.assign(draft, header)
     }
     savedDraft = snapshot()
-    ElMessage.success(atomic.value ? '单据及明细已原子保存' : '主单已保存')
+    ElMessage.success('单据已保存')
   } catch(reason) {
     if (current === generation) error.value = reason instanceof Error ? reason.message : '主单保存失败'
   } finally {
@@ -187,7 +201,8 @@ onBeforeUnmount(clear)
 </script>
 <template>
   <CrudPage
-    v-if="!opened"
+    v-if="presentation === 'dialog' || !opened"
+    ref="list"
     :title="title"
     :api="headerApi"
     :fields="headerFields"
@@ -204,53 +219,73 @@ onBeforeUnmount(clear)
     <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
     <template #actions="{ row, refresh }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" :refresh="refresh" /></template>
   </CrudPage>
-  <section v-else class="app-container">
-    <PageHeader :title="title" :description="id ? '单据编号 ' + id : '新增单据'">
-      <template #status><slot name="header-actions" :row="draft" :refresh="refresh" :dirty="snapshot() !== savedDraft" /></template>
-      <el-button :disabled="saving" @click="back">返回列表</el-button>
-      <el-button v-if="deletable && id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除主单</el-button>
-      <el-button v-if="writable" type="primary" :loading="saving" :disabled="loading" @click="save">保存主单</el-button>
-    </PageHeader>
-    <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
-    <section v-loading="loading" class="panel document-header" aria-label="主单信息">
-      <h2>主单信息</h2>
-      <DocumentFields :fields="headerFields" :draft="draft" :disabled="!writable || loading || saving" @submit="save">
-        <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
-      </DocumentFields>
-    </section>
-    <section class="panel document-items" aria-label="单据明细">
-      <h2>单据明细</h2>
-      <template v-if="atomic">
-        <el-alert v-if="!writable" title="当前单据只读。" type="info" :closable="false" />
-        <slot name="items" :header="draft" :items="aggregateItems" :writable="writable && !itemsReadonly?.(draft) && !loading && !saving" :saving="saving" :add="(row: Row) => aggregateItems.push(row)" :remove="(index: number) => aggregateItems.splice(index, 1)" />
-      </template>
-      <template v-else>
-        <el-alert v-if="!id" title="先保存主单，再新增明细。" type="info" :closable="false" />
-        <CrudPage
-          v-else
-          :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
-          embedded
-          :hide-refresh="hideItemRefresh"
-          :readonly="readonly || !!itemsReadonly?.(draft) || !!itemsReadonlyWhenDirty && snapshot() !== savedDraft"
-          title="明细"
-          :api="itemApi"
-          :fields="itemFields"
-          :permission="itemPermission"
-          :permission-overrides="itemPermissionOverrides"
-          permission-scope="factory"
-          list-action="list"
-          detail-action="query"
-          :fixed-values="fixedValues"
-          :before-create="itemBeforeCreate"
-          :table-key="itemTableKey"
-        >
-          <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
-        </CrudPage>
-      </template>
-    </section>
-  </section>
+  <component
+    :is="presentation === 'dialog' ? PageDialog : 'section'"
+    v-if="opened"
+    v-bind="presentation === 'dialog' ? {modelValue:opened,title:editorTitle,beforeClose:closeDialog,width:'min(1680px, 96vw)',top:'4vh'} : {}"
+    :class="presentation === 'dialog' ? 'document-dialog' : 'app-container'"
+    @update:model-value="(value: boolean) => { if (!value) clear() }"
+  >
+    <div :class="{ 'document-dialog-content': presentation === 'dialog' }">
+      <PageHeader v-if="presentation !== 'dialog'" :title="title" :description="id ? '单据编号 ' + id : '新增单据'">
+        <template #status><slot name="header-actions" :row="draft" :refresh="refresh" :dirty="snapshot() !== savedDraft" /></template>
+        <el-button :disabled="saving" @click="back">返回列表</el-button>
+        <el-button v-if="deletable && id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除主单</el-button>
+        <el-button v-if="writable" type="primary" :loading="saving" :disabled="loading" @click="save">保存主单</el-button>
+      </PageHeader>
+      <div v-if="presentation === 'dialog'" class="document-context"><slot name="header-actions" :row="draft" :refresh="refresh" :dirty="snapshot() !== savedDraft" /></div>
+      <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
+      <section v-loading="loading" class="panel document-header" aria-label="主单信息">
+        <h2>{{ presentation === 'dialog' ? '基本信息' : '主单信息' }}</h2>
+        <slot name="header-fields" :draft="draft" :disabled="!writable || loading || saving">
+          <DocumentFields :fields="headerFields" :draft="draft" :disabled="!writable || loading || saving" @submit="save">
+            <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
+          </DocumentFields>
+        </slot>
+      </section>
+      <section class="panel document-items" aria-label="单据明细">
+        <h2>单据明细</h2>
+        <template v-if="atomic">
+          <el-alert v-if="!writable && presentation !== 'dialog'" title="当前单据只读。" type="info" :closable="false" />
+          <slot name="items" :header="draft" :items="aggregateItems" :writable="writable && !itemsReadonly?.(draft) && !loading && !saving" :saving="saving" :add="(row: Row) => aggregateItems.push(row)" :remove="(index: number) => aggregateItems.splice(index, 1)" />
+        </template>
+        <template v-else>
+          <el-alert v-if="!id" title="先保存主单，再新增明细。" type="info" :closable="false" />
+          <CrudPage
+            v-else
+            :key="id + (itemVersionField ? ':' + draft[itemVersionField] : '')"
+            embedded
+            :hide-refresh="hideItemRefresh"
+            :readonly="readonly || !!itemsReadonly?.(draft) || !!itemsReadonlyWhenDirty && snapshot() !== savedDraft"
+            title="明细"
+            :api="itemApi"
+            :fields="itemFields"
+            :permission="itemPermission"
+            :permission-overrides="itemPermissionOverrides"
+            permission-scope="factory"
+            list-action="list"
+            detail-action="query"
+            :fixed-values="fixedValues"
+            :before-create="itemBeforeCreate"
+            :table-key="itemTableKey"
+          >
+            <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
+          </CrudPage>
+        </template>
+      </section>
+      <div v-if="presentation === 'dialog'" class="document-commands">
+        <el-button :disabled="saving" @click="back">{{ presentation === 'dialog' ? '关闭' : '返回列表' }}</el-button>
+        <el-button v-if="deletable && id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除单据</el-button>
+        <el-button v-if="writable" type="primary" :loading="saving" :disabled="loading" @click="save">{{ presentation === 'dialog' ? '保存草稿' : '保存主单' }}</el-button>
+      </div>
+    </div>
+  </component>
 </template>
 <style scoped>
+.document-dialog-content { max-height: 78vh; overflow: auto; }
+.document-context { margin-bottom: var(--ui-space-4); }
+.document-context:empty { display: none; }
+.document-commands { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: flex-end; gap: var(--ui-space-2); padding: var(--ui-space-4) 0 0; background: var(--mes-bg-surface); border-top: 1px solid var(--ui-border); }
 .document-header, .document-items { margin-bottom: 16px; padding: 16px; }
 h2 { margin: 0 0 16px; font-size: 16px; }
 .document-header :deep(.form-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
