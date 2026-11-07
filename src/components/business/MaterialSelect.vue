@@ -1,98 +1,58 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
+import SearchSelect from '@/components/SearchSelect.vue'
+import { useRemoteOptions, type SearchOption } from '@/composables/useRemoteOptions'
 import { api, type MaterialVo } from '@/api/basic/material'
 import { useAuth } from '@/stores/auth'
 
 const props = defineProps<{ modelValue?: string | null; disabled?: boolean; status?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 const auth = useAuth()
-const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching
-  && auth.hasPermission('business:material:list', 'factory'))
-const rows = ref<MaterialVo[]>([])
-const selected = ref<MaterialVo | null>(null)
-const loading = ref(false)
-const error = ref('')
-const keyword = ref('')
-const total = ref(0)
-let version = 0
-let detailVersion = 0
-const options = computed(() => selected.value && !rows.value.some(row => row.id === selected.value?.id)
-  ? [selected.value, ...rows.value] : rows.value)
-async function search(value: string, more = false) {
-  if (!allowed.value) return
-  const current = ++version
-  keyword.value = value
-  if (!more) rows.value = []
-  loading.value = true
-  error.value = ''
-  try {
-    const result = await api.list({ keyword: value, ...(props.status ? { status: props.status } : {}), offset: more ? rows.value.length : 0, limit: 20 })
-    if (current !== version) return
-    rows.value = more ? [...rows.value, ...result.items] : result.items
-    total.value = result.total
-  } catch(reason) {
-    if (current === version) error.value = reason instanceof Error ? reason.message : '物料查询失败'
-  } finally {
-    if (current === version) loading.value = false
+const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission('business:material:list', 'factory'))
+function toOption(row: MaterialVo): SearchOption<MaterialVo> {
+  return { value: String(row.id), label: `${row.code} · ${row.name}`, data: row }
+}
+const { items, selected, loading, resolving, error, resolveError, hasMore, search, scheduleSearch, loadMore, retry, open, hydrate, reset } = useRemoteOptions<MaterialVo>({
+  modelValue: () => props.modelValue,
+  enabled: () => allowed.value,
+  disabled: () => !!props.disabled,
+  search: async({ keyword, offset, limit }) => {
+    const page = await api.list({ keyword: keyword, offset, limit, ...(props.status ? { status: props.status } : {}) })
+    return { items: page.items.map(toOption), total: page.total, nextOffset: offset + page.items.length }
+  },
+  resolve: async value => {
+    if (!auth.hasPermission('business:material:query', 'factory')) return null
+    return toOption(await api.detail(value))
   }
-}
-async function hydrate() {
-  error.value = ''
-  const current = ++detailVersion
-  selected.value = null
-  if (!props.modelValue || !allowed.value) return
-  const cached = rows.value.find(row => row.id === props.modelValue)
-  if (cached) { selected.value = cached; return }
-  if (!auth.hasPermission('business:material:query', 'factory')) return
-  try {
-    const row = await api.detail(props.modelValue)
-    if (current === detailVersion) selected.value = row
-  } catch(reason) {
-    if (current === detailVersion) error.value = reason instanceof Error ? reason.message : '物料回显失败'
-  }
-}
-function clear() {
-  version++
-  detailVersion++
-  rows.value = []
-  selected.value = null
-  loading.value = false
-  error.value = ''
-  total.value = 0
-}
-watch(() => [auth.factoryId, auth.revision, allowed.value], (_, previous) => {
-  clear()
+})
+let contextVersion = 0
+watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), allowed.value, props.status], async(_, previous) => {
+  const current = ++contextVersion
+  reset()
   if (previous && props.modelValue) emit('update:modelValue', null)
+  if (previous) await nextTick()
+  if (current !== contextVersion) return
   if (allowed.value) { if (!props.disabled) void search(''); void hydrate() }
-}, { immediate: true })
-watch(() => props.modelValue, hydrate)
-onBeforeUnmount(clear)
+}, { immediate: true, flush: 'sync' })
 </script>
 
 <template>
-  <div class="material-select">
-    <span v-if="disabled" class="reference-text" :title="selected ? `${selected.code} · ${selected.name}` : modelValue || ''">{{ selected ? `${selected.code} · ${selected.name}` : modelValue ? `待确认（${modelValue}）` : '—' }}</span>
-    <el-select
-      v-else
-      :model-value="modelValue"
-      clearable
-      filterable
-      remote
-      :remote-method="search"
-      :loading="loading"
-      :disabled="!allowed || disabled"
-      placeholder="搜索物料名称"
-      @update:model-value="!disabled && emit('update:modelValue', $event || null)"
-    >
-      <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name}`" :value="row.id" />
-      <template #footer><el-button v-if="rows.length < total" link :disabled="loading || disabled" @mousedown.prevent @click="search(keyword, true)">加载更多</el-button></template>
-    </el-select>
-    <el-button v-if="error" link type="danger" @click="disabled ? hydrate() : search(keyword)">{{ error }}，重试</el-button>
-  </div>
+  <SearchSelect
+    :model-value="modelValue"
+    :options="items"
+    :selected-option="selected"
+    :disabled="disabled || !allowed"
+    :loading="loading"
+    :resolving="resolving"
+    :has-more="hasMore"
+    :error="error"
+    :resolve-error="resolveError"
+    placeholder="搜索物料名称"
+    @update:model-value="emit('update:modelValue', $event)"
+    @search="scheduleSearch"
+    @load-more="loadMore"
+    @retry="retry"
+    @resolve-retry="hydrate"
+    @open="open"
+  />
 </template>
-
-<style scoped>
-.material-select { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
-.reference-text { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
-.material-select :deep(.el-select) { flex: 1; min-width: 0; }
-</style>

@@ -25,7 +25,7 @@
 | 供应商 `SupplierSelect` | [SupplierSelect.vue](../src/components/business/SupplierSelect.vue) | 供应商ID、禁用状态及状态筛选；远程分页、跨页回显和切厂/撤权保护；新采购使用启用筛选，历史单据名称由单据快照呈现 | 供应商报价、采购入库 |
 | 采购成交价 `PurchasePriceInput` | [PurchasePriceInput.vue](../src/components/business/purchase/PurchasePriceInput.vue) | 当前采购单头和明细；按供应商/物料/业务日期读取参考价，仅空成交价自动带出；金额由服务端核算，迟到响应随工厂和输入失效，只读显示已存快照 | 采购入库明细 |
 | 仓库 `WarehouseSelect` | [WarehouseSelect.vue](../src/components/business/WarehouseSelect.vue) | 仓库ID、可信来源及已有历史读取语义；保留LOCAL/EXTERNAL来源约束，不由页面另写候选算法 | [工单用料](../src/components/business/production/WorkorderMaterialPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
-| 库存来源 `StockSourceSelect` | [StockSourceSelect.vue](../src/components/business/warehouse/StockSourceSelect.vue) | 当前物料、仓库和库存身份；选择具体库存来源，不等同于选择仓库或选择物料 | [库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
+| 库存来源 `StockSourceSelect` | [StockSourceSelect.vue](../src/components/business/warehouse/StockSourceSelect.vue) | 当前物料、仓库和库存身份；选择具体库存来源，使用批次、库位及可用数量呈现，不显示库存主键；已选批次/库位可用于回显，新增批次/库位仍复用原受控入口，不等同于选择仓库或选择物料 | [库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 工作站 `WorkstationSelect` | [WorkstationSelect.vue](../src/components/business/WorkstationSelect.vue) | 工作站ID；共享检索、分页和回显；页面不根据设备/报工用途重复实现同义工作站选择 | [设备维护](../src/views/basic/equipment/index.vue) |
 | 客户 `CustomerSelect` | [CustomerSelect.vue](../src/components/business/CustomerSelect.vue) | 客户ID、禁用状态；统一远程搜索、分页、回显和错误处理 | [销售订单](../src/views/sales/order/index.vue) |
 | 业务人员 `PersonnelSelect` | [PersonnelSelect.vue](../src/components/business/directory/PersonnelSelect.vue) | 引用sys_user ID；统一人员目录包装，不代表独立Personnel主数据，不以目录代替工序资格或派工校验 | [质量记录](../src/views/quality/productionDefect/index.vue) |
@@ -46,11 +46,49 @@
 
 状态、范围、HTTP方法及指标的纯视觉展示沿用[设计规范的公共实现](UI_DESIGN_SYSTEM.md#页面结构与公共实现)，不在业务页面另建配色或状态语义。
 
+## 检索选择输入的统一实现
+
+新增或调整检索型选择输入时，优先采用以下三层结构。页面优先使用已有业务选择器；已有业务选择器内部复用公共层，不在每个页面重复配置 API 或权限。
+
+- **UI：** [SearchSelect.vue](../src/components/SearchSelect.vue) 是受控单选组件，只接收选项、已选项、加载/错误状态并发出事件；不调用 API、不读取业务 Store。选项统一为 `{ value: string, label: string, disabled?: boolean }`；可附带 `data` 供业务层使用，UI 不解释它。
+- **行为：** [useRemoteOptions.ts](../src/composables/useRemoteOptions.ts) 通过外部 `search/resolve` 函数统一搜索防抖、分页位置、去重、回显、失败原页重试和请求竞态。列表和回显独立管理；分页位置依据回调返回的 `nextOffset`，不能依据过滤后或去重后的选项数量推进。
+- **业务：** 外部 Vue 提供接口调用、参数、业务过滤和选项转换，管理权限、来源、选中事件及上下文重置。业务上下文变化时同步 `reset()`，按业务规则清除已选值后再读取，不能让旧上下文的数据回填。
+
+`search({ keyword, offset, limit })` 返回 `{ items, total, nextOffset }`；`resolve(value)` 返回一个选项或合法 `null`，读取失败应抛错，不能返回空值伪装成功。保持 ID 字符串精度；详情权限与列表权限在业务层分别检查。首批候选由业务层初始化，或通过 UI 的 `open` 事件按需加载。
+
+UI 固定使用面板内分页：“加载更多”只在有下一页时出现，加载中禁止重复翻页；列表失败在面板内显示原错误与重试，保留已读候选。`disabled` 时显示可换行的已选文本及完整 title，不显示候选或分页、不查询候选；允许单独读取和重试已选项回显。缺值显示“—”，有值但无法回显显示“待确认（值）”，不以空白冒充成功。
+
+使用行为层时，将返回的 refs 解构后绑定，避免模板中的嵌套 ref 被误当作普通值：
+
+```vue
+<script setup lang="ts">
+// searchOptions/resolveOption 由业务 Vue 实现；enabled/disabled 由业务上下文决定。
+const { items, selected, loading, resolving, error, resolveError, hasMore,
+  scheduleSearch, loadMore, retry, hydrate, open, reset } = useRemoteOptions({
+  modelValue: () => props.modelValue,
+  enabled: () => allowed.value,
+  disabled: () => !!props.disabled,
+  search: searchOptions,
+  resolve: resolveOption,
+})
+</script>
+<template>
+  <SearchSelect :model-value="modelValue" :options="items" :selected-option="selected"
+    :disabled="disabled || !allowed" :loading="loading" :resolving="resolving"
+    :has-more="hasMore" :error="error" :resolve-error="resolveError"
+    @update:model-value="choose" @search="scheduleSearch" @load-more="loadMore"
+    @retry="retry" @resolve-retry="hydrate" @open="open" />
+</template>
+```
+
+普通物料、单位、仓库、供应商、客户、工作站、业务目录和BOM版本选择器已复用上述公共 UI 与行为。特殊流程可以复用 UI 并保留自己的状态编排；不得为了接入而放宽候选合法性或业务准入。当前组件只覆盖单选检索，不承诺多选、自由输入、树选择、扫码和复杂库存动作已统一；不为尚无真实用例的场景新增通用开关。
+
 ## 基础表单控件
 
 | 通用内容 / 组件 | 权威源码 | 规则边界 / 使用位置 |
 | --- | --- | --- |
 | 表单必填与长度校验 | [formValidation.ts](../src/lib/formValidation.ts) | 用于表单字段的必填、最大长度及按顺序返回首个错误；输入组件自己的业务校验仍由对应组件负责 |
+| 检索选择 `SearchSelect` / `useRemoteOptions` | [SearchSelect.vue](../src/components/SearchSelect.vue)、[useRemoteOptions.ts](../src/composables/useRemoteOptions.ts) | 检索型单选输入的首选公共实现；UI、异步行为、业务编排分层，详见上节 |
 | 字典选择 `DictSelect` | [DictSelect.vue](../src/components/DictSelect.vue) | 以字典code和值驱动，复用公共字典读取及错误状态；例如系统用户表单。不要用于替代有独立业务API的单位或物料选择 |
 | 字典值展示 `DictTag` | [DictTag/index.vue](../src/components/DictTag/index.vue) | 共享字典值/标签与状态展示；通过systemPlugin全局注册，不能因页面没有显式import判为未使用 |
 | 树选择 `Treeselect` | [Treeselect/index.vue](../src/components/Treeselect/index.vue) | 统一树控件适配；系统用户、菜单和部门页面提供各自真实树数据，控件不决定业务授权 |
@@ -64,7 +102,7 @@
 
 ## 已知统一缺口
 
-- **分页交互：** 单位、物料的分页已收进下拉面板；仓库、工作站、客户等选择器已有分页，但多处“加载更多”在下拉面板外。这是现状，不是推荐设计；应在组件层统一面板内分页交互，保留完整检索、失败重试和迟到响应保护，不能简单只取第一页或改成无界全量加载。
+- **分页交互：** 上述八类选择器已统一使用 SearchSelect 的面板内分页。库存来源选择及生产人员等特殊流程仍有独立实现，后续调整时优先接入公共 UI，保留各自业务编排；不能只取第一页或改成无界全量加载。
 - **单位回显：** 物料页仍有独立loadUnitNames查询；已复用单位选择器不等于所有单位名称读取都已统一。后续按统一引用读取与缓存规则治理，不再复制页面查询。
 - **物料对话框：** BOM面板内部仍使用MaterialPicker，与公共MaterialSelect的交互/读取需要核对并统一同义规则。该局部实现不作为另一个推荐公共入口，不能未经边界分析就复制到新页面。
 - **执行选择：** ExecutionSelect与ProductionExecutionSelect尚未统一；先明确记录查询、单据选择、可信状态候选和扫码定位的差异，再收敛共同选择能力。不能仅为减少文件而删除必要准入，也不能以不同组件名长期维护相同业务规则。

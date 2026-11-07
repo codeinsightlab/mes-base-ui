@@ -15,7 +15,7 @@ async function setup(disabled = false) {
   auth.factoryId = 'A'; auth.factoryPermissions = ['business:unit:measure:list', 'business:unit:measure:query']
   calls.list.mockResolvedValue({ items: [{ id: '1', code: '02', name: 'PCS' }], total: 21 })
   calls.detail.mockResolvedValue({ id: '1', code: '02', name: 'PCS' })
-  wrapper = mount(UnitSelect, { props: { modelValue: '1', disabled }, global: { plugins: [pinia, ElementPlus] } })
+  wrapper = mount(UnitSelect, { props: { modelValue: '1', disabled }, global: { plugins: [pinia, ElementPlus] }})
   await flushPromises(); return auth
 }
 it('shows a disabled unit as text without querying candidates or displaying pagination', async() => {
@@ -29,7 +29,9 @@ it('keeps pagination inside the dropdown and retains the search term', async() =
   await setup()
   const select = wrapper.findComponent({ name: 'ElSelect' })
   await select.find('.el-select__wrapper').trigger('click'); await flushPromises()
-  await select.props('remoteMethod')('件'); await flushPromises()
+  vi.useFakeTimers()
+  select.props('remoteMethod')('件'); await vi.advanceTimersByTimeAsync(300); await flushPromises()
+  vi.useRealTimers()
   const footer = document.querySelector('.el-select-dropdown__footer')!
   expect(footer?.textContent).toContain('加载更多')
   ;(footer.querySelector('button') as HTMLButtonElement).click(); await flushPromises()

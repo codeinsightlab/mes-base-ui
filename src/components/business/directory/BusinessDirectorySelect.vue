@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
+import SearchSelect from '@/components/SearchSelect.vue'
+import { useRemoteOptions, type SearchOption } from '@/composables/useRemoteOptions'
 import { directoryPermissions, getDirectory, listDirectory } from '@/api/business/directory'
 import type { DirectoryOption, DirectoryResource } from '@/api/business/directory'
 import { useAuth } from '@/stores/auth'
@@ -17,127 +19,62 @@ const emit = defineEmits<{
   change: [value: DirectoryOption | null]
 }>()
 const auth = useAuth()
-const canRead = computed(() => !!auth.factoryId && !auth.factorySwitching
-  && auth.hasPermission(directoryPermissions[props.resource], 'factory'))
-const options = ref<DirectoryOption[]>([])
-const selected = ref<DirectoryOption | null>(null)
-const keyword = ref('')
-const total = ref(0)
-const offset = ref(0)
-const loading = ref(false)
-const error = ref('')
-let listVersion = 0
-let detailVersion = 0
-const visibleOptions = computed(() => selected.value && !options.value.some(row => row.id === selected.value?.id)
-  ? [selected.value, ...options.value] : options.value)
-function choose(value: string | undefined) {
-  const row = visibleOptions.value.find(item => item.id === value) ?? null
-  selected.value = row
-  emit('update:modelValue', row?.id ?? null)
-  emit('change', row)
+const canRead = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission(directoryPermissions[props.resource], 'factory'))
+function toOption(row: DirectoryOption): SearchOption<DirectoryOption> {
+  return { value: row.id, label: row.code ? row.name + '（' + row.code + (row.version != null ? ' · V' + row.version : '') + '）' : row.name, data: row }
 }
-async function search(value: string, more = false) {
-  if (!canRead.value) return
-  const version = ++listVersion
-  keyword.value = value
-  if (!more) {
-    options.value = []
-    total.value = 0
-    offset.value = 0
-  }
-  loading.value = true
-  error.value = ''
-  try {
-    const page = await listDirectory(props.resource, value, more ? offset.value : 0, props.departmentId)
-    if (version !== listVersion) return
-    options.value = more ? [...options.value, ...page.items] : page.items
-    total.value = page.total
-    offset.value = page.offset + page.items.length
-  } catch(reason) {
-    if (version === listVersion) error.value = reason instanceof Error ? reason.message : '查询失败，请重试'
-  } finally {
-    if (version === listVersion) loading.value = false
-  }
+const { items, selected, loading, resolving, error, resolveError, hasMore, search, scheduleSearch, loadMore, retry, open, hydrate, reset } = useRemoteOptions<DirectoryOption>({
+  modelValue: () => props.modelValue,
+  enabled: () => canRead.value,
+  disabled: () => props.disabled,
+  search: async({ keyword, offset }) => {
+    const page = await listDirectory(props.resource, keyword, offset, props.departmentId)
+    return { items: page.items.map(toOption), total: page.total, nextOffset: page.offset + page.items.length }
+  },
+  resolve: async value => toOption(await getDirectory(props.resource, value))
+})
+function choose(value: string | null) {
+  const option = items.value.find(row => row.value === value) ?? selected.value
+  emit('update:modelValue', value)
+  emit('change', value && option?.value === value ? option.data ?? null : null)
 }
-function opened(open: boolean) {
-  if (open && !options.value.length) void search(keyword.value)
-}
-async function hydrate() {
-  const version = ++detailVersion
-  selected.value = null
-  if (!canRead.value || !props.modelValue) return
-  try {
-    const row = await getDirectory(props.resource, props.modelValue)
-    if (version === detailVersion) selected.value = row
-  } catch(reason) {
-    if (version === detailVersion) error.value = reason instanceof Error ? reason.message : '回显失败，请重试'
-  }
-}
-function reset(clearSelection: boolean) {
-  listVersion++
-  detailVersion++
-  options.value = []
-  selected.value = null
-  total.value = 0
-  offset.value = 0
-  keyword.value = ''
-  loading.value = false
-  error.value = ''
-  if (clearSelection && props.modelValue) {
-    emit('update:modelValue', null)
-    emit('change', null)
-  }
-}
-watch(() => [auth.revision, auth.factoryId, canRead.value, props.resource, props.departmentId], (_, old) => {
-  reset(!!old)
-  if (canRead.value) {
-    void search('')
-    if (!old) void hydrate()
-  }
-}, { immediate: true })
-watch(() => props.modelValue, () => { void hydrate() })
-onBeforeUnmount(() => reset(false))
+let contextVersion = 0
+watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), canRead.value, props.resource, props.departmentId], async(_, previous) => {
+  const current = ++contextVersion
+  reset()
+  if (previous && props.modelValue) { emit('update:modelValue', null); emit('change', null) }
+  if (previous) await nextTick()
+  if (current !== contextVersion) return
+  if (canRead.value) { if (!props.disabled) void search(''); void hydrate() }
+}, { immediate: true, flush: 'sync' })
 </script>
 
 <template>
   <div class="business-directory-select">
-    <el-select
-      :model-value="selected?.id"
+    <SearchSelect
+      :model-value="modelValue"
+      :options="items"
+      :selected-option="selected"
       :disabled="disabled || !canRead"
       :clearable="clearable"
-      no-data-text="暂无匹配结果"
-      no-match-text="暂无匹配结果"
-      loading-text="查询中"
-      filterable
-      remote
-      :remote-method="search"
-      :loading="loading"
       :placeholder="placeholder"
+      :loading="loading"
+      :resolving="resolving"
+      :has-more="hasMore"
+      :error="error"
+      :resolve-error="resolveError"
       @update:model-value="choose"
-      @visible-change="opened"
-    >
-      <el-option
-        v-for="row in visibleOptions"
-        :key="row.id"
-        :value="row.id"
-        :label="row.code ? row.name + '（' + row.code + (row.version != null ? ' · V' + row.version : '') + '）' : row.name"
-      />
-      <template #footer>
-        <el-button v-if="offset < total" text :loading="loading" @click="search(keyword, true)">加载更多</el-button>
-        <span v-else-if="!loading">共 {{ total }} 条</span>
-      </template>
-    </el-select>
+      @search="scheduleSearch"
+      @load-more="loadMore"
+      @retry="retry"
+      @resolve-retry="hydrate"
+      @open="open"
+    />
     <small v-if="!canRead">{{ auth.factoryId ? '没有查询权限' : '请先选择工厂' }}</small>
-    <div v-if="error" role="alert">
-      <span>{{ error }}</span>
-      <el-button text @click="search(keyword); hydrate()">重试</el-button>
-    </div>
   </div>
 </template>
 
 <style scoped>
-.business-directory-select { width: 100%; }
-.business-directory-select :deep(.el-select) { width: 100%; }
+.business-directory-select { width: 100%; min-width: 0; }
 small { color: var(--mes-text-secondary); }
-[role="alert"] { color: var(--mes-status-danger); }
 </style>

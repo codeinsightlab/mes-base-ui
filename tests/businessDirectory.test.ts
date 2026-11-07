@@ -18,7 +18,7 @@ const select = defineComponent({
   template: '<select :disabled="disabled" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option value="">请选择</option><slot /><slot name="footer" /></select>'
 })
 const option = defineComponent({ props: ['value', 'label'], template: '<option :value="value">{{ label }}</option>' })
-const button = defineComponent({ emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' })
+const button = defineComponent({ emits: ['click'], template: '<button @click="$emit(\'click\', $event)"><slot /></button>' })
 const wrappers: ReturnType<typeof mount>[] = []
 function setup(component: Component = PersonnelSelect, permission = true, modelValue: string | null = null) {
   const pinia = createPinia()
@@ -60,7 +60,8 @@ describe('read-only business directory components', () => {
     const { wrapper, auth } = setup(PersonnelSelect, false)
     await flushPromises()
     expect(listDirectory).not.toHaveBeenCalled()
-    expect(wrapper.find('select').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.text()).toContain('没有查询权限')
     auth.factoryPermissions = Object.values(directoryPermissions)
     auth.factoryId = ''
     await flushPromises()

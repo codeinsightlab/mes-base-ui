@@ -6,6 +6,7 @@ import { useAuth } from '../src/stores/auth'
 import MaterialSelect from '../src/components/business/MaterialSelect.vue'
 import WarehouseSelect from '../src/components/business/WarehouseSelect.vue'
 import Inventory from '../src/views/wm/wmInventory/index.vue'
+import SearchSelect from '../src/components/SearchSelect.vue'
 
 const material = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn() }))
 const warehouse = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn() }))
@@ -34,13 +35,12 @@ describe('stock reference selection', () => {
       await flushPromises()
       release({ items: [{ id: 'old', code: 'A', name: '过期引用' }], total: 1 })
       await flushPromises()
-      const select = wrapper.findComponent({ name: 'ElSelect' })
-      expect(select.props('disabled')).toBe(false)
+      expect(wrapper.findComponent(SearchSelect).props('disabled')).toBeFalsy()
       expect(wrapper.emitted('update:modelValue')).toContainEqual([null])
       expect(wrapper.html()).not.toContain('过期引用')
       auth.factoryPermissions = []
       await flushPromises()
-      expect(select.props('disabled')).toBe(true)
+      expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false)
       wrapper.unmount()
     }
   )
@@ -55,14 +55,14 @@ describe('stock reference selection', () => {
     const wrapper = mount(WarehouseSelect, { props: { modelValue: null }, global: { plugins: [pinia, ElementPlus] }})
     await flushPromises()
     expect(warehouse.list).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'LOCAL' }))
-    expect((wrapper.vm as unknown as { rows: { id: string }[] }).rows.map(row => row.id)).toEqual(['1'])
+    expect(wrapper.findComponent(SearchSelect).props('options').map((row: { value: string }) => row.value)).toEqual(['1'])
     auth.runtimeMode = 'ERP'
     await flushPromises()
     expect(warehouse.list).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'EXTERNAL' }))
-    expect((wrapper.vm as unknown as { rows: { id: string }[] }).rows.map(row => row.id)).toEqual(['2'])
+    expect(wrapper.findComponent(SearchSelect).props('options').map((row: { value: string }) => row.value)).toEqual(['2'])
     auth.runtimeMode = null
     await flushPromises()
-    expect(wrapper.findComponent({ name: 'ElSelect' }).props('disabled')).toBe(true)
+    expect(wrapper.findComponent({ name: 'ElSelect' }).exists()).toBe(false)
     wrapper.unmount()
   })
   it('renders named quantities and hides sync with CRUD-only grants', async() => {
@@ -72,6 +72,10 @@ describe('stock reference selection', () => {
     stock.list.mockResolvedValue({ items: [{ id: '9007199254740993', materialName: '物料一', warehouseName: '一号仓', quantity: '12345678901234.1234', availableQuantity: null, status: 'ENABLED' }], total: 1, offset: 0, limit: 20 })
     const wrapper = mount(Inventory, { global: { plugins: [pinia, ElementPlus] }})
     await flushPromises()
+    await wrapper.get('input[placeholder="请输入材料批次"]').setValue('LOT-001')
+    await wrapper.get('form.filter-panel').trigger('submit')
+    await flushPromises()
+    expect(stock.list).toHaveBeenLastCalledWith(expect.objectContaining({ batchNo: 'LOT-001', offset: 0 }))
     expect(wrapper.text()).toContain('物料一')
     expect(wrapper.text()).toContain('一号仓')
     expect(wrapper.text()).toContain('12345678901234.1234')

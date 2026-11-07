@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed, nextTick, watch } from 'vue'
+import SearchSelect from '@/components/SearchSelect.vue'
+import { useRemoteOptions, type SearchOption } from '@/composables/useRemoteOptions'
 import { businessSourceLabel } from '@/lib/businessSource'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { api, type WmWarehouseVo } from '@/api/wm/wmWarehouse'
 import { useAuth } from '@/stores/auth'
 
@@ -8,87 +10,56 @@ const props = defineProps<{ modelValue?: string | null; disabled?: boolean; sour
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 const auth = useAuth()
 const expectedSource = computed(() => props.history ? null : props.source ?? (auth.runtimeMode === 'LOCAL' ? 'LOCAL' : auth.runtimeMode === 'ERP' ? 'EXTERNAL' : null))
-const allowed = computed(() => !!auth.factoryId && (props.history || !!expectedSource.value) && !auth.factorySwitching
+const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching && (props.history || !!expectedSource.value)
   && auth.hasPermission('business:wm:warehouse:list', 'factory'))
-const rows = ref<WmWarehouseVo[]>([])
-const selected = ref<WmWarehouseVo | null>(null)
-const loading = ref(false)
-const error = ref('')
-const keyword = ref('')
-const total = ref(0)
-let version = 0
-let detailVersion = 0
-const options = computed(() => selected.value && !rows.value.some(row => row.id === selected.value?.id)
-  ? [selected.value, ...rows.value] : rows.value)
-async function search(value: string, more = false) {
-  if (!allowed.value) return
-  const current = ++version
-  keyword.value = value
-  if (!more) rows.value = []
-  loading.value = true
-  error.value = ''
-  try {
-    const result = await api.list({ name: value, ...(expectedSource.value ? { source: expectedSource.value } : {}), offset: more ? rows.value.length : 0, limit: 20 })
-    if (current !== version) return
-    const matching = result.items.filter(row => (!expectedSource.value || row.source === expectedSource.value))
-    rows.value = more ? [...rows.value, ...matching] : matching
-    total.value = result.total
-  } catch(reason) {
-    if (current === version) error.value = reason instanceof Error ? reason.message : '仓库查询失败'
-  } finally {
-    if (current === version) loading.value = false
+function toOption(row: WmWarehouseVo): SearchOption<WmWarehouseVo> {
+  return { value: row.id, label: `${row.code} · ${row.name} · ${businessSourceLabel(row.source)}`, data: row }
+}
+const { items, selected, loading, resolving, error, resolveError, hasMore, search, scheduleSearch, loadMore, retry, open, hydrate, reset } = useRemoteOptions<WmWarehouseVo>({
+  modelValue: () => props.modelValue,
+  enabled: () => allowed.value,
+  disabled: () => !!props.disabled,
+  search: async({ keyword, offset, limit }) => {
+    const page = await api.list({ name: keyword, offset, limit, ...(expectedSource.value ? { source: expectedSource.value } : {}) })
+    const matching = page.items.filter(row => !expectedSource.value || row.source === expectedSource.value)
+    return { items: matching.map(toOption), total: page.total, nextOffset: offset + page.items.length }
+  },
+  resolve: async value => {
+    if (!auth.hasPermission('business:wm:warehouse:query', 'factory')) return null
+    const row = await api.detail(value)
+    if (expectedSource.value && row.source !== expectedSource.value) throw new Error('仓库来源与当前业务不一致')
+    return toOption(row)
   }
-}
-async function hydrate() {
-  const current = ++detailVersion
-  selected.value = null
-  if (!props.modelValue || !allowed.value) return
-  const cached = rows.value.find(row => row.id === props.modelValue)
-  if (cached) { selected.value = cached; return }
-  if (!auth.hasPermission('business:wm:warehouse:query', 'factory')) return
-  try {
-    const row = await api.detail(props.modelValue)
-    if (current === detailVersion) {
-      if (expectedSource.value && row.source !== expectedSource.value) { error.value = '仓库来源与当前业务不一致'; emit('update:modelValue', null) } else selected.value = row
-    }
-  } catch(reason) {
-    if (current === detailVersion) error.value = reason instanceof Error ? reason.message : '仓库回显失败'
-  }
-}
-function clear() {
-  version++
-  detailVersion++
-  rows.value = []
-  selected.value = null
-  loading.value = false
-  error.value = ''
-  total.value = 0
-}
-watch(() => [auth.factoryId, auth.revision, expectedSource.value, allowed.value], (_, previous) => {
-  clear()
+})
+watch(resolveError, message => { if (message === '仓库来源与当前业务不一致') emit('update:modelValue', null) })
+let contextVersion = 0
+watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), expectedSource.value, allowed.value], async(_, previous) => {
+  const current = ++contextVersion
+  reset()
   if (previous && props.modelValue) emit('update:modelValue', null)
-  if (allowed.value) { void search(''); void hydrate() }
-}, { immediate: true })
-watch(() => props.modelValue, hydrate)
-onBeforeUnmount(clear)
+  if (previous) await nextTick()
+  if (current !== contextVersion) return
+  if (allowed.value) { if (!props.disabled) void search(''); void hydrate() }
+}, { immediate: true, flush: 'sync' })
 </script>
 
 <template>
-  <div>
-    <el-select
-      :model-value="modelValue"
-      clearable
-      filterable
-      remote
-      :remote-method="search"
-      :loading="loading"
-      :disabled="!allowed || disabled"
-      placeholder="搜索仓库名称"
-      @update:model-value="!disabled && emit('update:modelValue', $event || null)"
-    >
-      <el-option v-for="row in options" :key="row.id" :label="`${row.code} · ${row.name} · ${businessSourceLabel(row.source)}`" :value="row.id" />
-    </el-select>
-    <el-button v-if="rows.length < total" link :disabled="loading || disabled" @click="search(keyword, true)">加载更多</el-button>
-    <el-button :disabled="disabled" v-if="error" link type="danger" @click="search(keyword)">{{ error }}，重试</el-button>
-  </div>
+  <SearchSelect
+    :model-value="modelValue"
+    :options="items"
+    :selected-option="selected"
+    :disabled="disabled || !allowed"
+    :loading="loading"
+    :resolving="resolving"
+    :has-more="hasMore"
+    :error="error"
+    :resolve-error="resolveError"
+    placeholder="搜索仓库名称"
+    @update:model-value="emit('update:modelValue', $event)"
+    @search="scheduleSearch"
+    @load-more="loadMore"
+    @retry="retry"
+    @resolve-retry="hydrate"
+    @open="open"
+  />
 </template>
