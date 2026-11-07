@@ -240,7 +240,6 @@ async function delids() {
   }
 }
 
-watch(() => can(props.listAction), load)
 watch(() => can('delete'), () => {
   selectedIds.value = []
 })
@@ -255,23 +254,25 @@ function reset() {
   searchNow()
 }
 
-watch(() => JSON.stringify(props.initialSearch), () => {
-  Object.keys(search).forEach(k => delete search[k])
-  Object.assign(search, props.initialSearch)
-  searchNow()
-})
-
-watch(() => [props.api, JSON.stringify(props.fixedValues), auth.revision], () => {
-  generation++
-  contextGeneration++
-  saving.value = false
-  rows.value = []
-  total.value = 0
-  dialog.value = false
-  editId.value = null
-  Object.keys(draft).forEach(k => delete draft[k])
-  page.value = 1
-  load()
+// One watcher owns reactive list reloads so a single parent update issues one list request.
+watch(() => [props.api, JSON.stringify(props.fixedValues), auth.revision, JSON.stringify(props.initialSearch), can(props.listAction)], (current, previous) => {
+  if (current.slice(0, 3).some((value, index) => value !== previous[index])) {
+    generation++
+    contextGeneration++
+    saving.value = false
+    rows.value = []
+    total.value = 0
+    dialog.value = false
+    editId.value = null
+    Object.keys(draft).forEach(k => delete draft[k])
+    page.value = 1
+  }
+  if (current[3] !== previous[3]) {
+    Object.keys(search).forEach(k => delete search[k])
+    Object.assign(search, props.initialSearch)
+    page.value = 1
+  }
+  void load()
 })
 async function closeEditor(done: () => void = () => { dialog.value = false }) {
   if (saving.value || props.editorBusy) return

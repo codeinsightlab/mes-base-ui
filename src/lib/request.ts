@@ -26,7 +26,8 @@ async function send<T>(path: string, options: RequestOptions, consume: (response
   const snapshot = { ...context() }; const headers = new Headers()
   if (!options.public && snapshot.token) headers.set('Authorization', 'Bearer ' + snapshot.token)
   if (snapshot.factoryId) headers.set('X-Factory-Id', snapshot.factoryId)
-  const query = options.query ? '?' + new URLSearchParams(Object.entries(options.query).map(([k, v]) => [k, String(v)])).toString() : ''
+  const parameters = new URLSearchParams(Object.entries(options.query ?? {}).map(([k, v]) => [k, String(v)])).toString()
+  const query = parameters ? '?' + parameters : ''
   const multipart = options.body instanceof FormData
   if (options.body !== undefined && !multipart) headers.set('Content-Type', 'application/json')
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), Math.min(120000, Math.max(1000, options.timeoutMs ?? 15000)))

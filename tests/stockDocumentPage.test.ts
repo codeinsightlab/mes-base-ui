@@ -12,7 +12,7 @@ vi.mock('../src/lib/request', () => ({ request: mocks.request }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: mocks.query }), useRouter: () => mocks.router }))
 const Document = defineComponent({
   props: ['aggregateApi', 'headerFields', 'itemFields', 'initialSearch'],
-  setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft } },
+  setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft, open: (row: { id: string }) => props.aggregateApi.detail(row.id) } },
   template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="header-fields" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
 })
 const RouterLinkStub = defineComponent({ name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' })
@@ -20,7 +20,7 @@ const ExecutionSelect = defineComponent({ props: ['modelValue', 'disabled', 'sta
 let wrapper:ReturnType<typeof mount>
 beforeEach(() => { vi.clearAllMocks();mocks.query = {};mocks.request.mockImplementation((url:string, options:any) => url.endsWith('/types') ? Promise.resolve([{ value: 'PRODUCTION_RECEIPT', direction: 'IN', label: '生产入库', origin: '工单生产完成', requiredDocuments: '', approvalAvailable: true, qualityReceipt: false, enabled: true }, { value: 'OTHER_RECEIPT', direction: 'IN', label: '其他入库', origin: '其他', requiredDocuments: '', approvalAvailable: true, qualityReceipt: false, enabled: true }]) : url.includes('/numbering-rules') ? Promise.resolve([]) : Promise.resolve({ document: { id: '1', direction: options?.query?.direction ?? 'IN' }, lines: [] }));vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}}) })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '';vi.unstubAllGlobals() })
-async function setup() { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';wrapper = mount(Page, { props: { direction: 'IN' }, global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: Document, ProductionExecutionSelect: ExecutionSelect, RouterLink: RouterLinkStub, StockDocumentActions: true }}});await flushPromises();return wrapper.findComponent(Document) }
+async function setup(permissions: string[] = []) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = permissions;wrapper = mount(Page, { props: { direction: 'IN' }, global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: Document, ProductionExecutionSelect: ExecutionSelect, RouterLink: RouterLinkStub, StockDocumentActions: true }}});await flushPromises();return wrapper.findComponent(Document) }
 
 it('creates production inbound from the ordinary menu with a selectable execution and the formal type', async() => {
   const document = await setup(), type = wrapper.findComponent(ElSelect)
@@ -84,4 +84,11 @@ it('keeps the exact stock scope in the list query and clears it when switching f
   const state = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState
   state.auth.factoryId = 'B'; await flushPromises()
   expect(mocks.router.replace).toHaveBeenCalledWith(expect.objectContaining({ query: {}}))
+})
+
+it('opens a linked document with one detail read and one type read', async() => {
+  mocks.query = { documentId: '1' }
+  await setup(['business:wm:stock:document:query'])
+  expect(mocks.request.mock.calls.filter(([url]) => url === '/api/wm/inbound-documents/1')).toHaveLength(1)
+  expect(mocks.request.mock.calls.filter(([url]) => url === '/api/wm/inbound-documents/types')).toHaveLength(1)
 })

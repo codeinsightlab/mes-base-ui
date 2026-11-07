@@ -154,3 +154,9 @@ it.each([undefined, '', '   '])('uses the HTTP fallback when the server message 
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ errorCode: 'RESOURCE_CONFLICT', message }), { status: 409 })))
   await expect(request('/api/demo')).rejects.toMatchObject({ code: 'RESOURCE_CONFLICT', status: 409, message: '数据已变化或与当前状态冲突，请刷新后重新确认' })
 })
+
+it('omits the question mark when query parameters are empty', async() => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')))
+  await request('/api/test/empty-query', { query: {}})
+  expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('/api/test/empty-query')
+})

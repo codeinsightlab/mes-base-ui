@@ -4,7 +4,7 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 import PageDialog from '@/components/page/PageDialog.vue'
 import PageDrawer from '@/components/page/PageDrawer.vue'
 
-import { computed, nextTick, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onDeactivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import CrudPage from '@/components/CrudPage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -118,7 +118,9 @@ watch([selected, nodes], async() => {
   treeRef.value?.setCurrentKey(selectedCategory.value?.id ?? null)
 }, { flush: 'post' })
 watch(categoryKeyword, value => treeRef.value?.filter(value))
-onActivated(() => { void loadCategories();void loadUnitNames() })
+let deactivated = false
+onDeactivated(() => { deactivated = true })
+onActivated(() => { if (deactivated) { deactivated = false;void loadCategories();void loadUnitNames() } })
 onBeforeUnmount(clear)
 </script>
 <template>

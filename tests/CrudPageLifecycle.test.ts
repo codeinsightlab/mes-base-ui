@@ -86,3 +86,15 @@ describe('generated batch deletion', () => {
     expect(service.delids).not.toHaveBeenCalled()
   })
 })
+
+it('loads once when permission, context, API and initial search change together', async() => {
+  const oldApi = api(), { wrapper, auth } = page(oldApi);await flushPromises()
+  const nextApi = api()
+  auth.platformPermissions = []
+  await flushPromises()
+  auth.platformPermissions = ['acceptance:person:read'];auth.revision++
+  await wrapper.setProps({ api: nextApi, fixedValues: { parentId: '2' }, initialSearch: { name: '新范围' }})
+  await flushPromises()
+  expect(nextApi.list).toHaveBeenCalledOnce()
+  expect(nextApi.list).toHaveBeenCalledWith({ offset: 0, limit: 20, parentId: '2', name: '新范围' })
+})

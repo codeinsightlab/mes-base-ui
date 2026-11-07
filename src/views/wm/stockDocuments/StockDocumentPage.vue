@@ -123,18 +123,13 @@ async function openLinkedDocument() {
     }
     return
   }
+  // The document component owns the authoritative detail read, including direction and permission checks.
+  if (hasDocument) { await document.value?.open({ id }); return }
   const attempt = ++linkAttempt, factory = auth.factoryId, revision = auth.revision
   try {
-    const detail = hasDocument
-      ? await stockDocuments.detail(id, direction.value, issueQueryOnly.value)
-      : await stockDocuments.byRequest(requestId as string)
+    const detail = await stockDocuments.byRequest(requestId as string)
     if (attempt !== linkAttempt || factory !== auth.factoryId || revision !== auth.revision) return
-    if (!hasDocument || detail.document.direction !== direction.value) {
-      await router.replace({ path: route.path, query: { ...route.query, documentId: detail.document.id }})
-      return
-    }
-    await loadTypes()
-    if (attempt === linkAttempt && factory === auth.factoryId && revision === auth.revision) void document.value?.open({ id })
+    await router.replace({ path: route.path, query: { ...route.query, documentId: detail.document.id }})
   } catch(error) { if (attempt === linkAttempt) lineError.value = error instanceof Error ? error.message : '单据读取失败' }
 }
 onMounted(() => { void loadTypes();void openLinkedDocument() })
