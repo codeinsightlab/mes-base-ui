@@ -134,6 +134,12 @@ BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分�
 
 ProductionReportManager 的历史操作人员输入复用 SearchSelect/useRemoteOptions 的防抖、面板内分页和同页重试。仍调用 report-operators 历史补报目录，不增加当前工序能力或派工名单过滤；切厂、关闭编辑和撤权清除候选并拒绝迟到响应，未决命令的原人员ID保持原样，禁用时不读取新候选。
 
+### 通用字典数据读取与映射
+
+字典读取和数据结构转换统一复用 [dictionaries.ts](../src/utils/dictionaries.ts) 的 `dictionary(code)`：接口原始 `dictValue` / `dictLabel` 转换为 `DictionaryOption.value` / `label`，`raw` 保留样式及默认值等元数据。返回列表为响应式共享数据，选项顺序沿用字典；调用方不再分别转换接口结构或维护编码名称表。Vue 页面可在 `computed` 中读取；已有 `DictSelect`、`DictTag` 继续复用同一数据源。
+
+读取错误通过 `dictionaryState.errors[code]` 呈现；缓存、并发请求去重、失效与重试由公共模块负责，刷新复用 `refreshDictionaries()`。领域函数只负责选择字典编码及必要上下文，例如 `getStockDocumentTypes(direction)`；不得另建后端字典聚合请求或第二套前端缓存。后端业务接口提供真实业务编码；权限过滤候选、不可变快照等独立业务事实不由普通字典替代。约束权威入口见 [AGENTS.md](../AGENTS.md#字典读取与展示约束2026-11-07-用户确认)。
+
 ### 出入库单据类型的统一读取
 
 所有前端单据类型名称、候选与排序统一通过 `getStockDocumentTypes(direction)`（[stockDocumentTypes.ts](../src/lib/stockDocumentTypes.ts)）读取。函数复用公共 `dictionary`：入库读取 `stock_document_in_type`，出库读取 `stock_document_out_type`，缓存、请求去重、失效及重试沿用公共字典机制。Vue 调用方可使用 [useStockDocumentTypes](../src/composables/useStockDocumentTypes.ts) 取得响应式类型、错误与名称；禁止页面自建名称映射或另调库存单 `/types` 合并接口。
