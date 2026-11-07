@@ -24,6 +24,8 @@ import WorkorderCombinationPrint from '@/components/business/production/Workorde
 import WorkOrderCancellation from '@/components/business/production/WorkOrderCancellation.vue'
 import WorkorderMaterialPanel from '@/components/business/production/WorkorderMaterialPanel.vue'
 import WorkorderMaterialEditor from '@/components/business/production/WorkorderMaterialEditor.vue'
+import SearchSelect from '@/components/SearchSelect.vue'
+import { useRemoteOptions } from '@/composables/useRemoteOptions'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import { emptyMaterialDemand, materialDemandDraft, workorderMaterial } from '@/api/production/workorderMaterial'
 import WorkOrderExecutions from '@/components/business/production/WorkOrderExecutions.vue'
@@ -57,9 +59,8 @@ onMounted(() => { resizeDetails(); window.addEventListener('resize', resizeDetai
 onBeforeUnmount(() => window.removeEventListener('resize', resizeDetails))
 const dialog = ref(false), drawer = ref(false), detail = ref<Detail | null>(null), editId = ref<string | null>(null)
 const bomBuildDialog = ref(false)
-const routeOptions = ref<RoutingOption[]>([])
+const routeSnapshot = ref<RoutingOption | null>(null)
 const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false)
-const routesLoading = ref(false)
 const hasPublishedRoutes = ref<boolean | null>(null)
 const originalProductId = ref('')
 const originalPlannedQty = ref('')
@@ -71,7 +72,7 @@ const confirmingSave = ref(false)
 let listAttempt = 0, detailAttempt = 0, routeAttempt = 0, numberingAttempt = 0
 function clear() {
   listAttempt++; detailAttempt++; routeAttempt++; numberingAttempt++
-  rows.value = []; total.value = 0; detail.value = null; routeOptions.value = []; numberingRules.value = []; numberingRulesLoading.value = false
+  rows.value = []; total.value = 0; detail.value = null; routeSearch.reset(); routeSnapshot.value = null; numberingRules.value = []; numberingRulesLoading.value = false
   dialog.value = drawer.value = loading.value = busy.value = false; error.value = ''; page.value = 1; editId.value = null; Object.assign(form, blank())
 }
 watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), canExecutions.value], () => { clear(); if (can('list')) void load() }, { flush: 'sync' })
@@ -88,19 +89,36 @@ async function load() {
   loading.value = true; error.value = ''
   try { const result = await api.list({ code: code.value, status: status.value, offset: (page.value - 1) * pageSize.value, limit: pageSize.value }); if (attempt === listAttempt) { rows.value = result.items; total.value = result.total } } catch(e) { if (attempt === listAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === listAttempt) loading.value = false }
 }
-function resetRouteOptions() { hasPublishedRoutes.value = null; routeAttempt++; routeOptions.value = []; routesLoading.value = false }
+function resetRouteOptions() { hasPublishedRoutes.value = null; routeAttempt++; routeSearch.reset(); routeSnapshot.value = null }
 watch(dialog, (visible) => { if (!visible) { numberingAttempt++; numberingRulesLoading.value = false; resetRouteOptions() } }, { flush: 'sync' })
+let selectSingleRoute = false
+const routeSearch = useRemoteOptions<RoutingOption>({
+  modelValue: () => form.routingId,
+  enabled: () => dialog.value && !!form.productId && !!auth.factoryId && !auth.factorySwitching && (can('create') || can('update')),
+  // Product changes own the initial query; opening the control reuses that result.
+  disabled: () => false,
+  search: async({ keyword }) => {
+    const attempt = ++routeAttempt, productId = form.productId, selectOnly = selectSingleRoute
+    selectSingleRoute = false
+    const result = await api.routings(productId, keyword)
+    if (attempt === routeAttempt && productId === form.productId && dialog.value) {
+      if (!keyword) hasPublishedRoutes.value = result.length > 0
+      if (selectOnly && result.length === 1 && !form.routingId) { routeSnapshot.value = result[0]!; form.routingId = result[0]!.id }
+    }
+    return { items: result.map(row => ({ value: row.id, label: `${row.code} / V${row.version} · ${row.name}`, data: row })), total: result.length, nextOffset: result.length }
+  }
+})
+const routeOptions = computed(() => routeSearch.items.value.map(option => option.data!))
+const routesLoading = routeSearch.loading
+const selectedRoute = computed(() => {
+  if (routeSearch.selected.value) return routeSearch.selected.value
+  const row = routeOptions.value.find(option => option.id === form.routingId) ?? routeSnapshot.value
+  if (!row || row.id !== form.routingId) return null
+  return { value: row.id, label: `${row.code} / V${row.version} · ${row.name}` }
+})
 async function searchRoutes(search = '', selectOnly = false) {
-  const attempt = ++routeAttempt, productId = form.productId
-  if (!dialog.value || !productId) { routeOptions.value = []; routesLoading.value = false; return }
-  routesLoading.value = true
-  try {
-    const result = await api.routings(productId, search)
-    if (attempt !== routeAttempt || productId !== form.productId) return
-    routeOptions.value = result
-    if (!search) hasPublishedRoutes.value = result.length > 0
-    if (selectOnly && result.length === 1 && !form.routingId) form.routingId = result[0]!.id
-  } catch(e) { if (attempt === routeAttempt) error.value = e instanceof Error ? e.message : '工艺版本读取失败' } finally { if (attempt === routeAttempt) routesLoading.value = false }
+  selectSingleRoute = selectOnly
+  await routeSearch.search(search)
 }
 async function productChanged(value: string) {
   if (value === form.productId) return
@@ -141,7 +159,7 @@ async function edit(id: string) {
     const [d, demand] = await Promise.all([api.detail(id), workorderMaterial.get(id)])
     if (attempt !== detailAttempt) return
     originalProductId.value = d.workorder.productId; originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; plannedQuantityValid.value = false; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty), material: materialDemandDraft(demand) })
-    routeOptions.value = d.routing ? [d.routing] : []; hasPublishedRoutes.value = d.routing !== null; dialog.value = true
+    routeSnapshot.value = d.routing; hasPublishedRoutes.value = d.routing !== null; dialog.value = true
   } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
 }
 async function save() {
@@ -237,7 +255,7 @@ onMounted(load)
         <el-form-item v-else label="工单号"><span>{{ form.code }}</span></el-form-item>
         <el-form-item label="产出物料" required><MaterialSelect :model-value="form.productId || null" status="ENABLED" @update:model-value="productChanged($event || '')" /></el-form-item>
         <el-form-item label="计划数量" required><QuantityInput v-model="form.plannedQty" required positive :unchanged-value="editId && form.productId === originalProductId ? originalPlannedQty : null" :material-id="form.productId" :disabled="busy" @validity="plannedQuantityValid = $event" /></el-form-item>
-        <el-form-item label="默认工艺" :required="hasPublishedRoutes !== false"><el-select v-model="form.routingId" :disabled="!form.productId" :loading="routesLoading" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" no-data-text="该物料暂无匹配的已发布工艺" filterable remote :remote-method="searchRoutes" @visible-change="(v: boolean)=>v && !routesLoading && searchRoutes()"><el-option v-for="r in routeOptions" :key="r.id" :value="r.id" :label="r.code+' / V'+r.version+' · '+r.name" /></el-select></el-form-item>
+        <el-form-item label="默认工艺" :required="hasPublishedRoutes !== false"><SearchSelect v-model="form.routingId" :disabled="!form.productId" :options="routeSearch.items.value" :selected-option="selectedRoute" :loading="routesLoading" :error="routeSearch.error.value" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" @search="routeSearch.scheduleSearch" @open="routeSearch.open" @retry="routeSearch.retry" /></el-form-item>
         <p v-if="hasPublishedRoutes === false" class="help-block">当前产品无已发布适用工艺，领料后直接办理成品入库，无需报工。</p>
         <el-form-item label="计划开始"><el-date-picker v-model="form.plannedStartAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
         <el-form-item label="计划结束"><el-date-picker v-model="form.plannedEndAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>

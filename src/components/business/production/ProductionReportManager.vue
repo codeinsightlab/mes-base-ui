@@ -3,6 +3,8 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 
 import PageDialog from '@/components/page/PageDialog.vue'
 
+import SearchSelect from '@/components/SearchSelect.vue'
+import { useRemoteOptions } from '@/composables/useRemoteOptions'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
@@ -35,12 +37,21 @@ const command = ref<'supplement' | 'adjust' | 'void' | null>(null), original = r
 const pending = ref<{ requestId: string; uncertain: boolean; mode: 'supplement' | 'adjust' | 'void'; originalId: string | null; executionCode: string; nodeId: string; form: typeof form } | null>(null)
 const pendingKey = () => 'mes-admin-report-pending:' + auth.username + ':' + auth.factoryId + ':' + props.executionCode
 const form = reactive({ quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' })
-const users = ref<HistoricalUser[]>([]), userKeyword = ref(''), usersLoading = ref(false), userOffset = ref(0), usersMore = ref(false)
+const historicalUsers = useRemoteOptions<HistoricalUser>({
+  modelValue: () => form.operatorUserId,
+  enabled: () => command.value === 'supplement' && can('supplement') && !pending.value && !saving.value && !auth.factorySwitching,
+  // Command opening owns the initial read; pending commands never fetch new candidates.
+  disabled: () => false,
+  search: async({ keyword, offset }) => {
+    const result = await api.users(keyword, offset)
+    return { items: result.items.map(row => ({ value: row.id, label: row.name, data: row })), total: result.total, nextOffset: offset + result.items.length }
+  }
+})
 const historyVisible = ref(false), detail = ref<Detail | null>(null), history = ref<Ledger[]>([]), historyPage = ref(1), historyLimit = ref(20), historyTotal = ref(0), historyLoading = ref(false), historyError = ref('')
-let generation = 0, ledgerSequence = 0, userSequence = 0, historySequence = 0
+let generation = 0, ledgerSequence = 0, historySequence = 0
 const commandTitle = computed(() => command.value === 'supplement' ? '管理员历史补录' : command.value === 'adjust' ? '管理员数量订正' : '原始报工整笔冲销')
 function setCommandVisible(value: boolean) { if (!value && !pending.value) clearCommand() }
-function clearCommand() { pending.value = null; userSequence++; command.value = null; original.value = null; users.value = []; usersLoading.value = false; saving.value = false; commandError.value = ''; Object.assign(form, { quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' }) }
+function clearCommand() { pending.value = null; historicalUsers.reset(); command.value = null; original.value = null; saving.value = false; commandError.value = ''; Object.assign(form, { quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' }) }
 function clear() { generation++; ledgerSequence++; historySequence++; visible.value = false; quantity.value = null; path.value = null; pathError.value = ''; ledgerError.value = ''; rows.value = []; nodeId.value = ''; total.value = 0; page.value = 1; loading.value = false; ledgerLoading.value = false; error.value = ''; clearCommand(); historyVisible.value = false; detail.value = null; history.value = []; historyLoading.value = false }
 watch(() => props.executionCode, () => { clear(); if (props.executionCode && can('quantity')) { visible.value = true; void refresh() } }, { flush: 'sync', immediate: true })
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
@@ -91,13 +102,7 @@ async function openCommand(mode: 'supplement' | 'adjust' | 'void', row?: Ledger)
   if (saved) {
     try { pending.value = { ...JSON.parse(saved), uncertain: true }; command.value = pending.value!.mode; Object.assign(form, pending.value!.form); commandError.value = '存在结果待确认的原请求，请原样重试核实；不会创建新请求。' } catch { commandError.value = '待确认请求无法读取，请保留记录并联系管理员'; return }
   }
-  if (mode === 'supplement') { userKeyword.value = ''; await loadUsers('') }
-}
-async function loadUsers(keyword: string, more = false) {
-  if (command.value !== 'supplement') return
-  userKeyword.value = keyword; if (!more) userOffset.value = 0
-  const ticket = ++userSequence; usersLoading.value = true; commandError.value = ''
-  try { const result = await api.users(keyword, userOffset.value); if (ticket !== userSequence) return; users.value = more ? [...users.value, ...result.items] : result.items; userOffset.value += result.items.length; usersMore.value = userOffset.value < result.total } catch(e) { if (ticket === userSequence) commandError.value = e instanceof Error ? e.message : '人员读取失败' } finally { if (ticket === userSequence) usersLoading.value = false }
+  if (command.value === 'supplement' && !pending.value) await historicalUsers.search('')
 }
 async function save() {
   const mode = command.value
@@ -215,7 +220,21 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
     <el-form class="report-command" label-position="top" :disabled="saving || !!pending" @submit.prevent="save">
       <el-form-item v-if="command !== 'void'" :label="command === 'supplement' ? '本次加工完成数量' : '数量变化（正数增加，负数减少）'" required><QuantityInput v-model="form.quantity" :material-id="quantity?.productId" required :positive="command==='supplement'" :historical-reduction="command==='adjust'" :disabled="saving || !!pending" @validity="quantityValid=$event" /></el-form-item>
       <template v-if="command === 'supplement'">
-        <el-form-item label="历史实际操作人员" required><el-select v-model="form.operatorUserId" filterable remote :remote-method="loadUsers" :loading="usersLoading" placeholder="输入昵称检索历史人员" aria-label="历史实际操作人员"><el-option v-for="u in users" :key="u.id" :value="u.id" :label="`${u.name}（${u.id}）`" /><template #footer><el-button v-if="usersMore" text :loading="usersLoading" @click="loadUsers(userKeyword, true)">加载更多人员</el-button><span v-else class="secondary">不按当前工序能力或派工名单限制历史补录</span></template></el-select></el-form-item>
+        <el-form-item label="历史实际操作人员" required><SearchSelect
+          v-model="form.operatorUserId"
+          :options="historicalUsers.items.value"
+          :selected-option="historicalUsers.selected.value ?? (pending && form.operatorUserId ? {value:form.operatorUserId,label:'原请求历史操作人员（待核实）'} : null)"
+          :loading="historicalUsers.loading.value"
+          :has-more="historicalUsers.hasMore.value"
+          :error="historicalUsers.error.value"
+          :disabled="saving || !!pending"
+          placeholder="输入昵称检索历史人员"
+          aria-label="历史实际操作人员"
+          @search="historicalUsers.scheduleSearch"
+          @open="historicalUsers.open"
+          @load-more="historicalUsers.loadMore"
+          @retry="historicalUsers.retry"
+        /><span class="secondary">不按当前工序能力或派工名单限制历史补录</span></el-form-item>
         <el-form-item label="实际生产时间" required><el-date-picker v-model="form.reportTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择实际生产时间" /></el-form-item>
         <el-form-item label="工作站编号（可选）"><el-input v-model="form.workstationId" /></el-form-item>
       </template>

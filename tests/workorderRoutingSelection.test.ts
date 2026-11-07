@@ -26,7 +26,7 @@ async function setup() {
 it('requires a product before choosing its published routes without restricting the output material type', async() => {
   const { state } = await setup(); await state.searchRoutes()
   expect(routings).not.toHaveBeenCalled(); expect(materials).toHaveBeenCalledWith({ keyword: '', status: 'ENABLED', offset: 0, limit: 20 })
-  const selects = wrapper.findAllComponents({ name: 'ElSelect' })
+  const selects = wrapper.findAllComponents({ name: 'SearchSelect' })
   expect(selects.find(s => s.props('placeholder') === '请先选择产出物料')?.props('disabled')).toBe(true)
   state.form.productId = '101'; await state.searchRoutes('装配')
   expect(routings).toHaveBeenCalledWith('101', '装配')
@@ -127,4 +127,20 @@ it('releases from the list with the original revision and blocks an external ord
   expect(release).toHaveBeenCalledExactlyOnceWith(row.id, 7)
   await state.release({ ...row, source: 'EXTERNAL' })
   expect(release).toHaveBeenCalledOnce()
+})
+
+it('reuses the product lookup when opening and searching the same empty keyword', async() => {
+  vi.useFakeTimers()
+  try {
+    const { state } = await setup()
+    routings.mockResolvedValueOnce([{ id: '201', code: 'R', version: 1, name: '装配' }])
+    await state.productChanged('101');await flushPromises()
+    const input = wrapper.findAllComponents({ name: 'SearchSelect' }).find(s => s.props('placeholder') === '搜索该物料适用的已发布工艺')!
+    input.vm.$emit('open');input.vm.$emit('search', '')
+    await vi.advanceTimersByTimeAsync(300)
+    expect(routings).toHaveBeenCalledTimes(1)
+    input.vm.$emit('search', '装');input.vm.$emit('search', '装配')
+    await vi.advanceTimersByTimeAsync(299);expect(routings).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1);expect(routings).toHaveBeenLastCalledWith('101', '装配')
+  } finally { vi.useRealTimers() }
 })

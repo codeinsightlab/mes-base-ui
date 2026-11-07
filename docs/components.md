@@ -35,6 +35,7 @@
 | 执行关联 `ExecutionSelect`（待归并） | [ExecutionSelect.vue](../src/components/business/production/ExecutionSelect.vue) | 执行ID及可选父工单；当前用于记录查询/申报关联。与下一行的检索、候选及返回方式不同，新增消费者前须统一同义规则 | [报工记录](../src/views/production/productionReport/index.vue)、[质量申报](../src/components/business/quality/DefectDeclarationPanel.vue) |
 | 单据执行选择 `ProductionExecutionSelect`（待归并） | [ProductionExecutionSelect.vue](../src/components/business/production/ProductionExecutionSelect.vue) | 执行ID、状态上下文及selected事件；与ExecutionSelect并存不表示允许持续维护两套同义规则；不能混淆ID关联与用户扫码定位 | [库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
 | 工单可用工艺 `ExecutionRoutingSelect` | [ExecutionRoutingSelect.vue](../src/components/business/production/ExecutionRoutingSelect.vue) | 父工单ID、工艺选择值和禁用状态；候选来自该工单上下文，不等同于通用工艺目录或路径编辑 | [执行列表](../src/components/business/production/ProductionExecutionList.vue) |
+| 工艺节点工序 `RoutingOperationSelect` | [RoutingOperationSelect.vue](../src/components/business/production/RoutingOperationSelect.vue) | 每个节点独立维护检索、已选快照和错误；按需展开查询，复用 SearchSelect/useRemoteOptions。候选沿用 routing 的启用工序参考接口（最多100条，无offset契约），不恢复通用目录operations资源；当前页展示和路径预览共用所选名称 | [工艺路线节点](../src/views/production/routing/index.vue) |
 
 ## 扫码与值展示
 
@@ -103,7 +104,7 @@ const { items, selected, loading, resolving, error, resolveError, hasMore,
 
 ## 已知统一缺口
 
-- **分页交互：** 上述八类选择器已统一使用 SearchSelect 的面板内分页。库存来源选择及生产人员等特殊流程仍有独立实现，后续调整时优先接入公共 UI，保留各自业务编排；不能只取第一页或改成无界全量加载。
+- **分页交互：** 已接入的分页选择器统一使用 SearchSelect 的面板内分页。库存来源选择及批量人员等特殊流程仍有独立实现，后续调整时优先接入公共 UI，保留各自业务编排；不能只取第一页或改成无界全量加载。
 - **单位回显：** 物料页仍有独立loadUnitNames查询；已复用单位选择器不等于所有单位名称读取都已统一。后续按统一引用读取与缓存规则治理，不再复制页面查询。
 - **物料对话框：** BOM面板内部仍使用MaterialPicker，与公共MaterialSelect的交互/读取需要核对并统一同义规则。该局部实现不作为另一个推荐公共入口，不能未经边界分析就复制到新页面。
 - **执行选择：** ExecutionSelect与ProductionExecutionSelect尚未统一；先明确记录查询、单据选择、可信状态候选和扫码定位的差异，再收敛共同选择能力。不能仅为减少文件而删除必要准入，也不能以不同组件名长期维护相同业务规则。
@@ -124,3 +125,11 @@ BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分�
 `StockDocumentDetailDialog` 接收明确的单据方向、单据ID及可选领料明细ID，通过正式查询接口展示来源单据；库存流水使用 `stockDocumentReference` 解析可信来源，不从动作名称或库存ID猜测单据。弹窗只读，复用 `StockDocumentHeader` 和 `StockDocumentLines`，不承载审核、编辑或作废。完整单据、领料列表和单条领料明细分别遵循既有查询权限；关闭、切厂、撤权和卸载清空内容并拒绝迟到响应。
 
 库存操作的列表入口继续路由跳转，携带字符串 `stockId`；列表初始化查询及重置保留该筛选，切厂移除旧库存范围。过滤、去重、分页和总数由后端完成。
+
+### 工艺与历史补报的检索输入
+
+工单默认工艺复用 SearchSelect/useRemoteOptions。切换产品只执行一次未筛选的已发布工艺查询，再次展开沿用该次结果；关键字检索防抖，失败在输入旁重试。仅首次成功的未筛选查询可以判定无适用工艺，过滤后无匹配不能改变这个结论。产品切换时只有一个候选则沿用原有预选行为；编辑已有工单保留已存工艺及名称，不因打开下拉改选。
+
+工艺节点使用 RoutingOperationSelect，各行候选和请求序号独立；打开工艺详情不批量逐节点预载工序候选，已存节点名称直接回显。选择工序后向页面传递已选名称用于当前工艺图，图的名称表不作为各行共享的搜索候选。参考接口没有分页契约，达到100条时提示细化名称，不显示虚假的下一页。
+
+ProductionReportManager 的历史操作人员输入复用 SearchSelect/useRemoteOptions 的防抖、面板内分页和同页重试。仍调用 report-operators 历史补报目录，不增加当前工序能力或派工名单过滤；切厂、关闭编辑和撤权清除候选并拒绝迟到响应，未决命令的原人员ID保持原样，禁用时不读取新候选。

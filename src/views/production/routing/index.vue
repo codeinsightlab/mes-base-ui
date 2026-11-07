@@ -16,6 +16,7 @@ import RightToolbar from '@/components/RightToolbar/index.vue'
 import SyncButton from '@/components/business/SyncButton.vue'
 import { api, sync, type ReferenceOption, type RoutingDetail, type RoutingVo } from '@/api/production/routing'
 import { contentError } from '@/lib/production/routingGraph'
+import RoutingOperationSelect from '@/components/business/production/RoutingOperationSelect.vue'
 import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
 import type { RoutingNode, RoutingProduct } from '@/api/production/routing'
 import { parseTime } from '@/utils/ruoyi'
@@ -40,7 +41,7 @@ const connection = reactive({ from: '', to: '' })
 const pendingContent = computed(() => !!detail.value && contentFingerprint() !== savedContent.value)
 const pendingMetadata = computed(() => !!detail.value && (metadata.name !== detail.value.routing.name || metadata.description !== (detail.value.routing.description ?? '')))
 const editable = computed(() => detail.value?.routing.status === 'DRAFT' && can('update'))
-let sequence = 0, listSequence = 0, operationSequence = 0, materialSequence = 0
+let sequence = 0, listSequence = 0, materialSequence = 0
 const alive = (attempt: number, revision: number) => attempt === sequence && revision === auth.revision
 const labels = { DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '停用' } as const
 const tone = (status: RoutingVo['status']) => status === 'PUBLISHED' ? 'success' : status === 'DRAFT' ? 'warning' : 'disabled'
@@ -50,7 +51,7 @@ function productLabel(product: RoutingProduct) {
   return `${product.currentMaterialCode} · ${product.currentMaterialName}`
 }
 function clear() {
-  sequence++; listSequence++; operationSequence++; materialSequence++
+  sequence++; listSequence++; materialSequence++
   rows.value = []; total.value = 0; detail.value = null; materialIds.value = []
   drawer.value = createDialog.value = copyDialog.value = graphDialog.value = false
   operationOptions.value = []; materialOptions.value = []; loading.value = busy.value = false
@@ -68,7 +69,7 @@ async function beforeCloseDetail(done: () => void) {
   if (alive(attempt, revision)) done()
 }
 function closeDetail() {
-  sequence++; operationSequence++; materialSequence++
+  sequence++; materialSequence++
   busy.value = false; detail.value = null
   graphDialog.value = copyDialog.value = false
   operationOptions.value = []; materialOptions.value = []
@@ -103,7 +104,7 @@ async function open(id: string) {
     const value = await api.detail(id)
     if (!alive(attempt, revision)) return
     accept(value)
-    if (editable.value) { void searchOperations(''); void searchMaterials('') }
+    if (editable.value) { void searchMaterials('') }
   } catch(failure) {
     if (alive(attempt, revision)) drawerError.value = failure instanceof Error ? failure.message : '读取详情失败'
   } finally { if (alive(attempt, revision)) busy.value = false }
@@ -112,13 +113,8 @@ function mergeOptions(old: ReferenceOption[], incoming: ReferenceOption[]) {
   const selected = new Set([...materialIds.value, ...(detail.value?.nodes.map(step => step.operationId) ?? [])])
   return [...new Map([...old.filter(option => selected.has(option.id)), ...incoming].map(option => [option.id, option])).values()]
 }
-async function searchOperations(search: string) {
-  if (!editable.value) return
-  const attempt = ++operationSequence, revision = auth.revision, owner = sequence
-  try {
-    const options = await api.operations(search)
-    if (attempt === operationSequence && alive(owner, revision) && editable.value) operationOptions.value = mergeOptions(operationOptions.value, options)
-  } catch(failure) { if (attempt === operationSequence && alive(owner, revision)) drawerError.value = failure instanceof Error ? failure.message : '工序查询失败' }
+function rememberOperation(option:ReferenceOption) {
+  operationOptions.value = [...operationOptions.value.filter(row => row.id !== option.id), option]
 }
 async function searchMaterials(search: string) {
   if (!editable.value) return
@@ -278,9 +274,7 @@ onMounted(load)
         <el-table :data="detail.nodes" empty-text="尚未添加工艺节点">
           <el-table-column label="节点编码" min-width="110"><template #default="{ row }"><el-input v-if="editable" :model-value="row.nodeCode" maxlength="64" :disabled="busy" aria-label="节点编码" @update:model-value="(value: string) => renameNode(row, value)" /><CodeText v-else :value="row.nodeCode" /></template></el-table-column>
           <el-table-column label="工序" min-width="220"><template #default="{ row }">
-            <el-select v-if="editable" v-model="row.operationId" filterable remote :remote-method="searchOperations" placeholder="搜索并选择工序" style="width: 100%" :disabled="busy">
-              <el-option v-for="option in operationOptions" :key="option.id" :value="option.id" :label="`${option.code} · ${option.name}`" />
-            </el-select><span v-else>{{ row.operationCode }} · {{ row.operationName }}</span><div v-if="row.operationDescription" class="secondary">{{ row.operationDescription }}</div>
+            <RoutingOperationSelect v-if="editable" v-model="row.operationId" :option="operationOptions.find(option=>option.id===row.operationId)" :disabled="busy" @selected="rememberOperation" /><span v-else>{{ row.operationCode }} · {{ row.operationName }}</span><div v-if="row.operationDescription" class="secondary">{{ row.operationDescription }}</div>
           </template></el-table-column>
           <el-table-column label="关键点" width="75"><template #default="{ row, $index }"><el-checkbox :model-value="row.isKey" :disabled="!editable || busy" aria-label="关键工艺节点" @change="(value: string | number | boolean) => keyNode($index, Boolean(value))" /></template></el-table-column>
           <el-table-column label="节点说明" min-width="145"><template #default="{ row }"><el-input v-if="editable" v-model="row.description" maxlength="1000" :disabled="busy" /><span v-else>{{ row.description ?? '—' }}</span></template></el-table-column>
