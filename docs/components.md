@@ -136,12 +136,14 @@ ProductionReportManager 的历史操作人员输入复用 SearchSelect/useRemote
 
 ### 通用字典数据读取与映射
 
-字典读取和数据结构转换统一复用 [dictionaries.ts](../src/utils/dictionaries.ts) 的 `dictionary(code)`：接口原始 `dictValue` / `dictLabel` 转换为 `DictionaryOption.value` / `label`，`raw` 保留样式及默认值等元数据。返回列表为响应式共享数据，选项顺序沿用字典；调用方不再分别转换接口结构或维护编码名称表。Vue 页面可在 `computed` 中读取；已有 `DictSelect`、`DictTag` 继续复用同一数据源。
+字典读取和数据结构转换统一复用 [dictionaries.ts](../src/utils/dictionaries.ts) 的 `dictionary(code)`：接口原始 `dictValue` / `dictLabel` 转换为 `DictionaryOption.value` / `label`，`raw` 保留样式及默认值等元数据。返回列表为响应式共享数据，选项顺序沿用字典。纯展示调用方不再分别转换接口结构或维护编码名称表；Vue 页面可在 `computed` 中读取，已有 `DictSelect`、`DictTag` 继续复用同一数据源。读取错误通过 `dictionaryState.errors[code]` 呈现，缓存、并发请求去重、失效与重试由公共模块负责，刷新复用 `refreshDictionaries()`。
 
-读取错误通过 `dictionaryState.errors[code]` 呈现；缓存、并发请求去重、失效与重试由公共模块负责，刷新复用 `refreshDictionaries()`。领域函数只负责选择字典编码及必要上下文，例如 `getStockDocumentTypes(direction)`；不得另建后端字典聚合请求或第二套前端缓存。后端业务接口提供真实业务编码；权限过滤候选、不可变快照等独立业务事实不由普通字典替代。约束权威入口见 [AGENTS.md](../AGENTS.md#字典读取与展示约束2026-11-07-用户确认)。
+前后端使用同一稳定业务编码和接口契约：后端决定业务身份、权限、来源、状态及受业务条件限制的候选，字典提供当前展示名称、样式和普通选项排序。纯编码展示优先前端映射；业务候选、可操作标志和限制原因可通过 `/types` 等合理业务接口提供，前端不能用完整字典扩大候选或另行判断准入。历史冻结名称、审计快照、导出及服务端消费按业务契约返回，不被当前字典覆盖；不按接口名称或返回label禁止正常业务接口，也无需为正常业务需求申请例外。
+
+领域入口可组合业务接口和公共字典结果，但必须保留候选及操作能力的后端权威，只将当前展示字段交给字典；不得各自维护第二套名称表、字典缓存或业务规则。字段冲突、缺失或读取失败要显式呈现，不能静默替换来源。约束权威入口见 [AGENTS.md](../AGENTS.md#字典读取与展示约束2026-11-07-用户确认)。
 
 ### 出入库单据类型的统一读取
 
-所有前端单据类型名称、候选与排序统一通过 `getStockDocumentTypes(direction)`（[stockDocumentTypes.ts](../src/lib/stockDocumentTypes.ts)）读取。函数复用公共 `dictionary`：入库读取 `stock_document_in_type`，出库读取 `stock_document_out_type`，缓存、请求去重、失效及重试沿用公共字典机制。Vue 调用方可使用 [useStockDocumentTypes](../src/composables/useStockDocumentTypes.ts) 取得响应式类型、错误与名称；禁止页面自建名称映射或另调库存单 `/types` 合并接口。
+出入库类型的当前字典名称、普通选项与排序统一通过 `getStockDocumentTypes(direction)`（[stockDocumentTypes.ts](../src/lib/stockDocumentTypes.ts)）读取。函数复用公共 `dictionary`：入库读取 `stock_document_in_type`，出库读取 `stock_document_out_type`；Vue 调用方可使用 [useStockDocumentTypes](../src/composables/useStockDocumentTypes.ts) 取得响应式类型、错误与名称。若场景需要受权限、工厂、状态或来源限制的类型候选，领域入口可以组合后端业务接口的合法候选与字典名称，不另建候选准入规则；`/types` 并非禁止使用的接口。
 
-当前消费者为出入库单列表／表单、来源单据详情和库存流水。库存流水以正式关联单据的 `documentType` 显示类型，不能将通用库存动作 `OTHER_RECEIPT` 当成采购、生产等具体单据类型；无可靠关联显示待确认，独立盘盈／盘亏／撤销仍展示其动作语义。名称读取失败保留原流水及余额，展示错误与重试。字典只负责名称和候选，业务来源、审核和库存校验由后端执行。
+当前消费者为出入库单列表／表单、来源单据详情和库存流水。库存流水以正式关联单据的 `documentType` 显示类型，不能将通用库存动作 `OTHER_RECEIPT` 当成采购、生产等具体单据类型；无可靠关联显示待确认，独立盘盈／盘亏／撤销仍展示其动作语义。当前字典名称与冻结名称快照分别遵循各自字段契约；名称读取失败保留原流水及余额，展示错误与重试。字典不决定业务来源、审核或库存准入，最终命令由后端复验。
