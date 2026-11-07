@@ -20,6 +20,7 @@ const select = defineComponent({
 const option = defineComponent({ props: ['value', 'label'], template: '<option :value="value">{{ label }}</option>' })
 const button = defineComponent({ emits: ['click'], template: '<button @click="$emit(\'click\', $event)"><slot /></button>' })
 const wrappers: ReturnType<typeof mount>[] = []
+
 function setup(component: Component = PersonnelSelect, permission = true, modelValue: string | null = null) {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -32,6 +33,7 @@ function setup(component: Component = PersonnelSelect, permission = true, modelV
   wrappers.push(wrapper)
   return { wrapper, auth }
 }
+
 beforeEach(() => {
   vi.mocked(listDirectory).mockReset().mockResolvedValue({ items: [row], total: 1, offset: 0, limit: 20 })
   vi.mocked(getDirectory).mockReset().mockResolvedValue(row)
@@ -42,7 +44,7 @@ describe('read-only business directory components', () => {
     'uses the correct list endpoint and preserves string IDs', async(component, resource) => {
       const { wrapper } = setup(component)
       await flushPromises()
-      expect(listDirectory).toHaveBeenCalledWith(resource, '', 0, undefined)
+      expect(listDirectory).toHaveBeenCalledWith(resource, '', 0, undefined, 20)
       await wrapper.find('select').setValue(row.id)
       expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([row.id])
       expect(wrapper.emitted('change')?.at(-1)).toEqual([row])
@@ -53,7 +55,7 @@ describe('read-only business directory components', () => {
     const component = defineComponent({ components: { BusinessDirectorySelect }, template: `<BusinessDirectorySelect resource="${resource}" />` })
     const { wrapper } = setup(component)
     await flushPromises()
-    expect(listDirectory).toHaveBeenCalledWith(resource, '', 0, undefined)
+    expect(listDirectory).toHaveBeenCalledWith(resource, '', 0, undefined, 20)
     expect(wrapper.text()).toContain('精加工（ROUTE · V2）')
   })
   it('makes no request without the exact business read grant or factory', async() => {
@@ -77,25 +79,28 @@ describe('read-only business directory components', () => {
     await wrapper.find('select').setValue('')
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([null])
   })
-  it('paginates and filters without replacing selected details', async() => {
-    vi.mocked(listDirectory).mockResolvedValueOnce({ items: [row], total: 2, offset: 0, limit: 20 })
-    const { wrapper } = setup()
+  it('filters a fixed result while retaining independently resolved selection', async() => {
+    const { wrapper } = setup(PersonnelSelect, true, row.id)
     await flushPromises()
-    vi.mocked(listDirectory).mockResolvedValueOnce({ items: [{ ...row, id: '2' }], total: 2, offset: 1, limit: 20 })
-    await wrapper.find('button').trigger('click')
-    await flushPromises()
-    expect(listDirectory).toHaveBeenLastCalledWith('personnel', '', 1, undefined)
-    expect(wrapper.findAll('option')).toHaveLength(3)
+    expect(wrapper.find('button').exists()).toBe(false)
+    vi.mocked(listDirectory).mockResolvedValueOnce({ items: [{ ...row, id: '2', name: 'Other' }], total: 100, offset: 0, limit: 20 })
     const inner = wrapper.findComponent(BusinessDirectorySelect).vm as unknown as { search(value: string): Promise<void> }
-    await inner.search('测试')
-    expect(listDirectory).toHaveBeenLastCalledWith('personnel', '测试', 0, undefined)
+    await inner.search('Other')
+    expect(listDirectory).toHaveBeenLastCalledWith('personnel', 'Other', 0, undefined, 20)
+    expect(wrapper.findAll('option')).toHaveLength(3)
+    expect(wrapper.text()).toContain(row.name)
   })
   it('rejects stale list and detail responses after changing factory', async() => {
     let listDone!: (value: Awaited<ReturnType<typeof listDirectory>>) => void
     let detailDone!: (value: DirectoryOption) => void
-    vi.mocked(listDirectory).mockImplementationOnce(() => new Promise(done => { listDone = done }))
-    vi.mocked(getDirectory).mockImplementationOnce(() => new Promise(done => { detailDone = done }))
+    vi.mocked(listDirectory).mockImplementationOnce(() => new Promise(done => {
+      listDone = done
+    }))
+    vi.mocked(getDirectory).mockImplementationOnce(() => new Promise(done => {
+      detailDone = done
+    }))
     const { wrapper, auth } = setup(PersonnelSelect, true, row.id)
+    await flushPromises()
     auth.factoryId = 'F2'
     auth.factoryPermissions = []
     auth.revision++

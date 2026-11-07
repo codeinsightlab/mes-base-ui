@@ -21,11 +21,11 @@
 | BOM版本 `BomVersionSelect` | [BomVersionSelect.vue](../src/components/business/material/BomVersionSelect.vue) | BOM ID、所属物料ID、禁用状态；按物料选择已发布版本，返回选中版本及revision并补查当前已选项以支持跨页回显；只显示默认标记，不自行应用默认。子BOM未选仍表示叶项 | [BOM组成](../src/components/business/material/MaterialBomPanel.vue)、[工单用料](../src/components/business/production/WorkorderMaterialPanel.vue) |
 | 工单BOM选择 `WorkorderBomSelect` | [WorkorderBomSelect.vue](../src/components/business/material/WorkorderBomSelect.vue) | 当前产出物料、已选BOM及禁用状态；复用BomVersionSelect与默认接口，有默认已发布版本则预选，无默认由用户选择，手选/清空及已有版本不被迟到默认覆盖 | [工单创建编辑](../src/views/production/workorder/index.vue)、[用料维护](../src/components/business/production/WorkorderMaterialPanel.vue)经共享用料编辑器复用 |
 | 数量输入 `QuantityInput` | [QuantityInput.vue](../src/components/business/material/QuantityInput.vue) | 只负责录入、单位规则读取和有效性校验；错误提示在用户编辑或离开字段后显示，父表单仍可即时阻止无效提交。默认 `physical`；BOM基准/组件系数显式 `semantic="bom-ratio"`；`showUnit` 按同次读取的正式单位显示后缀。精度豁免只能使用已定义的可信原值/余量契约 | [质量申报](../src/components/business/quality/DefectDeclarationPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue)、[销售订单](../src/views/sales/order/index.vue) |
-| 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态及可选状态筛选；按编码或名称前缀远程检索，分页、回显及上下文保护在组件内维护；分页按钮位于候选底部，保留搜索词并继续当前候选；disabled时仅展示已选物料文本，不查询候选 | [工单产出物料](../src/views/production/workorder/index.vue)、[销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
+| 物料 `MaterialSelect` | [MaterialSelect.vue](../src/components/business/MaterialSelect.vue) | 物料ID、禁用状态及可选状态筛选；按编码或名称前缀远程检索，候选上限、回显及上下文保护复用统一检索规则。出入库单列表用已确认的材料ID过滤明细，与批次、库位在同一明细组合匹配；disabled时仅展示已选物料文本，不查询候选 | [工单产出物料](../src/views/production/workorder/index.vue)、[销售订单](../src/views/sales/order/index.vue)、[库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue) |
 | 供应商 `SupplierSelect` | [SupplierSelect.vue](../src/components/business/SupplierSelect.vue) | 供应商ID、禁用状态及状态筛选；远程分页、跨页回显和切厂/撤权保护；新采购使用启用筛选，历史单据名称由单据快照呈现 | 供应商报价、采购入库 |
 | 采购成交价 `PurchasePriceInput` | [PurchasePriceInput.vue](../src/components/business/purchase/PurchasePriceInput.vue) | 当前采购单头和明细；按供应商/物料/业务日期读取参考价，仅空成交价自动带出；金额由服务端核算，迟到响应随工厂和输入失效，只读显示已存快照 | 采购入库明细 |
 | 仓库 `WarehouseSelect` | [WarehouseSelect.vue](../src/components/business/WarehouseSelect.vue) | 仓库ID、可信来源及已有历史读取语义；保留LOCAL/EXTERNAL来源约束，不由页面另写候选算法 | [工单用料](../src/components/business/production/WorkorderMaterialPanel.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
-| 原领料单 `MaterialIssueDocumentSelect` | [MaterialIssueDocumentSelect.vue](../src/components/business/warehouse/MaterialIssueDocumentSelect.vue) | 按业务单号检索已审核的材料领用出库单；复用 SearchSelect/useRemoteOptions，内部保留字符串 ID，沿用单据查询权限及切厂失效规则，不改变退料准入 | 库存明细退料表单 |
+| 原领料单 `MaterialIssueDocumentSelect` | [MaterialIssueDocumentSelect.vue](../src/components/business/warehouse/MaterialIssueDocumentSelect.vue) | 必传当前库存 stockId，按物料、仓库、批次及库位的完整库存身份检索已审核的材料领用出库单；单号关键词在该范围内过滤，缺少库存上下文不查询。复用 SearchSelect/useRemoteOptions，保留字符串 ID，切换库存或工厂失效旧候选及已选值，不改变退料准入 | 库存明细退料表单 |
 | 库存来源 `StockSourceSelect` | [StockSourceSelect.vue](../src/components/business/warehouse/StockSourceSelect.vue) | 当前物料、仓库和库存身份；选择具体库存来源，使用批次、库位及可用数量呈现，不显示库存主键；已选批次/库位可用于回显，新增批次/库位仍复用原受控入口，不等同于选择仓库或选择物料 | [库存单据](../src/views/wm/stockDocuments/StockDocumentPage.vue)、[生产入库](../src/components/business/production/ProductionReceiptAction.vue) |
 | 工作站 `WorkstationSelect` | [WorkstationSelect.vue](../src/components/business/WorkstationSelect.vue) | 工作站ID；共享检索、分页和回显；页面不根据设备/报工用途重复实现同义工作站选择 | [设备维护](../src/views/basic/equipment/index.vue) |
 | 客户 `CustomerSelect` | [CustomerSelect.vue](../src/components/business/CustomerSelect.vue) | 客户ID、禁用状态；统一远程搜索、分页、回显和错误处理 | [销售订单](../src/views/sales/order/index.vue) |
@@ -53,20 +53,40 @@
 新增或调整检索型选择输入时，优先采用以下三层结构。页面优先使用已有业务选择器；已有业务选择器内部复用公共层，不在每个页面重复配置 API 或权限。
 
 - **UI：** [SearchSelect.vue](../src/components/SearchSelect.vue) 是受控单选组件，只接收选项、已选项、加载/错误状态并发出事件；不调用 API、不读取业务 Store。选项统一为 `{ value: string, label: string, disabled?: boolean }`；可附带 `data` 供业务层使用，UI 不解释它。
-- **行为：** [useRemoteOptions.ts](../src/composables/useRemoteOptions.ts) 通过外部 `search/resolve` 函数统一搜索防抖、分页位置、去重、回显、失败原页重试和请求竞态。列表和回显独立管理；分页位置依据回调返回的 `nextOffset`，不能依据过滤后或去重后的选项数量推进。
+- **行为：** [useRemoteOptions.ts](../src/composables/useRemoteOptions.ts) 通过外部 `search/resolve` 函数统一固定数量检索、防抖、去重、回显、失败重试和请求竞态。候选上限由系统参数控制（初始20），不分页、不追加加载；列表和已选项回显独立管理。
 - **业务：** 外部 Vue 提供接口调用、参数、业务过滤和选项转换，管理权限、来源、选中事件及上下文重置。业务上下文变化时同步 `reset()`，按业务规则清除已选值后再读取，不能让旧上下文的数据回填。
 
-`search({ keyword, offset, limit })` 返回 `{ items, total, nextOffset }`；`resolve(value)` 返回一个选项或合法 `null`，读取失败应抛错，不能返回空值伪装成功。保持 ID 字符串精度；详情权限与列表权限在业务层分别检查。首批候选由业务层初始化，或通过 UI 的 `open` 事件按需加载。
+`search({ keyword, offset, limit })` 固定 `offset=0`，`limit` 由 `/system/config` 的 `sys.ui.searchSelect.limit` 控制（初始20，范围1至100），返回 `{ items }`；不再维护 total、nextOffset、hasMore 或 loadMore。`resolve(value)` 返回一个选项或合法 `null`，已选项不在当前候选中时仍独立回显；读取失败应抛错，不能返回空值伪装成功。保持 ID 字符串精度；详情权限与列表权限在业务层分别检查。首批候选由业务层初始化，或通过 UI 的 `open` 事件按需加载。无 limit 参数的工艺适用性接口保留原业务判断，再限制候选展示，不把截断集合冒充完整业务依据。
 
-UI 固定使用面板内分页：“加载更多”只在有下一页时出现，加载中禁止重复翻页；列表失败在面板内显示原错误与重试，保留已读候选。`disabled` 时显示可换行的已选文本及完整 title，不显示候选或分页、不查询候选；允许单独读取和重试已选项回显。缺值显示“—”，有值但无法回显显示“待确认（值）”，不以空白冒充成功。
+参数读取使用现有登录用户公共配置接口，不要求系统参数管理权限。每次发起检索前重新读取，同时发起的读取共享一个请求；后台修改后下一次检索生效，不需重新构建前端。参数缺失、非法或读取失败时显示错误并允许重试，不静默回退写死的20。
+
+UI 不提供分页或“加载更多”，需要更多匹配项时输入更准确的关键词；列表失败在面板内显示原错误与重试。下拉面板通过 `fit-input-width` 跟随输入框宽度，并限制在可视区域内；空态与加载提示居中、保留内边距，不用覆盖原生最小宽度的方式压缩成文字宽度。长选项允许换行。`disabled` 时显示可换行的已选文本及完整 title，不显示候选、不查询候选；允许单独读取和重试已选项回显。缺值显示“—”，有值但无法回显显示“待确认（值）”，不以空白冒充成功。
+
+交互统一区分“未选择”“已选择”“检索中”。正式值 `modelValue` 由父层持有，输入文字与候选高亮由底层选择框管理；搜索请求的关键字只是请求快照，不回写输入文字。输入事件在底层记录字符后处理，不在捕获阶段触发候选重绘。候选或已选项回显迟到时，不覆盖正在编辑的文字。
+
+| 操作 | 搜索与选中值 | 查询行为 |
+| --- | --- | --- |
+| 已选择后输入新词 | 进入检索状态；保留原选项，尚不改变正式值 | 不查询页面 |
+| 删除搜索词至空 | 仍处于检索状态，不自动恢复为“选择完成” | 回车继续确认候选，不拿旧值查询 |
+| 回车 / 点击候选 | 确认该候选（包括再次确认原选项），退出检索 | 只确认，不同时查询 |
+| 已确认后再次回车 | 发出确认意图 | 仅所在 QueryForm 触发查询 |
+| 粘贴 / 输入后立即回车，检索尚未完成 | 记住本次确认意图，等待当前检索完成后确认高亮候选或首个可用候选 | 只确认，不自动查询；继续输入、Esc、失焦、外部重置或查询失败均取消等待确认 |
+| 点击清空 | 清除正式值和搜索词，原选项不再可恢复 | 不自动查询 |
+| Esc 取消 | 一次取消整段未确认搜索，恢复当前正式选项；没有原选项则恢复为空，保持输入焦点 | 不查询 |
+| 失焦 / 点击外部 | 放弃未确认搜索，保留当前正式选项；候选选择和面板内翻页、重试不算失焦取消 | 不自动查询 |
+| 外部重置 / 禁用 | 丢弃当前搜索状态，以父层的新值及权限状态为准 | 不查询 |
+
+未展开候选时回车选择首个可用项，无候选则请求加载。加载状态覆盖防抖等待、系统参数读取及候选请求，不在等待期间显示“暂无匹配结果”。中文输入法确认和连续按住回车不能重复选取或查询；等待确认只对当前检索有效，查询失败后点击重试不会沿用失败前的确认意图。确认候选时复用底层选择动作，统一收起面板和清除搜索草稿，不依赖原生回车再次执行选择。`SearchSelect` 的 `confirm` 表示已选值的确认意图；`QueryForm` 通过公共上下文提供确认查询能力，并检查禁用的查询按钮、沿唯一原生 submit 入口提交。选择组件不寻找、提交外层 DOM 表单，普通新增/编辑表单不提供此能力，不会自动保存。页面无需为每个业务选择器重复绑定回车事件。
+
+已选名称可鼠标选取复制；已选择模式下聚焦检索框，Ctrl/Cmd+C 复制完整显示名称；检索模式复制实际选中的输入文字，搜索词为空也不复制隐藏的旧值。鼠标选取部分文字保留原生复制；禁用展示文本同样可复制。输入新词并不成为页面筛选条件，必须确认候选；主动点击查询按钮时，未确认搜索按失焦规则放弃，使用已确认的正式值。
 
 使用行为层时，将返回的 refs 解构后绑定，避免模板中的嵌套 ref 被误当作普通值：
 
 ```vue
 <script setup lang="ts">
 // searchOptions/resolveOption 由业务 Vue 实现；enabled/disabled 由业务上下文决定。
-const { items, selected, loading, resolving, error, resolveError, hasMore,
-  scheduleSearch, loadMore, retry, hydrate, open, reset } = useRemoteOptions({
+const { items, selected, loading, resolving, error, resolveError,
+  scheduleSearch, retry, hydrate, open, reset } = useRemoteOptions({
   modelValue: () => props.modelValue,
   enabled: () => allowed.value,
   disabled: () => !!props.disabled,
@@ -77,8 +97,8 @@ const { items, selected, loading, resolving, error, resolveError, hasMore,
 <template>
   <SearchSelect :model-value="modelValue" :options="items" :selected-option="selected"
     :disabled="disabled || !allowed" :loading="loading" :resolving="resolving"
-    :has-more="hasMore" :error="error" :resolve-error="resolveError"
-    @update:model-value="choose" @search="scheduleSearch" @load-more="loadMore"
+    :error="error" :resolve-error="resolveError"
+    @update:model-value="choose" @search="scheduleSearch"
     @retry="retry" @resolve-retry="hydrate" @open="open" />
 </template>
 ```
@@ -100,11 +120,11 @@ const { items, selected, loading, resolving, error, resolveError, hasMore,
 | 富文本 `Editor` | [Editor/index.vue](../src/components/Editor/index.vue) | 公共编辑器适配，文件上传沿用私有接口；通过systemPlugin注册，具体数据权限由使用业务决定 |
 | 图标选择 `IconSelect` | [IconSelect/index.vue](../src/components/IconSelect/index.vue) | 系统菜单图标选择，使用已有图标资源；不另建页面级图标选择实现 |
 
-单位选择器`UnitMeasureSelect`的分页位于下拉面板底部；禁用时只回显已选单位，不查询候选、不显示“加载更多”。回显失败保留ID与重试入口，不用空白代替失败。
+单位选择器`UnitMeasureSelect`按系统参数限定候选数量，不提供分页；禁用时只回显已选单位，不查询候选。回显失败保留ID与重试入口，不用空白代替失败。
 
 ## 已知统一缺口
 
-- **分页交互：** 已接入的分页选择器统一使用 SearchSelect 的面板内分页。库存来源选择及批量人员等特殊流程仍有独立实现，后续调整时优先接入公共 UI，保留各自业务编排；不能只取第一页或改成无界全量加载。
+- **检索数量：** 已接入 SearchSelect 的单选输入的候选数量由系统参数控制、无追加分页。库存来源及批量人员等独立流程不属于本次变更，后续接入前先核对其业务语义，不将所有选择流程一刀切为20条。
 - **单位回显：** 物料页仍有独立loadUnitNames查询；已复用单位选择器不等于所有单位名称读取都已统一。后续按统一引用读取与缓存规则治理，不再复制页面查询。
 - **物料对话框：** BOM面板内部仍使用MaterialPicker，与公共MaterialSelect的交互/读取需要核对并统一同义规则。该局部实现不作为另一个推荐公共入口，不能未经边界分析就复制到新页面。
 - **执行选择：** ExecutionSelect与ProductionExecutionSelect尚未统一；先明确记录查询、单据选择、可信状态候选和扫码定位的差异，再收敛共同选择能力。不能仅为减少文件而删除必要准入，也不能以不同组件名长期维护相同业务规则。
@@ -116,7 +136,7 @@ const { items, selected, loading, resolving, error, resolveError, hasMore,
 
 `WorkorderBomSelect`统一工单BOM选择：物料有默认已发布版本时预选；没有默认时必须由用户选择，不私选唯一、最新或第一条。已有工单保留已关联版本，默认变化不覆盖它；默认读取失败显示错误和重试，不能当作“没有默认”。用户改选/清空、产品和工厂上下文变化会使迟到默认响应失效。
 
-该组件复用`BomVersionSelect`的候选分页及回显和`defaultBom`接口，不另建版本体系。创建/编辑工单与详情用料维护共用`WorkorderMaterialEditor`；它调用服务端`direct-components`读取直接组件和数量，产量变化只重算未调整的BOM行，保留人工调整及新增行并在保存前确认。标准数量仍由服务端保存时复验，客户端不自行复制BOM公式。
+该组件复用`BomVersionSelect`的按系统参数限制的候选检索及独立回显和`defaultBom`接口，不另建版本体系。创建/编辑工单与详情用料维护共用`WorkorderMaterialEditor`；它调用服务端`direct-components`读取直接组件和数量，产量变化只重算未调整的BOM行，保留人工调整及新增行并在保存前确认。标准数量仍由服务端保存时复验，客户端不自行复制BOM公式。
 
 BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分析仍可读取各状态版本；这两种语义不套用工单默认选择策略。
 
@@ -130,9 +150,9 @@ BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分�
 
 工单默认工艺复用 SearchSelect/useRemoteOptions。切换产品只执行一次未筛选的已发布工艺查询，再次展开沿用该次结果；关键字检索防抖，失败在输入旁重试。仅首次成功的未筛选查询可以判定无适用工艺，过滤后无匹配不能改变这个结论。产品切换时只有一个候选则沿用原有预选行为；编辑已有工单保留已存工艺及名称，不因打开下拉改选。
 
-工艺节点使用 RoutingOperationSelect，各行候选和请求序号独立；打开工艺详情不批量逐节点预载工序候选，已存节点名称直接回显。选择工序后向页面传递已选名称用于当前工艺图，图的名称表不作为各行共享的搜索候选。参考接口没有分页契约，达到100条时提示细化名称，不显示虚假的下一页。
+工艺节点使用 RoutingOperationSelect，各行候选和请求序号独立；打开工艺详情不批量逐节点预载工序候选，已存节点名称直接回显。选择工序后向页面传递已选名称用于当前工艺图，图的名称表不作为各行共享的搜索候选。参考接口传入系统参数的 limit，不提供下一页。
 
-ProductionReportManager 的历史操作人员输入复用 SearchSelect/useRemoteOptions 的防抖、面板内分页和同页重试。仍调用 report-operators 历史补报目录，不增加当前工序能力或派工名单过滤；切厂、关闭编辑和撤权清除候选并拒绝迟到响应，未决命令的原人员ID保持原样，禁用时不读取新候选。
+ProductionReportManager 的历史操作人员输入复用 SearchSelect/useRemoteOptions 的防抖、参数控制的候选上限和同条件重试。仍调用 report-operators 历史补报目录，不增加当前工序能力或派工名单过滤；切厂、关闭编辑和撤权清除候选并拒绝迟到响应，未决命令的原人员ID保持原样，禁用时不读取新候选。
 
 ### 通用字典数据读取与映射
 

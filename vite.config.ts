@@ -11,7 +11,11 @@ export function validateApiTarget(value: string, localOnly: boolean): string {
     throw new Error('MES_API_TARGET 必须为 http(s) 后端地址，不含路径、查询参数或凭证')
   }
   let target: URL
-  try { target = new URL(value) } catch { throw new Error('MES_API_TARGET 后端地址或端口无效') }
+  try {
+    target = new URL(value)
+  } catch {
+    throw new Error('MES_API_TARGET 后端地址或端口无效')
+  }
   if (localOnly && (target.protocol !== 'http:' || target.hostname !== '127.0.0.1' || !target.port)) {
     throw new Error('Development proxy requires an explicit loopback backend')
   }
@@ -44,6 +48,6 @@ export default defineConfig(({ command, mode }) => {
         '/v3/api-docs/open-api': { target: apiTarget }
       } : undefined
     },
-    test: { include: ['tests/**/*.{test,spec}.{ts,tsx,js,jsx}'], environment: 'jsdom', restoreMocks: true, maxWorkers: 4 }
+    test: { setupFiles: ['tests/setup/systemConfig.ts'], include: ['tests/**/*.{test,spec}.{ts,tsx,js,jsx}'], environment: 'jsdom', restoreMocks: true, maxWorkers: 4 }
   }
 })

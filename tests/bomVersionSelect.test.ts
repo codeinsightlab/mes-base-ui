@@ -14,15 +14,21 @@ let wrapper: ReturnType<typeof mount>
 
 beforeEach(() => {
   vi.resetAllMocks()
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {} unobserve() {} disconnect() {}
+  })
   list.mockResolvedValue({ items: [pageBom], total: 40 })
   detail.mockResolvedValue(selectedBom)
 })
-afterEach(() => { wrapper?.unmount(); document.body.innerHTML = '' })
+afterEach(() => {
+  wrapper?.unmount()
+  document.body.innerHTML = ''
+})
 
 function setup(modelValue: string | null = null) {
   const pinia = createPinia(), auth = useAuth(pinia)
-  auth.factoryId = 'A'; auth.factoryPermissions = ['business:material:list', 'business:material:query']
+  auth.factoryId = 'A'
+  auth.factoryPermissions = ['business:material:list', 'business:material:query']
   wrapper = mount(BomVersionSelect, { attachTo: document.body, props: { modelValue, materialId: '8' }, global: { plugins: [pinia, ElementPlus] }})
   return wrapper
 }
@@ -35,8 +41,9 @@ it('resolves a selected version outside the first page without auto-selecting th
   expect(component.emitted('update:modelValue')).toBeUndefined()
   expect(component.text()).not.toContain('加载更多')
   const select = component.findComponent({ name: 'ElSelect' })
-  await select.find('.el-select__wrapper').trigger('click'); await flushPromises()
-  expect(document.querySelector('.el-select-dropdown__footer')?.textContent).toContain('加载更多')
+  await select.find('.el-select__wrapper').trigger('click')
+  await flushPromises()
+  expect(document.querySelector('.el-select-dropdown__footer')).toBeNull()
 })
 
 it('keeps an empty child BOM selection as an empty leaf choice', async() => {

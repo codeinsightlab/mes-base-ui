@@ -11,7 +11,7 @@
     "build": "vue-tsc --noEmit && vite build --mode production",
     "build:prod": "npm run build",
     "build:dev": "vue-tsc --noEmit && vite build --mode development",
-    "verify": "npm run test:format && npm run lint && npm test && npm run build",
+    "verify": "npm run test:format && npm run lint:quality && npm run check:changed && npm test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
@@ -21,7 +21,10 @@
     "check:staged": "node scripts/check-staged.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "prepare": "npm run hooks:install",
-    "test:format": "node --test scripts/format-workflow.test.mjs"
+    "test:format": "node --test scripts/format-workflow.test.mjs",
+    "lint:quality": "eslint . --config eslint.quality.config.mjs",
+    "check:changed": "node scripts/check-changed.mjs",
+    "format:changed": "node scripts/check-changed.mjs --fix"
   },
   "dependencies": {
     "dompurify": "^3.4.16",

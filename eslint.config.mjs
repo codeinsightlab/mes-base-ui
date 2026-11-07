@@ -31,7 +31,22 @@ const statementNewline = {
       }
     }
 
-    return { Program: check, BlockStatement: check, SwitchCase: check, TSModuleBlock: check }
+    return {
+      Program: check,
+      BlockStatement: check,
+      SwitchCase: check,
+      TSModuleBlock: check,
+      IfStatement(node) {
+        if (!node.alternate || node.consequent.type === 'BlockStatement') return
+        const elseToken = context.sourceCode.getTokenBefore(node.alternate)
+        if (elseToken.value !== 'else' || node.consequent.loc.end.line !== elseToken.loc.start.line) return
+        context.report({
+          node: node.alternate,
+          messageId: 'newline',
+          fix: fixer => fixer.insertTextBefore(elseToken, '\n')
+        })
+      }
+    }
   }
 }
 

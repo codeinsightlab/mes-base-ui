@@ -12,6 +12,7 @@ import StockDocumentHeader from '@/components/business/warehouse/StockDocumentHe
 import DocumentFields from '@/components/document/DocumentFields.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import SupplierSelect from '@/components/business/SupplierSelect.vue'
+import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
 import { useRoute, useRouter } from 'vue-router'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
@@ -38,7 +39,7 @@ const headerPermissions = computed(() => ({
   list: issueListOnly.value ? issuePermission + ':list' : p + ':list',
   query: issueQueryOnly.value ? issuePermission + ':query' : p + ':query'
 }))
-const { headerApi, itemApi, aggregateApi: baseAggregateApi } = stockDocumentApis({
+const { headerApi: baseHeaderApi, itemApi, aggregateApi: baseAggregateApi } = stockDocumentApis({
   issueListOnly: () => issueListOnly.value,
   issueQueryOnly: () => issueQueryOnly.value
 }, () => direction.value)
@@ -136,6 +137,13 @@ const initialSearch = computed<Record<string, string>>((): Record<string, string
   ...(issueListOnly.value && direction.value === 'OUT' ? { documentType: 'MATERIAL_ISSUE' } : {}),
   ...(typeof route.query.documentType === 'string' && typeOptions.value.some(t => t.value === route.query.documentType)
     ? { documentType: route.query.documentType } : {}) }))
+const headerApi = {
+  ...baseHeaderApi,
+  list: (query: Record<string, string | number>) => baseHeaderApi.list({
+    ...query, direction: direction.value,
+    ...(initialSearch.value.stockId ? { stockId: initialSearch.value.stockId } : {})
+  })
+}
 const actionDialog = ref<InstanceType<typeof StockActionDialog> | null>(null)
 let linkAttempt = 0
 
@@ -279,6 +287,9 @@ const headerFields = computed<Field[]>(() => [
   { key: 'isNew', label: '新建状态', kind: 'text', readonly: true, hidden: true, defaultValue: 'Y' },
   { key: 'ruleCode', label: '单据编号', columnVisible: false, defaultValue: typeof route.query.executionCode === 'string' ? 'PRODUCTION_RECEIPT' : direction.value === 'IN' ? 'OTHER_RECEIPT' : 'OTHER_ISSUE', kind: 'select', showWhen: ruleCodeVisibility },
   { key: 'documentNo', label: '单号', kind: 'text', readonly: true, searchable: true, columnMinWidth: 200 },
+  { key: 'materialId', label: '材料', kind: 'text', readonly: true, hidden: true, searchable: true },
+  { key: 'batchNo', label: '批次号', kind: 'text', readonly: true, hidden: true, searchable: true },
+  { key: 'binCode', label: '库位', kind: 'text', readonly: true, hidden: true, searchable: true },
   { key: 'direction', label: '方向', kind: 'text', readonly: true, defaultValue: direction.value, hidden: true },
   { key: 'documentType', label: '单据类型', kind: 'select', required: true, defaultValue: typeof route.query.executionCode === 'string' ? 'PRODUCTION_RECEIPT' : direction.value === 'IN' ? 'OTHER_RECEIPT' : 'OTHER_ISSUE', searchable: true, options: typeOptions.value.map(t => ({ value: t.value, label: t.label })) },
   { key: 'status', label: '状态', kind: 'select', readonly: true, searchable: true, options: [{ value: 'DRAFT', label: '草稿', tone: 'warning' }, { value: 'POSTED', label: '已审核', tone: 'success' }, { value: 'CANCELLED', label: '已作废', tone: 'info' }] },
@@ -346,6 +357,7 @@ const itemFields:Field[] = [
       :item-permission-overrides="{list:p+':query',query:p+':query',create:p+':update',update:p+':update',delete:p+':update'}"
       @back="reset"
     >
+      <template #search-materialId="{search}"><MaterialSelect :model-value="search.materialId || null" @update:model-value="search.materialId = $event ?? ''" /></template>
       <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
       <template #header-fields="{draft: headerDraft,disabled: headerDisabled}">
         <template v-if="headerDisabled">

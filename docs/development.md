@@ -65,9 +65,12 @@ Vite 开发代理还处理健康检查、OpenAPI 及接口文档相关路径，�
 npm ci                         # prepare 自动安装本仓库 Git hook
 npm run hooks:install           # 已安装依赖的工作区手动启用一次
 npm run format -- src/views/Home.vue
+npm run format:changed          # 格式化所有本地变更的 JS / TS / Vue（含未跟踪文件）
 npm run format:check -- src/views/Home.vue
 npm run check:staged            # 检查本次暂存的 JS / TS / Vue
-npm run lint                   # 全库代码检查
+npm run check:changed           # 严格检查本地变更文件，不修改文件
+npm run lint:quality            # 全库代码质量，允许历史布局逐步统一
+npm run lint                   # 全库完整规则，仍会报告历史格式差异
 npm run test:format            # 格式、暂存区保护及样本稳定性测试
 npm test
 npm run build
@@ -75,9 +78,13 @@ npm run build
 
 提交顺序为：编辑器格式化 → `git add` → `git commit` → pre-commit 检查暂存内容。检查失败会阻止提交，修复后重新暂存再提交。钩子不会修改文件、执行 `git add` 或自动提交，部分暂存时也只检查索引中的版本。新克隆或更换工作区需安装依赖；若使用 `--ignore-scripts`，需手动执行 `npm run hooks:install`。已有自定义 hooksPath 或 pre-commit 时安装器拒绝覆盖，应在现有钩子中接入 `npm run check:staged`。Git 的 `--no-verify` 可以绕过本地钩子，因此本地检查不是远端强制策略。
 
+提交者（包括 Agent）必须先格式化本次修改的文件、复查差异，然后暂存并提交。`format:changed` 只修改工作区，不更新暂存区；使用部分暂存时优先指定文件，修复后仍需自行审查并重新暂存。
+
+CI 的 `verify` 依次运行格式工具测试、全库 `lint:quality`、变更文件完整规则、全量测试及生产构建。`eslint.quality.config.mjs` 复用主配置，仅关闭脚本布局规则，保留全库语法和代码质量检查；变更文件继续使用主配置，任何错误或警告均失败。push 通过 `MES_FORMAT_BASE` 比较本次推送前 SHA，PR 比较 base SHA；工作流拉取完整历史，首次新分支推送比较与默认分支的公共祖先。CI 缺少或无法读取 base 必须失败，不能按空工作区跳过检查；本地 `check:changed` 默认相对 HEAD 检查工作区及未跟踪文件。CI 只检查，不自动格式化或提交。
+
 历史文件在触及时逐步统一，不为规则调整全量重排。`npm run lint:fix` 会修复整个检查范围，执行前确认工作区差异；日常优先指定文件运行 `format`。暂存检查与 ESLint 覆盖 JS / TS / Vue，独立 CSS 和 Markdown 不在该钩子的校验范围；Vue 内 CSS 由编辑器按共享样式排版。构建包含 `vue-tsc` 类型检查。
 
-2026-11-07 调整：原先仅 ESLint、禁止尾逗号及多行标签每行一个属性的约定由上述样本风格取代。
+2026-11-07 调整：原先仅 ESLint、禁止尾逗号及多行标签每行一个属性的约定由上述样本风格取代；CI 同时采用全库代码质量与变更文件严格格式检查，衔接历史文件逐步统一的规则。
 
 ## 协作入口
 

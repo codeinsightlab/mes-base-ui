@@ -21,9 +21,9 @@ export const directoryPermissions: Record<DirectoryResource, string> = {
   personnel: 'business:directory:personnel:read',
   routings: 'routing:list'
 }
-export function listDirectory(resource: DirectoryResource, keyword: string, offset = 0, departmentId?: string) {
+export function listDirectory(resource: DirectoryResource, keyword: string, offset = 0, departmentId?: string, limit = 20) {
   return request<DirectoryPage>('/api/business/directory/' + resource, {
-    scope: 'factory', query: { keyword, offset, limit: 20, ...(departmentId ? { departmentId } : {}) }
+    scope: 'factory', query: { keyword, offset, limit, ...(departmentId ? { departmentId } : {}) }
   })
 }
 export function getDirectory(resource: DirectoryResource, id: string) {

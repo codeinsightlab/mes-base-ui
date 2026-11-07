@@ -56,8 +56,8 @@ p{
   margin-bottom:var(--ui-space-3)
 }
 :focus-visible{
-  outline:2px solid var(--ui-accent);
-  outline-offset:3px
+  outline:2px solid color-mix(in srgb,var(--ui-primary) 70%,transparent);
+  outline-offset:2px
 }
 a,button{
   transition:background-color var(--ui-transition),color var(--ui-transition),border-color var(--ui-transition)

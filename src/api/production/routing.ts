@@ -37,7 +37,7 @@ export const api = {
   copy: (id: string, body: { code: string; name: string; revision: number }) =>
     request<RoutingVo>(path(id) + '/actions/copy', { method: 'POST', body, scope: 'factory' }),
   remove: (id: string) => request<void>(base, { method: 'DELETE', body: [id], scope: 'factory' }),
-  operations: (search = '') => request<ReferenceOption[]>(base + '/references/operations', { query: { search, limit: 100 }, scope: 'factory' }),
+  operations: (search = '', limit = 20) => request<ReferenceOption[]>(base + '/references/operations', { query: { search, limit }, scope: 'factory' }),
   materials: (search = '') => request<ReferenceOption[]>(base + '/references/materials', { query: { search, limit: 100 }, scope: 'factory' })
 }
 export const sync = () => request<SyncResult>(base + '/actions/sync', { method: 'POST', scope: 'factory' })

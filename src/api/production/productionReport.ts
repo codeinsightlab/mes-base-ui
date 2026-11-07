@@ -21,5 +21,5 @@ export const productionReport = {
   supplement: (body: Supplement) => request<Ledger>(root + '/reports/supplements', { method: 'POST', body, scope: 'factory' }),
   adjust: (id: string, quantityDelta: string, reason: string, requestId: string) => request<Ledger>(report(id) + '/adjustments', { method: 'POST', body: { quantityDelta, reason, requestId }, scope: 'factory' }),
   void: (id: string, reason: string, requestId: string) => request<Ledger>(report(id) + '/void', { method: 'POST', body: { reason, requestId }, scope: 'factory' }),
-  users: (keyword: string, offset = 0) => request<Page<HistoricalUser>>('/api/business/directory/report-operators', { query: { keyword, offset, limit: 20 }, scope: 'factory' })
+  users: (keyword: string, offset = 0, limit = 20) => request<Page<HistoricalUser>>('/api/business/directory/report-operators', { query: { keyword, offset, limit }, scope: 'factory' })
 }

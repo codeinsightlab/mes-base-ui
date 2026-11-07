@@ -35,7 +35,14 @@ const props = withDefaults(defineProps<{
   itemsReadonlyWhenDirty?: boolean;
   itemVersionField?: string;
   itemBeforeCreate?: () => Promise<Row | null>;
-}>(), { presentation: 'page', creatable: true, deletable: true, headerActionColumnWidth: 180 })
+}>(), {
+  presentation: 'page', creatable: true, deletable: true, headerActionColumnWidth: 180,
+  documentNumberKey: undefined, aggregateApi: undefined, headerPermissionOverrides: undefined,
+  initialSearch: undefined, revisionField: undefined, validateAggregateItems: undefined,
+  headerTableKey: undefined, itemTableKey: undefined, headerReadonly: undefined,
+  itemsReadonly: undefined, itemPermissionOverrides: undefined, itemVersionField: undefined,
+  itemBeforeCreate: undefined
+})
 const list = ref<InstanceType<typeof CrudPage> | null>(null)
 const auth = useAuth()
 const opened = ref(false), id = ref<string | null>(null), loading = ref(false), saving = ref(false), error = ref('')
@@ -48,7 +55,11 @@ const readonly = computed(() => !!id.value && !!props.headerReadonly?.(draft))
 const writable = computed(() => !readonly.value && (id.value ? can('update') : can('create')))
 const fixedValues = computed(() => id.value ? { [props.parentKey]: id.value } : {})
 const atomic = computed(() => !!props.aggregateApi)
-function snapshot() { return JSON.stringify({ header: draft, items: atomic.value ? aggregateItems.value : [] }) }
+
+function snapshot() {
+  return JSON.stringify({ header: draft, items: atomic.value ? aggregateItems.value : [] })
+}
+
 function editableItems(items: Row[]) {
   return items.map(item => {
     const result = { ...item }
@@ -61,6 +72,7 @@ function editableItems(items: Row[]) {
     return result
   })
 }
+
 function clear() {
   generation++
   opened.value = false
@@ -72,25 +84,35 @@ function clear() {
   aggregateItems.value = []
   savedDraft = snapshot()
 }
+
 async function back() {
   if (saving.value) return
   const current = generation
   if (snapshot() !== savedDraft) {
     try {
       await ElMessageBox.confirm('有未保存的修改，确认关闭并放弃修改？', '未保存的修改', { confirmButtonText: '放弃修改', cancelButtonText: '继续编辑', type: 'warning' })
-    } catch { return }
+    } catch {
+      return
+    }
   }
-  if (current === generation) { clear(); emit('back'); if (props.presentation === 'dialog') void list.value?.load() }
+  if (current === generation) {
+    clear()
+    emit('back')
+    if (props.presentation === 'dialog') void list.value?.load()
+  }
 }
+
 async function closeDialog(done: () => void) {
   await back()
   if (!opened.value) done()
 }
+
 const editorTitle = computed(() => {
   if (!id.value) return '新增' + props.title
   const number = props.documentNumberKey && draft[props.documentNumberKey]
   return number ? props.title + ' · ' + number : props.title
 })
+
 async function open(row?: Row) {
   if (row ? !can('query') : props.creatable === false || !can('create')) return
   clear()
@@ -111,12 +133,13 @@ async function open(row?: Row) {
     Object.assign(draft, result)
     aggregateItems.value = aggregate ? editableItems(aggregate.items) : []
     savedDraft = snapshot()
-  } catch(reason) {
+  } catch (reason) {
     if (current === generation) error.value = reason instanceof Error ? reason.message : '主单加载失败'
   } finally {
     if (current === generation) loading.value = false
   }
 }
+
 async function refresh() {
   if (!id.value || !props.aggregateApi && !props.headerApi.detail) return
   const current = generation
@@ -127,6 +150,7 @@ async function refresh() {
   if (aggregate) aggregateItems.value = editableItems(aggregate.items)
   savedDraft = snapshot()
 }
+
 async function save() {
   if (!writable.value || loading.value || saving.value) return
   for (const field of props.headerFields.filter(f => !f.readonly && f.required && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value))) {
@@ -136,9 +160,15 @@ async function save() {
     }
   }
   if (atomic.value) {
-    if (!aggregateItems.value.length) { ElMessage.warning('至少添加一条明细'); return }
+    if (!aggregateItems.value.length) {
+      ElMessage.warning('至少添加一条明细')
+      return
+    }
     const invalid = props.validateAggregateItems?.(aggregateItems.value)
-    if (invalid) { ElMessage.warning(invalid); return }
+    if (invalid) {
+      ElMessage.warning(invalid)
+      return
+    }
     for (const [index, item] of aggregateItems.value.entries()) {
       for (const field of props.itemFields.filter(f => f.required)) {
         if (item[field.key] == null || String(item[field.key]).trim() === '') {
@@ -174,12 +204,13 @@ async function save() {
     }
     savedDraft = snapshot()
     ElMessage.success('单据已保存')
-  } catch(reason) {
+  } catch (reason) {
     if (current === generation) error.value = reason instanceof Error ? reason.message : '主单保存失败'
   } finally {
     if (current === generation) saving.value = false
   }
 }
+
 async function remove() {
   if (!id.value || !can('delete') || saving.value) return
   const current = generation, recordId = id.value
@@ -188,13 +219,17 @@ async function remove() {
     if (current !== generation || !can('delete')) return
     saving.value = true
     await props.headerApi.remove(recordId)
-    if (current === generation) { clear(); ElMessage.success('主单已删除') }
-  } catch(reason) {
+    if (current === generation) {
+      clear()
+      ElMessage.success('主单已删除')
+    }
+  } catch (reason) {
     if (current === generation && reason !== 'cancel' && reason !== 'close') error.value = reason instanceof Error ? reason.message : '删除失败'
   } finally {
     if (current === generation) saving.value = false
   }
 }
+
 watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|')], clear)
 defineExpose({ open, refresh, back, hasUnsavedChanges: () => snapshot() !== savedDraft })
 onBeforeUnmount(clear)
@@ -216,8 +251,9 @@ onBeforeUnmount(clear)
     :table-key="headerTableKey"
     :initial-search="initialSearch"
   >
+    <template v-for="name in Object.keys($slots).filter(name => name.startsWith('search-'))" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
     <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
-    <template #actions="{ row, refresh }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" :refresh="refresh" /></template>
+    <template #actions="{ row, refresh: refreshList }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" :refresh="refreshList" /></template>
   </CrudPage>
   <component
     :is="presentation === 'dialog' ? PageDialog : 'section'"

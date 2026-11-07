@@ -1,0 +1,144 @@
+.mes-focus {
+  --mes-focus-color: #356a96;
+  --mes-focus-error-color: var(--el-color-danger-dark-2, #c45656);
+  --mes-focus-edge-height: 3px;
+  --mes-focus-radius: 4px;
+  --mes-focus-mark-width: 24px;
+  --mes-focus-mark-height: 2px;
+  --mes-focus-mark-bottom: 3px;
+  --mes-focus-icon-target: 32px;
+  --mes-button-focus-ink: currentColor;
+  --mes-field-focus-outline: none;
+  --mes-field-focus-outline-offset: 0;
+  --mes-button-focus-outline: none;
+  --mes-button-focus-outline-offset: 0;
+}
+
+.mes-focus :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner),
+.mes-focus .el-button:not(.is-circle):not(.is-round) {
+  border-radius: var(--mes-focus-radius);
+}
+
+/* The field owns its focus indicator, rather than its inner input. */
+.mes-focus :is(.el-input__inner, .el-select__input, .el-range-input):focus-visible {
+  outline: none;
+}
+
+.mes-focus .el-input:not(.is-disabled) > .el-input__wrapper:is(.is-focus, :focus-within),
+.mes-focus .el-input.is-active:not(.is-disabled) > .el-input__wrapper,
+.mes-focus .el-select__wrapper:not(.is-disabled):is(.is-focused, :focus-within),
+.mes-focus .el-range-editor:not(.is-disabled):is(.is-active, :focus-within),
+.mes-focus .el-textarea:not(.is-disabled) > .el-textarea__inner:focus {
+  --mes-field-contour: var(--el-border-color);
+  outline: var(--mes-field-focus-outline);
+  outline-offset: var(--mes-field-focus-outline-offset);
+  box-shadow:
+    inset 0 calc(-1 * var(--mes-focus-edge-height)) 0 0 var(--mes-focus-color),
+    inset 0 0 0 1px var(--mes-field-contour);
+}
+
+.mes-focus .el-input:not(.is-disabled) > .el-input__wrapper:is(.is-focus, :focus-within):hover,
+.mes-focus .el-input.is-active:not(.is-disabled) > .el-input__wrapper:hover,
+.mes-focus .el-select__wrapper:not(.is-disabled):is(.is-focused, :focus-within):hover,
+.mes-focus .el-range-editor:not(.is-disabled):is(.is-active, :focus-within):hover,
+.mes-focus .el-textarea:not(.is-disabled) > .el-textarea__inner:focus:hover {
+  --mes-field-contour: var(--el-border-color-hover);
+}
+
+/* Error contours and the lower edge remain red, including on hover. */
+.mes-focus .el-form-item.is-error .el-input:not(.is-disabled) > .el-input__wrapper:is(.is-focus, :focus-within),
+.mes-focus .el-form-item.is-error .el-input.is-active:not(.is-disabled) > .el-input__wrapper,
+.mes-focus .el-form-item.is-error .el-select__wrapper:not(.is-disabled):is(.is-focused, :focus-within),
+.mes-focus .el-form-item.is-error .el-range-editor:not(.is-disabled):is(.is-active, :focus-within),
+.mes-focus .el-form-item.is-error .el-textarea:not(.is-disabled) > .el-textarea__inner:focus,
+.mes-focus .el-input.is-exceed:not(.is-disabled) > .el-input__wrapper:is(.is-focus, :focus-within),
+.mes-focus .el-input.is-exceed.is-active:not(.is-disabled) > .el-input__wrapper,
+.mes-focus .el-textarea.is-exceed:not(.is-disabled) > .el-textarea__inner:focus {
+  box-shadow:
+    inset 0 calc(-1 * var(--mes-focus-edge-height)) 0 0 var(--mes-focus-error-color),
+    inset 0 0 0 1px var(--el-color-danger, #f56c6c);
+}
+
+.mes-focus .el-button {
+  position: relative;
+}
+
+.mes-focus .el-button--small {
+  --mes-focus-mark-width: 18px;
+  --mes-focus-mark-bottom: 1px;
+  --mes-focus-icon-target: 24px;
+}
+
+.mes-focus .el-button--large {
+  --mes-focus-icon-target: 40px;
+}
+
+.mes-focus .el-button.mes-focus-icon {
+  min-width: var(--mes-focus-icon-target);
+  min-height: var(--mes-focus-icon-target);
+}
+
+.mes-focus .el-button:is(.mes-focus-icon, .is-circle) {
+  --mes-focus-mark-width: 16px;
+}
+
+.mes-focus .el-button--small:is(.mes-focus-icon, .is-circle) {
+  --mes-focus-mark-width: 12px;
+  --mes-focus-mark-bottom: 2px;
+}
+
+.mes-focus .el-button:is(.is-text, .is-link):not(.mes-focus-icon):not(.is-circle) {
+  --mes-button-mark-display: none;
+}
+
+.mes-focus .el-button:focus-visible:not(:disabled):not(.is-disabled):not([aria-disabled="true"]):not(.is-loading) {
+  outline: var(--mes-button-focus-outline);
+  outline-offset: var(--mes-button-focus-outline-offset);
+  box-shadow: none;
+}
+
+/* Keep ::before available for Element Plus's loading mask. */
+.mes-focus .el-button:focus-visible:not(:disabled):not(.is-disabled):not([aria-disabled="true"]):not(.is-loading)::after {
+  content: "";
+  display: var(--mes-focus-mark-visibility, var(--mes-button-mark-display, block));
+  position: absolute;
+  left: 50%;
+  bottom: var(--mes-focus-mark-bottom);
+  width: min(var(--mes-focus-mark-width), calc(100% - 8px));
+  height: var(--mes-focus-mark-height);
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background-color: var(--mes-button-focus-ink);
+  pointer-events: none;
+}
+
+.mes-focus .el-button:is(.is-text, .is-link):not(.mes-focus-icon):not(.is-circle):focus-visible:not(:disabled):not(.is-disabled):not([aria-disabled="true"]):not(.is-loading) > span {
+  text-decoration-line: var(--mes-text-focus-decoration, underline);
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+
+@media (forced-colors: active) {
+  .mes-focus {
+    --mes-field-focus-outline: 2px solid Highlight;
+    --mes-field-focus-outline-offset: -2px;
+    --mes-button-focus-outline: 2px solid Highlight;
+    --mes-button-focus-outline-offset: -2px;
+    --mes-focus-mark-visibility: none;
+    --mes-text-focus-decoration: none;
+  }
+
+  .mes-focus :is(.el-input__wrapper, .el-select__wrapper, .el-textarea__inner) {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  .mes-focus .el-input.is-disabled > .el-input__wrapper,
+  .mes-focus .el-select__wrapper.is-disabled,
+  .mes-focus .el-range-editor.is-disabled,
+  .mes-focus .el-textarea.is-disabled > .el-textarea__inner {
+    outline-color: GrayText;
+  }
+}

@@ -8,10 +8,13 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/dist/index.css'
 import './assets/styles/tokens.css'
 import './styles.css'
+import './styles/mes-focus.css'
 import App from './App.vue'
 import router, { installMenuRoutes } from './router'
 import { useAuth } from './stores/auth'
 import { configureRequests } from './lib/request'
+
+document.documentElement.classList.add('mes-focus')
 
 const app = createApp(App), pinia = createPinia()
 app.use(pinia)

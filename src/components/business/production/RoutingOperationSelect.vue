@@ -14,25 +14,29 @@ const options = useRemoteOptions<ReferenceOption>({
   enabled: () => allowed.value && !props.disabled,
   // Wait for an explicit open, including when the detail finishes loading.
   disabled: () => false,
-  search: async({ keyword }) => {
-    const rows = await api.operations(keyword)
-    // This reference API returns at most 100 rows and has no offset contract.
-    return { items: rows.map(toOption), total: rows.length, nextOffset: rows.length }
+  search: async({ keyword, limit }) => {
+    const rows = await api.operations(keyword, limit)
+    // This reference API returns a bounded result and has no offset contract.
+    return { items: rows.map(toOption) }
   }
 })
 const snapshotScope = ref([auth.factoryId, auth.revision].join(':'))
-watch(() => props.option, () => { snapshotScope.value = [auth.factoryId, auth.revision].join(':') })
+watch(() => props.option, () => {
+  snapshotScope.value = [auth.factoryId, auth.revision].join(':')
+})
 const selected = computed(() => {
   if (!allowed.value) return null
   if (options.selected.value) return options.selected.value
   if (snapshotScope.value !== [auth.factoryId, auth.revision].join(':') || props.option?.id !== props.modelValue) return null
   return toOption(props.option)
 })
+
 function choose(value:string | null) {
   emit('update:modelValue', value ?? '')
   const option = options.items.value.find(row => row.value === value)
   if (option?.data) emit('selected', option.data)
 }
+
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), allowed.value, props.disabled], options.reset, { flush: 'sync' })
 </script>
 <template>
@@ -49,5 +53,4 @@ watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), a
     @open="options.open"
     @retry="options.retry"
   />
-  <small v-if="options.items.value.length >= 100">匹配较多，请细化工序名称继续检索。</small>
 </template>

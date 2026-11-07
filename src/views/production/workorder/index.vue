@@ -39,10 +39,12 @@ const ElMessageBox = usePageMessageBox()
 const route = inject(routeLocationKey, undefined)
 const auth = useAuth()
 const can = (action: string) => auth.hasPermission('workorder:' + action, 'factory')
+
 function canMore(row: Detail['workorder']) {
   return row.source === 'LOCAL' && (auth.hasPermission(inputPermission, 'factory')
     || auth.runtimeMode === 'LOCAL' && (can('delete') || can('release') && row.status === 'RELEASED'))
 }
+
 const orderStates: Record<string, { label: string; tone: StatusTone }> = {
   DRAFT: { label: '草稿', tone: 'disabled' },
   COMPLETED: { label: '已完工', tone: 'success' },
@@ -54,8 +56,15 @@ const canExecutions = computed(() => auth.hasPermission('business:mes:production
 const rows = ref<Awaited<ReturnType<typeof api.list>>['items']>([]), total = ref(0), page = ref(1), pageSize = ref(20)
 const code = ref(''), status = ref(''), loading = ref(false), busy = ref(false), error = ref('')
 const detailColumns = ref(window.innerWidth < 600 ? 1 : 2)
-function resizeDetails() { detailColumns.value = window.innerWidth < 600 ? 1 : 2 }
-onMounted(() => { resizeDetails(); window.addEventListener('resize', resizeDetails) })
+
+function resizeDetails() {
+  detailColumns.value = window.innerWidth < 600 ? 1 : 2
+}
+
+onMounted(() => {
+  resizeDetails()
+  window.addEventListener('resize', resizeDetails)
+})
 onBeforeUnmount(() => window.removeEventListener('resize', resizeDetails))
 const dialog = ref(false), drawer = ref(false), detail = ref<Detail | null>(null), editId = ref<string | null>(null)
 const bomBuildDialog = ref(false)
@@ -70,27 +79,75 @@ const form = reactive<Save>(blank())
 const materialEditor = ref<InstanceType<typeof WorkorderMaterialEditor> | null>(null)
 const confirmingSave = ref(false)
 let listAttempt = 0, detailAttempt = 0, routeAttempt = 0, numberingAttempt = 0
+
 function clear() {
-  listAttempt++; detailAttempt++; routeAttempt++; numberingAttempt++
-  rows.value = []; total.value = 0; detail.value = null; routeSearch.reset(); routeSnapshot.value = null; numberingRules.value = []; numberingRulesLoading.value = false
-  dialog.value = drawer.value = loading.value = busy.value = false; error.value = ''; page.value = 1; editId.value = null; Object.assign(form, blank())
+  listAttempt++
+  detailAttempt++
+  routeAttempt++
+  numberingAttempt++
+  rows.value = []
+  total.value = 0
+  detail.value = null
+  routeSearch.reset()
+  routeSnapshot.value = null
+  numberingRules.value = []
+  numberingRulesLoading.value = false
+  dialog.value = drawer.value = loading.value = busy.value = false
+  error.value = ''
+  page.value = 1
+  editId.value = null
+  Object.assign(form, blank())
 }
-watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), canExecutions.value], () => { clear(); if (can('list')) void load() }, { flush: 'sync' })
+
+watch(() => [auth.revision, auth.factoryId, can('list'), can('query'), can('update'), can('create'), canExecutions.value], () => {
+  clear()
+  if (can('list')) void load()
+}, { flush: 'sync' })
+
 function refreshAfterIssueVoid(event: Event) {
   if (!(event instanceof CustomEvent) || event.detail?.factoryId !== auth.factoryId) return
   if (can('list')) void load()
   if (drawer.value && detail.value?.workorder.id === event.detail.workorderId && can('query')) void open(event.detail.workorderId)
 }
+
 onMounted(() => window.addEventListener('mes:workorder-changed', refreshAfterIssueVoid))
-onBeforeUnmount(() => { window.removeEventListener('mes:workorder-changed', refreshAfterIssueVoid); clear() })
+onBeforeUnmount(() => {
+  window.removeEventListener('mes:workorder-changed', refreshAfterIssueVoid)
+  clear()
+})
+
 async function load() {
   if (!can('list')) return
   const attempt = ++listAttempt
-  loading.value = true; error.value = ''
-  try { const result = await api.list({ code: code.value, status: status.value, offset: (page.value - 1) * pageSize.value, limit: pageSize.value }); if (attempt === listAttempt) { rows.value = result.items; total.value = result.total } } catch(e) { if (attempt === listAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === listAttempt) loading.value = false }
+  loading.value = true
+  error.value = ''
+  try {
+    const result = await api.list({ code: code.value, status: status.value, offset: (page.value - 1) * pageSize.value, limit: pageSize.value })
+    if (attempt === listAttempt) {
+      rows.value = result.items
+      total.value = result.total
+    }
+  } catch (e) {
+    if (attempt === listAttempt) error.value = e instanceof Error ? e.message : '读取失败'
+  } finally {
+    if (attempt === listAttempt) loading.value = false
+  }
 }
-function resetRouteOptions() { hasPublishedRoutes.value = null; routeAttempt++; routeSearch.reset(); routeSnapshot.value = null }
-watch(dialog, (visible) => { if (!visible) { numberingAttempt++; numberingRulesLoading.value = false; resetRouteOptions() } }, { flush: 'sync' })
+
+function resetRouteOptions() {
+  hasPublishedRoutes.value = null
+  routeAttempt++
+  routeSearch.reset()
+  routeSnapshot.value = null
+}
+
+watch(dialog, (visible) => {
+  if (!visible) {
+    numberingAttempt++
+    numberingRulesLoading.value = false
+    resetRouteOptions()
+  }
+}, { flush: 'sync' })
 let selectSingleRoute = false
 const routeSearch = useRemoteOptions<RoutingOption>({
   modelValue: () => form.routingId,
@@ -103,9 +160,12 @@ const routeSearch = useRemoteOptions<RoutingOption>({
     const result = await api.routings(productId, keyword)
     if (attempt === routeAttempt && productId === form.productId && dialog.value) {
       if (!keyword) hasPublishedRoutes.value = result.length > 0
-      if (selectOnly && result.length === 1 && !form.routingId) { routeSnapshot.value = result[0]!; form.routingId = result[0]!.id }
+      if (selectOnly && result.length === 1 && !form.routingId) {
+        routeSnapshot.value = result[0]!
+        form.routingId = result[0]!.id
+      }
     }
-    return { items: result.map(row => ({ value: row.id, label: `${row.code} / V${row.version} · ${row.name}`, data: row })), total: result.length, nextOffset: result.length }
+    return { items: result.map(row => ({ value: row.id, label: `${row.code} / V${row.version} · ${row.name}`, data: row })) }
   }
 })
 const routeOptions = computed(() => routeSearch.items.value.map(option => option.data!))
@@ -116,21 +176,33 @@ const selectedRoute = computed(() => {
   if (!row || row.id !== form.routingId) return null
   return { value: row.id, label: `${row.code} / V${row.version} · ${row.name}` }
 })
+
 async function searchRoutes(search = '', selectOnly = false) {
   selectSingleRoute = selectOnly
   await routeSearch.search(search)
 }
+
 async function productChanged(value: string) {
   if (value === form.productId) return
   const current = detailAttempt
   if (materialEditor.value && !await materialEditor.value.confirmReset()) return
   if (current !== detailAttempt || !dialog.value) return
   const materialRevision = form.material.expectedRevision
-  form.productId = value; form.routingId = ''; form.material = { ...emptyMaterialDemand(), expectedRevision: materialRevision, adjustmentsConfirmed: true }
-  resetRouteOptions(); void searchRoutes('', true)
+  form.productId = value
+  form.routingId = ''
+  form.material = { ...emptyMaterialDemand(), expectedRevision: materialRevision, adjustmentsConfirmed: true }
+  resetRouteOptions()
+  void searchRoutes('', true)
 }
+
 async function create() {
-  resetRouteOptions(); editId.value = null; plannedQuantityValid.value = false; Object.assign(form, blank()); error.value = ''; numberingRules.value = []; dialog.value = true
+  resetRouteOptions()
+  editId.value = null
+  plannedQuantityValid.value = false
+  Object.assign(form, blank())
+  error.value = ''
+  numberingRules.value = []
+  dialog.value = true
   const attempt = ++numberingAttempt, factory = auth.factoryId, revision = auth.revision
   if (!factory || !can('create')) return
   numberingRulesLoading.value = true
@@ -138,75 +210,162 @@ async function create() {
     const result = await api.numberingRules()
     if (attempt !== numberingAttempt || factory !== auth.factoryId || revision !== auth.revision) return
     numberingRules.value = result
-  } catch(e) { if (attempt === numberingAttempt) error.value = e instanceof Error ? e.message : '工单编码规则读取失败' } finally { if (attempt === numberingAttempt) numberingRulesLoading.value = false }
+  } catch (e) {
+    if (attempt === numberingAttempt) error.value = e instanceof Error ? e.message : '工单编码规则读取失败'
+  } finally {
+    if (attempt === numberingAttempt) numberingRulesLoading.value = false
+  }
 }
+
 async function open(id: string) {
   if (!can('query')) return
   const attempt = ++detailAttempt
-  drawer.value = true; detail.value = null; busy.value = true; error.value = ''
-  try { const value = await api.detail(id); if (attempt === detailAttempt) detail.value = value } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '详情读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
+  drawer.value = true
+  detail.value = null
+  busy.value = true
+  error.value = ''
+  try {
+    const value = await api.detail(id)
+    if (attempt === detailAttempt) detail.value = value
+  } catch (e) {
+    if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '详情读取失败'
+  } finally {
+    if (attempt === detailAttempt) busy.value = false
+  }
 }
+
 watch(() => [route?.query.workorderId, auth.factoryId, auth.revision, can('query')], () => {
   const id = route?.query.workorderId
   if (typeof id === 'string' && /^[1-9][0-9]{0,18}$/.test(id) && auth.factoryId && can('query')) void open(id)
 }, { immediate: true })
+
 async function edit(id: string) {
   if (!can('update') || !can('query') || !can('material:update')) return
   resetRouteOptions()
   const attempt = ++detailAttempt
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   try {
     const [d, demand] = await Promise.all([api.detail(id), workorderMaterial.get(id)])
     if (attempt !== detailAttempt) return
-    originalProductId.value = d.workorder.productId; originalPlannedQty.value = String(d.workorder.plannedQty); editId.value = id; plannedQuantityValid.value = false; Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty), material: materialDemandDraft(demand) })
-    routeSnapshot.value = d.routing; hasPublishedRoutes.value = d.routing !== null; dialog.value = true
-  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败' } finally { if (attempt === detailAttempt) busy.value = false }
+    originalProductId.value = d.workorder.productId
+    originalPlannedQty.value = String(d.workorder.plannedQty)
+    editId.value = id
+    plannedQuantityValid.value = false
+    Object.assign(form, d.workorder, { plannedQty: String(d.workorder.plannedQty), material: materialDemandDraft(demand) })
+    routeSnapshot.value = d.routing
+    hasPublishedRoutes.value = d.routing !== null
+    dialog.value = true
+  } catch (e) {
+    if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '读取失败'
+  } finally {
+    if (attempt === detailAttempt) busy.value = false
+  }
 }
+
 async function save() {
   if (!can(editId.value ? 'update' : 'create') || busy.value || confirmingSave.value) return
-  if (!editId.value && (!form.ruleCode || !numberingRules.value.some(rule => rule.ruleCode === form.ruleCode))) { error.value = '请选择有效的工单编码规则'; return }
-  if (!form.productId || hasPublishedRoutes.value === null || (hasPublishedRoutes.value && !form.routingId) || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) { error.value = '请核对产出物料及适用工艺，填写符合单位精度的正计划数量'; return }
+  if (!editId.value && (!form.ruleCode || !numberingRules.value.some(rule => rule.ruleCode === form.ruleCode))) {
+    error.value = '请选择有效的工单编码规则'
+    return
+  }
+  if (!form.productId || hasPublishedRoutes.value === null || (hasPublishedRoutes.value && !form.routingId) || !plannedQuantityValid.value || !positiveQuantity(normalizedQuantityInput(form.plannedQty))) {
+    error.value = '请核对产出物料及适用工艺，填写符合单位精度的正计划数量'
+    return
+  }
   const attempt = detailAttempt
   confirmingSave.value = true
   let valid: boolean
-  try { valid = !!materialEditor.value && await materialEditor.value.validateAndConfirm() } finally { confirmingSave.value = false }
+  try {
+    valid = !!materialEditor.value && await materialEditor.value.validateAndConfirm()
+  } finally {
+    confirmingSave.value = false
+  }
   if (!valid) return
   if (attempt !== detailAttempt || !dialog.value || !can(editId.value ? 'update' : 'create')) return
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   try {
     const command = { ...form, plannedQty: normalizedQuantityInput(form.plannedQty) }
-    if (editId.value) await api.update(editId.value, command); else await api.create(command)
+    if (editId.value) await api.update(editId.value, command)
+    else await api.create(command)
     if (attempt !== detailAttempt) return
-    dialog.value = false; ElMessage.success('工单已保存'); await load()
-  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '保存失败' } finally { if (attempt === detailAttempt) busy.value = false }
+    dialog.value = false
+    ElMessage.success('工单已保存')
+    await load()
+  } catch (e) {
+    if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '保存失败'
+  } finally {
+    if (attempt === detailAttempt) busy.value = false
+  }
 }
+
 async function release(row: Detail['workorder']) {
   if (!can('release') || busy.value || row.status !== 'DRAFT' || row.source !== 'LOCAL' || auth.runtimeMode !== 'LOCAL') return
   const attempt = detailAttempt
-  busy.value = true; error.value = ''
-  try { const d = await api.release(row.id, row.revision); if (attempt === detailAttempt) { if (detail.value?.workorder.id === row.id) detail.value = d; ElMessage.success('工单已下达'); await load() } } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '下达失败' } finally { if (attempt === detailAttempt) busy.value = false }
+  busy.value = true
+  error.value = ''
+  try {
+    const d = await api.release(row.id, row.revision)
+    if (attempt === detailAttempt) {
+      if (detail.value?.workorder.id === row.id) detail.value = d
+      ElMessage.success('工单已下达')
+      await load()
+    }
+  } catch (e) {
+    if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '下达失败'
+  } finally {
+    if (attempt === detailAttempt) busy.value = false
+  }
 }
+
 async function recall(row: Detail['workorder']) {
   if (!can('release') || busy.value) return
   const attempt = detailAttempt
-  try { await ElMessageBox.confirm('确认将工单 ' + row.code + ' 退回草稿？存在下游记录时不能退回。', '退回草稿', { type: 'warning' }) } catch { return }
+  try {
+    await ElMessageBox.confirm('确认将工单 ' + row.code + ' 退回草稿？存在下游记录时不能退回。', '退回草稿', { type: 'warning' })
+  } catch {
+    return
+  }
   if (attempt !== detailAttempt || !can('release')) return
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   try {
     const result = await api.recall(row.id, row.revision)
     if (attempt !== detailAttempt) return
     if (detail.value?.workorder.id === row.id) detail.value = result
-    ElMessage.success('工单已退回草稿'); await load()
-  } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '退回失败' } finally { if (attempt === detailAttempt) busy.value = false }
+    ElMessage.success('工单已退回草稿')
+    await load()
+  } catch (e) {
+    if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '退回失败'
+  } finally {
+    if (attempt === detailAttempt) busy.value = false
+  }
 }
+
 async function remove(row: Detail['workorder']) {
   if (!can('delete')) return
   const attempt = detailAttempt
-  try { await ElMessageBox.confirm('确认删除工单 ' + row.code + '？存在执行、领料、仓储单据或其他下游记录时不能删除。', '删除确认', { type: 'warning' }) } catch { return }
+  try {
+    await ElMessageBox.confirm('确认删除工单 ' + row.code + '？存在执行、领料、仓储单据或其他下游记录时不能删除。', '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
   if (attempt !== detailAttempt || !can('delete')) return
-  try { await api.remove(row.id, row.revision); if (attempt === detailAttempt) await load() } catch(e) { if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '删除失败' }
+  try {
+    await api.remove(row.id, row.revision)
+    if (attempt === detailAttempt) await load()
+  } catch (e) {
+    if (attempt === detailAttempt) error.value = e instanceof Error ? e.message : '删除失败'
+  }
 }
-function closeDetail() { detailAttempt++; detail.value = null; busy.value = false }
+
+function closeDetail() {
+  detailAttempt++
+  detail.value = null
+  busy.value = false
+}
+
 onMounted(load)
 </script>
 <template>

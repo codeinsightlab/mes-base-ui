@@ -42,31 +42,86 @@ const historicalUsers = useRemoteOptions<HistoricalUser>({
   enabled: () => command.value === 'supplement' && can('supplement') && !pending.value && !saving.value && !auth.factorySwitching,
   // Command opening owns the initial read; pending commands never fetch new candidates.
   disabled: () => false,
-  search: async({ keyword, offset }) => {
-    const result = await api.users(keyword, offset)
-    return { items: result.items.map(row => ({ value: row.id, label: row.name, data: row })), total: result.total, nextOffset: offset + result.items.length }
+  search: async({ keyword, offset, limit }) => {
+    const result = await api.users(keyword, offset, limit)
+    return { items: result.items.map(row => ({ value: row.id, label: row.name, data: row })) }
   }
 })
 const historyVisible = ref(false), detail = ref<Detail | null>(null), history = ref<Ledger[]>([]), historyPage = ref(1), historyLimit = ref(20), historyTotal = ref(0), historyLoading = ref(false), historyError = ref('')
 let generation = 0, ledgerSequence = 0, historySequence = 0
 const commandTitle = computed(() => command.value === 'supplement' ? '管理员历史补录' : command.value === 'adjust' ? '管理员数量订正' : '原始报工整笔冲销')
-function setCommandVisible(value: boolean) { if (!value && !pending.value) clearCommand() }
-function clearCommand() { pending.value = null; historicalUsers.reset(); command.value = null; original.value = null; saving.value = false; commandError.value = ''; Object.assign(form, { quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' }) }
-function clear() { generation++; ledgerSequence++; historySequence++; visible.value = false; quantity.value = null; path.value = null; pathError.value = ''; ledgerError.value = ''; rows.value = []; nodeId.value = ''; total.value = 0; page.value = 1; loading.value = false; ledgerLoading.value = false; error.value = ''; clearCommand(); historyVisible.value = false; detail.value = null; history.value = []; historyLoading.value = false }
-watch(() => props.executionCode, () => { clear(); if (props.executionCode && can('quantity')) { visible.value = true; void refresh() } }, { flush: 'sync', immediate: true })
+
+function setCommandVisible(value: boolean) {
+  if (!value && !pending.value) clearCommand()
+}
+
+function clearCommand() {
+  pending.value = null
+  historicalUsers.reset()
+  command.value = null
+  original.value = null
+  saving.value = false
+  commandError.value = ''
+  Object.assign(form, { quantity: '', operatorUserId: '', reportTime: '', workstationId: '', reason: '' })
+}
+
+function clear() {
+  generation++
+  ledgerSequence++
+  historySequence++
+  visible.value = false
+  quantity.value = null
+  path.value = null
+  pathError.value = ''
+  ledgerError.value = ''
+  rows.value = []
+  nodeId.value = ''
+  total.value = 0
+  page.value = 1
+  loading.value = false
+  ledgerLoading.value = false
+  error.value = ''
+  clearCommand()
+  historyVisible.value = false
+  detail.value = null
+  history.value = []
+  historyLoading.value = false
+}
+
+watch(() => props.executionCode, () => {
+  clear()
+  if (props.executionCode && can('quantity')) {
+    visible.value = true
+    void refresh()
+  }
+}, { flush: 'sync', immediate: true })
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
 onBeforeUnmount(clear)
+
 async function refresh() {
-  const ticket = ++generation; ledgerSequence++; loading.value = true; error.value = ''; pathError.value = ''; ledgerError.value = ''
-  quantity.value = null; path.value = null; rows.value = []; total.value = 0
+  const ticket = ++generation
+  ledgerSequence++
+  loading.value = true
+  error.value = ''
+  pathError.value = ''
+  ledgerError.value = ''
+  quantity.value = null
+  path.value = null
+  rows.value = []
+  total.value = 0
   let requestedNode = ''
+
   async function refreshLedger() {
     if (ticket !== generation || !visible.value) return
-    if (!ledgerNodes.value.some(n => n.routingNodeId === nodeId.value)) { nodeId.value = ledgerNodes.value[0]?.routingNodeId ?? ''; page.value = 1 }
+    if (!ledgerNodes.value.some(n => n.routingNodeId === nodeId.value)) {
+      nodeId.value = ledgerNodes.value[0]?.routingNodeId ?? ''
+      page.value = 1
+    }
     if (!nodeId.value || nodeId.value === requestedNode) return
     requestedNode = nodeId.value
     await loadLedger()
   }
+
   const reads = [api.quantities(props.executionCode).then(async value => {
     if (ticket !== generation || !visible.value) return
     quantity.value = value
@@ -85,73 +140,169 @@ async function refresh() {
   }
   try {
     await Promise.all(reads)
-  } finally { if (ticket === generation) loading.value = false }
+  } finally {
+    if (ticket === generation) loading.value = false
+  }
 }
-async function chooseNode(row: { routingNodeId: string }) { nodeId.value = row.routingNodeId; page.value = 1; await loadLedger() }
-function selectLedgerNode(value: unknown) { void chooseNode({ routingNodeId: String(value) }) }
+
+async function chooseNode(row: { routingNodeId: string }) {
+  nodeId.value = row.routingNodeId
+  page.value = 1
+  await loadLedger()
+}
+
+function selectLedgerNode(value: unknown) {
+  void chooseNode({ routingNodeId: String(value) })
+}
+
 async function loadLedger() {
-  const ticket = ++ledgerSequence; rows.value = []; total.value = 0; ledgerError.value = ''
+  const ticket = ++ledgerSequence
+  rows.value = []
+  total.value = 0
+  ledgerError.value = ''
   if (!visible.value || !nodeId.value || !can('detail')) return
   ledgerLoading.value = true
-  try { const result = await api.page(props.executionCode, nodeId.value, (page.value - 1) * limit.value, limit.value); if (ticket !== ledgerSequence) return; rows.value = result.items; total.value = result.total } catch(e) { if (ticket === ledgerSequence) ledgerError.value = e instanceof Error ? e.message : '流水读取失败' } finally { if (ticket === ledgerSequence) ledgerLoading.value = false }
+  try {
+    const result = await api.page(props.executionCode, nodeId.value, (page.value - 1) * limit.value, limit.value)
+    if (ticket !== ledgerSequence) return
+    rows.value = result.items
+    total.value = result.total
+  } catch (e) {
+    if (ticket === ledgerSequence) ledgerError.value = e instanceof Error ? e.message : '流水读取失败'
+  } finally {
+    if (ticket === ledgerSequence) ledgerLoading.value = false
+  }
 }
+
 async function openCommand(mode: 'supplement' | 'adjust' | 'void', row?: Ledger) {
   if (!can(mode) || !historyWritable.value || !node.value || mode === 'supplement' && node.value.positiveReportBlockReason || row && row.recordType !== 'REPORT') return
-  clearCommand(); command.value = mode; original.value = row ?? null
+  clearCommand()
+  command.value = mode
+  original.value = row ?? null
   const saved = sessionStorage.getItem(pendingKey())
   if (saved) {
-    try { pending.value = { ...JSON.parse(saved), uncertain: true }; command.value = pending.value!.mode; Object.assign(form, pending.value!.form); commandError.value = '存在结果待确认的原请求，请原样重试核实；不会创建新请求。' } catch { commandError.value = '待确认请求无法读取，请保留记录并联系管理员'; return }
+    try {
+      pending.value = { ...JSON.parse(saved), uncertain: true }
+      command.value = pending.value!.mode
+      Object.assign(form, pending.value!.form)
+      commandError.value = '存在结果待确认的原请求，请原样重试核实；不会创建新请求。'
+    } catch {
+      commandError.value = '待确认请求无法读取，请保留记录并联系管理员'
+      return
+    }
   }
   if (command.value === 'supplement' && !pending.value) await historicalUsers.search('')
 }
+
 async function save() {
   const mode = command.value
   if (!mode || saving.value || !can(mode)) return
   if (!pending.value) {
     if (!historyWritable.value || !node.value) return
-    if (!form.reason.trim() || form.reason.length > 500) { commandError.value = '请填写操作原因（最多500字）'; return }
-    if (mode !== 'void' && (!quantityValid.value || !/[1-9]/.test(form.quantity))) { commandError.value = '请输入符合单位规则的非零数量；补录必须为正数'; return }
-    if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) { commandError.value = '请选择历史操作人员并填写实际生产时间'; return }
-    if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) { commandError.value = '工作站编号应为正整数'; return }
+    if (!form.reason.trim() || form.reason.length > 500) {
+      commandError.value = '请填写操作原因（最多500字）'
+      return
+    }
+    if (mode !== 'void' && (!quantityValid.value || !/[1-9]/.test(form.quantity))) {
+      commandError.value = '请输入符合单位规则的非零数量；补录必须为正数'
+      return
+    }
+    if (mode === 'supplement' && (!form.operatorUserId || !form.reportTime)) {
+      commandError.value = '请选择历史操作人员并填写实际生产时间'
+      return
+    }
+    if (form.workstationId && !/^[1-9]\d*$/.test(form.workstationId)) {
+      commandError.value = '工作站编号应为正整数'
+      return
+    }
     pending.value = { requestId: crypto.randomUUID(), uncertain: false, mode, originalId: original.value?.id ?? null, executionCode: props.executionCode, nodeId: node.value.routingNodeId, form: { ...form, quantity: normalizedQuantityInput(form.quantity) }}
     sessionStorage.setItem(pendingKey(), JSON.stringify(pending.value))
   }
   const intent = pending.value, body = intent.form, storageKey = pendingKey()
-  const ticket = generation; saving.value = true; commandError.value = ''
+  const ticket = generation
+  saving.value = true
+  commandError.value = ''
   try {
     if (intent.mode === 'supplement') await api.supplement({ requestId: intent.requestId, executionCode: intent.executionCode, routingNodeId: intent.nodeId, quantity: body.quantity, operatorUserId: body.operatorUserId, reportTime: body.reportTime, workstationId: body.workstationId || null, reason: body.reason.trim() })
     else if (intent.mode === 'adjust') await api.adjust(intent.originalId!, body.quantity, body.reason.trim(), intent.requestId)
     else await api.void(intent.originalId!, body.reason.trim(), intent.requestId)
     sessionStorage.removeItem(storageKey)
     if (ticket !== generation) return
-    clearCommand(); ElMessage.success('数量流水已追加'); await refresh(); emit('changed')
-  } catch(e) {
+    clearCommand()
+    ElMessage.success('数量流水已追加')
+    await refresh()
+    emit('changed')
+  } catch (e) {
   // A first-attempt local rejection rolls back. A later rejection cannot disprove an earlier unknown commit.
     if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.code !== 'REPORT_REQUEST_CONFLICT' && !intent.uncertain) {
-      sessionStorage.removeItem(storageKey); if (ticket === generation) pending.value = null
-    } else { intent.uncertain = true; sessionStorage.setItem(storageKey, JSON.stringify(intent)) }
+      sessionStorage.removeItem(storageKey)
+      if (ticket === generation) pending.value = null
+    } else {
+      intent.uncertain = true
+      sessionStorage.setItem(storageKey, JSON.stringify(intent))
+    }
     if (ticket === generation) commandError.value = (e instanceof Error ? e.message : '提交失败') + (pending.value ? '；结果待确认，请使用同一请求原样重试。' : '；请求已拒绝且未追加事实，可以修改后重新提交。')
-  } finally { if (ticket === generation) saving.value = false }
+  } finally {
+    if (ticket === generation) saving.value = false
+  }
 }
+
 async function closeCommand(done: () => void = clearCommand) {
   if (saving.value) return
-  if (pending.value) { commandError.value = '原请求结果待确认，请原样重试核实后再关闭。'; return }
+  if (pending.value) {
+    commandError.value = '原请求结果待确认，请原样重试核实后再关闭。'
+    return
+  }
   const ticket = generation
-  if (Object.values(form).some(Boolean)) { try { await ElMessageBox.confirm('尚有未提交的报工编辑，是否放弃？', '关闭编辑', { type: 'warning' }) } catch { return } }
-  if (ticket === generation) { clearCommand(); done() }
+  if (Object.values(form).some(Boolean)) {
+    try {
+      await ElMessageBox.confirm('尚有未提交的报工编辑，是否放弃？', '关闭编辑', { type: 'warning' })
+    } catch {
+      return
+    }
+  }
+  if (ticket === generation) {
+    clearCommand()
+    done()
+  }
 }
+
 async function openHistory(row: Ledger) {
   if (!can('detail')) return
-  historySequence++; detail.value = null; history.value = []; historyVisible.value = true; historyPage.value = 1
+  historySequence++
+  detail.value = null
+  history.value = []
+  historyVisible.value = true
+  historyPage.value = 1
   const originalId = row.referenceReportId ?? row.id
   await loadHistory(originalId)
 }
+
 async function loadHistory(id = detail.value?.record.id) {
   if (!id || !historyVisible.value) return
-  const ticket = ++historySequence; historyLoading.value = true; historyError.value = ''
-  try { const [d, h] = await Promise.all([api.detail(id), api.history(id, (historyPage.value - 1) * historyLimit.value, historyLimit.value)]); if (ticket !== historySequence) return; detail.value = d; history.value = h.items; historyTotal.value = h.total } catch(e) { if (ticket === historySequence) historyError.value = e instanceof Error ? e.message : '调整历史读取失败' } finally { if (ticket === historySequence) historyLoading.value = false }
+  const ticket = ++historySequence
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const [d, h] = await Promise.all([api.detail(id), api.history(id, (historyPage.value - 1) * historyLimit.value, historyLimit.value)])
+    if (ticket !== historySequence) return
+    detail.value = d
+    history.value = h.items
+    historyTotal.value = h.total
+  } catch (e) {
+    if (ticket === historySequence) historyError.value = e instanceof Error ? e.message : '调整历史读取失败'
+  } finally {
+    if (ticket === historySequence) historyLoading.value = false
+  }
 }
-function closeHistory() { historySequence++; historyVisible.value = false; detail.value = null; history.value = [] }
+
+function closeHistory() {
+  historySequence++
+  historyVisible.value = false
+  detail.value = null
+  history.value = []
+}
+
 const person = (name: string | null | undefined, id: string) => name || `用户 ${id}（名称未记录）`
 const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
 </script>
@@ -225,14 +376,12 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
           :options="historicalUsers.items.value"
           :selected-option="historicalUsers.selected.value ?? (pending && form.operatorUserId ? {value:form.operatorUserId,label:'原请求历史操作人员（待核实）'} : null)"
           :loading="historicalUsers.loading.value"
-          :has-more="historicalUsers.hasMore.value"
           :error="historicalUsers.error.value"
           :disabled="saving || !!pending"
           placeholder="输入昵称检索历史人员"
           aria-label="历史实际操作人员"
           @search="historicalUsers.scheduleSearch"
           @open="historicalUsers.open"
-          @load-more="historicalUsers.loadMore"
           @retry="historicalUsers.retry"
         /><span class="secondary">不按当前工序能力或派工名单限制历史补录</span></el-form-item>
         <el-form-item label="实际生产时间" required><el-date-picker v-model="form.reportTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择实际生产时间" /></el-form-item>

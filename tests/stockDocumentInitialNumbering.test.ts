@@ -1,3 +1,4 @@
+import { clearDictionaries } from '../src/utils/dictionaries'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, reactive, ref } from 'vue'
@@ -21,9 +22,16 @@ const Document = defineComponent({
 let wrapper: ReturnType<typeof mount> | undefined
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  clearDictionaries()
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {} unobserve() {} disconnect() {}
+  })
 })
-afterEach(() => { wrapper?.unmount();wrapper = undefined;vi.unstubAllGlobals() })
+afterEach(() => {
+  wrapper?.unmount()
+  wrapper = undefined
+  vi.unstubAllGlobals()
+})
 
 it.each([
   ['IN', 'OTHER_RECEIPT', 'OIR', 'OIR20261029001'],
@@ -31,7 +39,7 @@ it.each([
 ])('automatically matches the initial %s type to its rule and preview without allocating a number', async(direction, type, prefix, preview) => {
   mocks.direction = direction
   mocks.request.mockImplementation((url: string) => {
-    if (url.endsWith('/types')) return Promise.resolve([{ value: type, direction, label: type, enabled: true }])
+    if (url.includes('/common/dict/')) return Promise.resolve({ data: [{ dictValue: type, dictLabel: type }] })
     if (url.endsWith('/numbering-rules')) return Promise.resolve([
       { typeKey: 'UNRELATED', ruleCode: 'UNRELATED', ruleName: '别的类型', prefix: 'WRONG', preview: 'WRONG001', available: true },
       { typeKey: type, ruleCode: type, ruleName: '当前类型规则', prefix, preview, available: true }
@@ -39,11 +47,14 @@ it.each([
     return Promise.resolve([])
   })
   const pinia = createPinia(), auth = useAuth(pinia)
-  auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryPermissions = ['business:wm:stock:document:create', 'business:wm:stock:document:list', 'business:wm:stock:document:query']
+  auth.factoryId = 'A'
+  auth.runtimeMode = 'LOCAL'
+  auth.factoryPermissions = ['business:wm:stock:document:create', 'business:wm:stock:document:list', 'business:wm:stock:document:query']
   wrapper = mount(Page, { props: { direction: direction as 'IN' | 'OUT' }, global: { plugins: [pinia, ElementPlus], stubs: { MasterDetailDocument: Document, RouterLink: true }}})
   await flushPromises()
   expect(mocks.request.mock.calls.filter(([url]) => url.endsWith('/numbering-rules'))).toHaveLength(0)
-  await wrapper.findComponent(Document).get('button').trigger('click');await flushPromises()
+  await wrapper.findComponent(Document).get('button').trigger('click')
+  await flushPromises()
   const state = (wrapper.findComponent(Document).vm.$ as unknown as { setupState: { draft: Record<string, unknown> }}).setupState
   expect(state.draft.documentType).toBe(type)
   expect(state.draft.ruleCode).toBe(type)

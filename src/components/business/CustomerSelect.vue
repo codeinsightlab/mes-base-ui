@@ -10,16 +10,18 @@ const props = defineProps<{ modelValue?: string | null; disabled?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>()
 const auth = useAuth()
 const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission('business:mes:customer:list', 'factory'))
+
 function toOption(row: Row): SearchOption<Row> {
   return { value: String(row.id), label: `${row.code} · ${row.name}`, data: row }
 }
-const { items, selected, loading, resolving, error, resolveError, hasMore, search, scheduleSearch, loadMore, retry, open, hydrate, reset } = useRemoteOptions<Row>({
+
+const { items, selected, loading, resolving, error, resolveError, search, scheduleSearch, retry, open, hydrate, reset } = useRemoteOptions<Row>({
   modelValue: () => props.modelValue,
   enabled: () => allowed.value,
   disabled: () => !!props.disabled,
   search: async({ keyword, offset, limit }) => {
     const page = await customerApi.list({ name: keyword, offset, limit })
-    return { items: page.items.map(toOption), total: page.total, nextOffset: offset + page.items.length }
+    return { items: page.items.map(toOption) }
   },
   resolve: async value => {
     if (!auth.hasPermission('business:mes:customer:query', 'factory')) return null
@@ -33,7 +35,10 @@ watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), a
   if (previous && props.modelValue) emit('update:modelValue', null)
   if (previous) await nextTick()
   if (current !== contextVersion) return
-  if (allowed.value) { if (!props.disabled) void search(''); void hydrate() }
+  if (allowed.value) {
+    if (!props.disabled) void search('')
+    void hydrate()
+  }
 }, { immediate: true, flush: 'sync' })
 </script>
 
@@ -45,13 +50,11 @@ watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), a
     :disabled="disabled || !allowed"
     :loading="loading"
     :resolving="resolving"
-    :has-more="hasMore"
     :error="error"
     :resolve-error="resolveError"
     placeholder="搜索客户名称"
     @update:model-value="emit('update:modelValue', $event)"
     @search="scheduleSearch"
-    @load-more="loadMore"
     @retry="retry"
     @resolve-retry="hydrate"
     @open="open"

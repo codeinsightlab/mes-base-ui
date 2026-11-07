@@ -8,16 +8,18 @@ const props = defineProps<{ modelValue?: string | null; materialId?: string | nu
 const emit = defineEmits<{ 'update:modelValue': [string | null]; selected: [Bom | null] }>()
 const auth = useAuth()
 const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching && !!props.materialId && auth.hasPermission('business:material:list', 'factory'))
+
 function toOption(row: Bom): SearchOption<Bom> {
   return { value: row.id, label: `${row.code} · ${row.version}${row.status === 'DRAFT' ? ' · 草稿' : ''}${row.defaultVersion ? ' · 默认' : ''}`, disabled: row.status === 'DISABLED', data: row }
 }
-const { items, selected, loading, resolving, error, resolveError, hasMore, search, scheduleSearch, loadMore, retry, open, hydrate, reset } = useRemoteOptions<Bom>({
+
+const { items, selected, loading, resolving, error, resolveError, search, scheduleSearch, retry, open, hydrate, reset } = useRemoteOptions<Bom>({
   modelValue: () => props.modelValue,
   enabled: () => allowed.value,
   disabled: () => !!props.disabled,
   search: async({ keyword, offset, limit }) => {
     const page = await bomApi.list({ productId: props.materialId!, ...(keyword ? { code: keyword } : {}), ...(props.allowDraft ? {} : { status: 'PUBLISHED' }), offset, limit })
-    return { items: (page.items as Bom[]).map(toOption), total: page.total, nextOffset: offset + page.items.length }
+    return { items: (page.items as Bom[]).map(toOption) }
   },
   resolve: async value => {
     if (!auth.hasPermission('business:material:query', 'factory')) return null
@@ -26,20 +28,30 @@ const { items, selected, loading, resolving, error, resolveError, hasMore, searc
     return toOption(row)
   }
 })
-watch(selected, option => { if (option?.data) emit('selected', option.data) })
+watch(selected, option => {
+  if (option?.data) emit('selected', option.data)
+})
+
 function choose(value: string | null) {
   emit('update:modelValue', value)
-  if (!value) { emit('selected', null); return }
+  if (!value) {
+    emit('selected', null)
+    return
+  }
   const row = items.value.find(option => option.value === value) ?? selected.value
   if (row?.data) emit('selected', row.data)
 }
+
 let contextVersion = 0
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), allowed.value, props.materialId, props.allowDraft], async(_, previous) => {
   const current = ++contextVersion
   reset()
   if (previous) await nextTick()
   if (current !== contextVersion) return
-  if (allowed.value) { if (!props.disabled) void search(''); void hydrate() }
+  if (allowed.value) {
+    if (!props.disabled) void search('')
+    void hydrate()
+  }
 }, { immediate: true, flush: 'sync' })
 </script>
 
@@ -51,13 +63,11 @@ watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), a
     :disabled="disabled || !allowed"
     :loading="loading"
     :resolving="resolving"
-    :has-more="hasMore"
     :error="error"
     :resolve-error="resolveError"
     :placeholder="placeholder || (allowDraft ? '选择子BOM版本；不选则为本层叶项' : '选择已发布子BOM；不选则为本层叶项')"
     @update:model-value="choose"
     @search="scheduleSearch"
-    @load-more="loadMore"
     @retry="retry"
     @resolve-retry="hydrate"
     @open="open"

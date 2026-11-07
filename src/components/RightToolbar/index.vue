@@ -2,13 +2,13 @@
   <div class="top-right-btn">
     <el-row>
       <el-tooltip class="item" effect="dark" :content="showSearch ? '隐藏搜索' : '显示搜索'" placement="top">
-        <el-button size="small" circle icon="Search" :aria-label="showSearch ? '隐藏搜索' : '显示搜索'" @click="toggleSearch()" />
+        <el-button class="mes-focus-icon" size="small" circle icon="Search" :aria-label="showSearch ? '隐藏搜索' : '显示搜索'" @click="toggleSearch()" />
       </el-tooltip>
       <el-tooltip class="item" effect="dark" content="刷新" placement="top">
-        <el-button size="small" circle icon="Refresh" aria-label="刷新列表" @click="refresh()" />
+        <el-button class="mes-focus-icon" size="small" circle icon="Refresh" aria-label="刷新列表" @click="refresh()" />
       </el-tooltip>
       <el-tooltip v-if="columns" class="item" effect="dark" content="显隐列" placement="top">
-        <el-button size="small" circle icon="Menu" aria-label="显示或隐藏列" @click="showColumn()" />
+        <el-button class="mes-focus-icon" size="small" circle icon="Menu" aria-label="显示或隐藏列" @click="showColumn()" />
       </el-tooltip>
     </el-row>
     <PageDialog v-model="open" :title="title" append-to-body>
@@ -25,8 +25,8 @@
 import PageDialog from '@/components/page/PageDialog.vue'
 
 export default {
-  components: { PageDialog },
   name: 'RightToolbar',
+  components: { PageDialog },
   props: {
     showSearch: {
       type: Boolean,
@@ -50,7 +50,9 @@ export default {
   },
   watch: {
     columns: {
-      handler(columns) { this.value = (columns || []).filter(column => column.visible === false).map(column => column.key) },
+      handler(columns) {
+        this.value = (columns || []).filter(column => column.visible === false).map(column => column.key)
+      },
       immediate: true,
       deep: true
     }

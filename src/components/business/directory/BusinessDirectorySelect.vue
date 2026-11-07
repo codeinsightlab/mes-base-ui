@@ -20,32 +20,42 @@ const emit = defineEmits<{
 }>()
 const auth = useAuth()
 const canRead = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission(directoryPermissions[props.resource], 'factory'))
+
 function toOption(row: DirectoryOption): SearchOption<DirectoryOption> {
   return { value: row.id, label: row.code ? row.name + '（' + row.code + (row.version != null ? ' · V' + row.version : '') + '）' : row.name, data: row }
 }
-const { items, selected, loading, resolving, error, resolveError, hasMore, search, scheduleSearch, loadMore, retry, open, hydrate, reset } = useRemoteOptions<DirectoryOption>({
+
+const { items, selected, loading, resolving, error, resolveError, search, scheduleSearch, retry, open, hydrate, reset } = useRemoteOptions<DirectoryOption>({
   modelValue: () => props.modelValue,
   enabled: () => canRead.value,
   disabled: () => props.disabled,
-  search: async({ keyword, offset }) => {
-    const page = await listDirectory(props.resource, keyword, offset, props.departmentId)
-    return { items: page.items.map(toOption), total: page.total, nextOffset: page.offset + page.items.length }
+  search: async({ keyword, offset, limit }) => {
+    const page = await listDirectory(props.resource, keyword, offset, props.departmentId, limit)
+    return { items: page.items.map(toOption) }
   },
   resolve: async value => toOption(await getDirectory(props.resource, value))
 })
+
 function choose(value: string | null) {
   const option = items.value.find(row => row.value === value) ?? selected.value
   emit('update:modelValue', value)
   emit('change', value && option?.value === value ? option.data ?? null : null)
 }
+
 let contextVersion = 0
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), canRead.value, props.resource, props.departmentId], async(_, previous) => {
   const current = ++contextVersion
   reset()
-  if (previous && props.modelValue) { emit('update:modelValue', null); emit('change', null) }
+  if (previous && props.modelValue) {
+    emit('update:modelValue', null)
+    emit('change', null)
+  }
   if (previous) await nextTick()
   if (current !== contextVersion) return
-  if (canRead.value) { if (!props.disabled) void search(''); void hydrate() }
+  if (canRead.value) {
+    if (!props.disabled) void search('')
+    void hydrate()
+  }
 }, { immediate: true, flush: 'sync' })
 </script>
 
@@ -60,12 +70,10 @@ watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|'), c
       :placeholder="placeholder"
       :loading="loading"
       :resolving="resolving"
-      :has-more="hasMore"
       :error="error"
       :resolve-error="resolveError"
       @update:model-value="choose"
       @search="scheduleSearch"
-      @load-more="loadMore"
       @retry="retry"
       @resolve-retry="hydrate"
       @open="open"
