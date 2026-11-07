@@ -47,7 +47,7 @@ export const stockDocuments = {
   lineLabels: (id:string, direction: StockDocumentDirection, materialIssueOnly = false) => request<LineLabel[]>(path(id, direction) + '/line-labels', { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
   detail: (id:string, direction: StockDocumentDirection = 'OUT', materialIssueOnly = false) => request<Detail>(path(id, direction), { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
   byRequest: (requestId:string) => request<Detail>(root('OUT') + '/by-request/' + encodeURIComponent(requestId), { scope: 'factory' }),
-  productionInputBasis: (id:string, materialIssueOnly = false) => request<ProductionInputBasis | null>(path(id) + '/production-input-basis', { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
+  productionInputBasis: (id:string, materialIssueOnly = false) => request<ProductionInputBasis | null>(path(id) + '/production-input-basis', { ...(materialIssueOnly ? { query: { documentType: 'MATERIAL_ISSUE' }} : {}), scope: 'factory' }),
   materialIssueLines: (id:string) => request<Line[]>(path(id) + '/lines', { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }),
   materialIssueLine: (id:string, lineId:string) => request<Line>(path(id) + '/lines/' + encodeURIComponent(lineId), { query: { documentType: 'MATERIAL_ISSUE' }, scope: 'factory' }),
   createAggregate: (body:unknown, direction:StockDocumentDirection = 'OUT') => request<Detail>(root(direction) + '/aggregate', { method: 'POST', body, scope: 'factory' }),

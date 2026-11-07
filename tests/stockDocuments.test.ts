@@ -167,3 +167,64 @@ it('sends supplier snapshots and uses the formal purchase receipt approval', asy
   await s.approve()
   expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/inbound-documents/15/actions/approve')
 })
+
+const inputBasisCalls = () => mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/production-input-basis'))
+it('loads the production input basis once when document identity and source fields arrive together', async() => {
+  mocks.request.mockResolvedValue(null)
+  setup();await flushPromises();mocks.request.mockClear()
+  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'POSTED', sourceWorkorderId: '7', sourceExecutionCode: 'WO:M#LOT' }});await flushPromises()
+  expect(inputBasisCalls()).toHaveLength(1)
+  expect(inputBasisCalls()[0]![0]).toBe('/api/wm/outbound-documents/44/production-input-basis')
+})
+it('does not query a production input basis until the document has an identifier', async() => {
+  mocks.request.mockResolvedValue(null)
+  setup();await wrapper!.setProps({ row: { documentType: 'MATERIAL_ISSUE', direction: 'OUT' }});await flushPromises()
+  expect(inputBasisCalls()).toHaveLength(0)
+})
+it('reads the basis only once after approval refresh changes document revision and source fields', async() => {
+  mocks.request.mockResolvedValue(null)
+  const { s, refresh } = setup()
+  const row = { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'DRAFT', sourceWorkorderId: '7', sourceExecutionCode: 'WO:M#LOT' }
+  await wrapper!.setProps({ row });await flushPromises();mocks.request.mockClear()
+  refresh.mockImplementationOnce(async() => { await wrapper!.setProps({ row: { ...row, revision: '2', status: 'POSTED', sourceExecutionCode: 'WO:M#CONFIRMED' }}) })
+  await s.approve();await flushPromises()
+  expect(inputBasisCalls()).toHaveLength(1)
+  expect(mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/actions/approve'))).toHaveLength(1)
+})
+
+it('refreshes the basis once even when the header does not change', async() => {
+  mocks.request.mockResolvedValue(null)
+  const { s, refresh } = setup()
+  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'POSTED' }});await flushPromises();mocks.request.mockClear()
+  await s.refreshDocument();await flushPromises()
+  expect(refresh).toHaveBeenCalledOnce()
+  expect(inputBasisCalls()).toHaveLength(1)
+})
+it('discards a delayed basis response after switching documents', async() => {
+  mocks.request.mockResolvedValue(null)
+  const { s } = setup()
+  let release!:(value:unknown) => void
+  mocks.request.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT' }});await flushPromises()
+  await wrapper!.setProps({ row: { id: '45', documentType: 'MATERIAL_ISSUE', direction: 'OUT' }});await flushPromises()
+  release({ executionId: 'old' });await flushPromises()
+  expect(s.inputBasis).toBeNull()
+})
+it('omits empty basis query parameters but preserves the material issue permission filter', async() => {
+  mocks.request.mockResolvedValue(null)
+  await stockDocuments.productionInputBasis('44')
+  expect(mocks.request).toHaveBeenLastCalledWith('/api/wm/outbound-documents/44/production-input-basis', { scope: 'factory' })
+  await stockDocuments.productionInputBasis('44', true)
+  expect(mocks.request).toHaveBeenLastCalledWith('/api/wm/outbound-documents/44/production-input-basis', { scope: 'factory', query: { documentType: 'MATERIAL_ISSUE' }})
+})
+it('releases the cancel button after a status-changing refresh', async() => {
+  mocks.request.mockResolvedValue(null)
+  const { s, auth, refresh } = setup()
+  auth.factoryPermissions.push('business:wm:stock:document:cancel')
+  const row = { id: '44', documentType: 'OTHER_RECEIPT', direction: 'IN', revision: '1', status: 'DRAFT' }
+  await wrapper!.setProps({ row });await flushPromises()
+  refresh.mockImplementationOnce(async() => { await wrapper!.setProps({ row: { ...row, revision: '2', status: 'CANCELLED' }}) })
+  await s.cancel();await flushPromises()
+  expect(s.cancelBusy).toBe(false)
+  expect(refresh).toHaveBeenCalledOnce()
+})
