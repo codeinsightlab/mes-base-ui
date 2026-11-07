@@ -3,6 +3,7 @@ import { invalidateQuantityRules } from '@/lib/production/quantityRuleInvalidati
 
 export interface UnitMeasureVo {
   [key: string]: unknown;
+
   id: string;
 
   code: string;
@@ -38,13 +39,25 @@ export const api = {
 
   update: (id: string, body: unknown) =>
     request<UnitMeasureVo>('/api/basic/unit-measure/' + encodeURIComponent(id), {
-      method: 'PUT', body, scope: 'factory'
-    }).then(row => { invalidateQuantityRules(); return row }),
+      method: 'PUT', body, scope: 'factory',
+    }).then(row => {
+      invalidateQuantityRules()
+      return row
+    }),
 
   remove: (id: string) => removeIds([id]),
 
-  delids: removeIds
+  delids: removeIds,
 }
 
-export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
-export const sync = () => request<SyncResult>('/api/basic/unit-measure/actions/sync', { method: 'POST', scope: 'factory' })
+export interface SyncResult {
+  fetched: number;
+  created: number;
+  updated: number;
+  skipped: number
+}
+
+export const sync = () => request<SyncResult>('/api/basic/unit-measure/actions/sync', {
+  method: 'POST',
+  scope: 'factory',
+})

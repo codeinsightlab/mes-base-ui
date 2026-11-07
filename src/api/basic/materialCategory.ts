@@ -2,6 +2,7 @@ import { request } from '@/lib/request'
 
 export interface MaterialCategoryVo {
   [key: string]: unknown;
+
   id: string;
 
   code: string;
@@ -37,15 +38,24 @@ export const api = {
 
   update: (id: string, body: unknown) =>
     request<MaterialCategoryVo>('/api/basic/material-category/' + encodeURIComponent(id), {
-      method: 'PUT', body, scope: 'factory'
+      method: 'PUT', body, scope: 'factory',
     }),
 
   remove: (id: string) => removeIds([id]),
 
-  delids: removeIds
+  delids: removeIds,
 }
 
-export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
-export const sync = () => request<SyncResult>('/api/basic/material-category/actions/sync', { method: 'POST', scope: 'factory' })
+export interface SyncResult {
+  fetched: number;
+  created: number;
+  updated: number;
+  skipped: number
+}
+
+export const sync = () => request<SyncResult>('/api/basic/material-category/actions/sync', {
+  method: 'POST',
+  scope: 'factory',
+})
 
 export const tree = () => request<Page>('/api/basic/material-category/tree', { scope: 'factory' })
