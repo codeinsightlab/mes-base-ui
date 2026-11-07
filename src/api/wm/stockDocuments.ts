@@ -2,7 +2,6 @@ import { request } from '@/lib/request'
 import type { CrudApi, Row } from '@/lib/crud'
 export type StockDocumentDirection = 'IN' | 'OUT'
 export type StockDocumentType = 'PURCHASE_RECEIPT' | 'PRODUCTION_RECEIPT' | 'OUTSOURCE_RECEIPT' | 'MATERIAL_RETURN_RECEIPT' | 'REWORK_RECEIPT' | 'SALES_RETURN_RECEIPT' | 'DEFECT_RECEIPT' | 'SCRAP_RECEIPT' | 'OTHER_RECEIPT' | 'MATERIAL_ISSUE' | 'OTHER_ISSUE' | 'TRANSFER_RECEIPT' | 'TRANSFER_ISSUE'
-export interface StockDocumentTypeOption { value: StockDocumentType; direction: StockDocumentDirection; label: string; origin: string; requiredDocuments: string; approvalAvailable: boolean; qualityReceipt: boolean; enabled: boolean }
 export interface NumberingRuleOption { typeKey: StockDocumentType; ruleCode: string; ruleName: string | null; prefix: string | null; preview: string | null; available: boolean; issue: string | null }
 const semantics: Partial<Record<StockDocumentType, { origin: string;basis: string;approvalAvailable: boolean }>> = {
   PURCHASE_RECEIPT: { origin: '供应商直接交货', basis: '供应商、实物清点及送货凭据（无需采购订单）', approvalAvailable: true }, PRODUCTION_RECEIPT: { origin: '工单生产完成', basis: '工单、Execution、报工及质量数量依据', approvalAvailable: true },
@@ -42,7 +41,6 @@ export interface CancellationBasis { workorderId: string;productId: string;statu
 const root = (direction: StockDocumentDirection = 'OUT') => '/api/wm/' + (direction === 'IN' ? 'inbound-documents' : 'outbound-documents')
 const path = (id:string, direction: StockDocumentDirection = 'OUT') => root(direction) + '/' + encodeURIComponent(id)
 export const stockDocuments = {
-  types: (direction: StockDocumentDirection) => request<StockDocumentTypeOption[]>(root(direction) + '/types', { scope: 'factory' }),
   list: (query:Record<string, string | number>, direction:StockDocumentDirection = 'OUT') => request<{ items: Header[];total: number;offset: number;limit: number }>(root(direction), { query, scope: 'factory' }),
   lineLabels: (id:string, direction: StockDocumentDirection, materialIssueOnly = false) => request<LineLabel[]>(path(id, direction) + '/line-labels', { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
   detail: (id:string, direction: StockDocumentDirection = 'OUT', materialIssueOnly = false) => request<Detail>(path(id, direction), { query: { ...(materialIssueOnly ? { documentType: 'MATERIAL_ISSUE' } : {}) }, scope: 'factory' }),
@@ -64,12 +62,16 @@ export const stockDocuments = {
 }
 /** The document and its complete set of lines are saved by one business command. */
 export function stockDocumentApis(access: { issueListOnly: () => boolean; issueQueryOnly: () => boolean } = { issueListOnly: () => false, issueQueryOnly: () => false }, direction: () => StockDocumentDirection = () => 'OUT') {
-  const unsupported = async(): Promise<never> => { throw Error('请使用整单保存') }
+  const unsupported = async(): Promise<never> => {
+    throw Error('请使用整单保存')
+  }
   const headerApi: CrudApi = {
     list: query => stockDocuments.list({ ...query, ...(access.issueListOnly() ? { documentType: 'MATERIAL_ISSUE' } : {}) }, direction()),
     detail: async id => (await stockDocuments.detail(id, direction(), access.issueQueryOnly())).document,
     create: unsupported, update: unsupported,
-    remove: async() => { throw Error('正式仓储单据仅允许作废草稿') }
+    remove: async() => {
+      throw Error('正式仓储单据仅允许作废草稿')
+    }
   }
   const itemApi: CrudApi = { list: unsupported, detail: unsupported, create: unsupported, update: unsupported, remove: unsupported }
   const view = (detail:Detail) => ({

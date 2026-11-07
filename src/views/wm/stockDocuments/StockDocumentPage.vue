@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useStockDocumentTypes } from '@/composables/useStockDocumentTypes'
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import PageDialog from '@/components/page/PageDialog.vue'
 
@@ -14,7 +15,7 @@ import SupplierSelect from '@/components/business/SupplierSelect.vue'
 import ProductionExecutionSelect from '@/components/business/production/ProductionExecutionSelect.vue'
 import { useRoute, useRouter } from 'vue-router'
 import StockDocumentActions from '@/components/business/warehouse/StockDocumentActions.vue'
-import { stockDocumentApis, stockDocumentPermission as p, stockDocuments, type NumberingRuleOption, type StockDocumentDirection, type StockDocumentTypeOption } from '@/api/wm/stockDocuments'
+import { stockDocumentApis, stockDocumentPurpose, stockDocumentPermission as p, stockDocuments, type NumberingRuleOption, type StockDocumentDirection } from '@/api/wm/stockDocuments'
 import { useAuth } from '@/stores/auth'
 import type { ProductionInputBasis } from '@/api/wm/stockDocuments'
 import { type Field, type Row } from '@/lib/crud'
@@ -22,7 +23,7 @@ const route = useRoute(), router = useRouter()
 const props = defineProps<{ direction: StockDocumentDirection }>()
 const direction = computed(() => props.direction)
 const transferPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/stockTransfers/index'))
-const typeOptions = ref<StockDocumentTypeOption[]>([]), typeOptionsError = ref('')
+const { types: typeOptions, error: typeOptionsError, load: readTypes, label: typeLabel } = useStockDocumentTypes()
 const pendingDocument = ref<string | null>(null)
 const numberingRules = ref<NumberingRuleOption[]>([]), numberingRulesLoading = ref(false), numberingRulesError = ref('')
 const selectedNumberRule = ref<NumberingRuleOption | null>(null)
@@ -46,22 +47,39 @@ const lineId = ref(''), selectedLine = ref<Row | null>(null), lineError = ref(''
 const canIssueLines = computed(() => canStockQuery.value || auth.hasPermission(issuePermission + ':item:list', 'factory'))
 const canIssueLine = computed(() => canStockQuery.value || auth.hasPermission(issuePermission + ':item:query', 'factory'))
 let lineAttempt = 0
+
 async function readIssueLine(documentId: unknown) {
   if (!/^[1-9]\d*$/.test(String(documentId ?? '')) || !/^[1-9]\d*$/.test(lineId.value) || !canIssueLine.value) return
   const attempt = ++lineAttempt, factory = auth.factoryId, revision = auth.revision
-  selectedLine.value = null; lineError.value = ''; lineLoading.value = true
+  selectedLine.value = null
+  lineError.value = ''
+  lineLoading.value = true
   try {
     const row = await stockDocuments.materialIssueLine(String(documentId), lineId.value)
     if (attempt === lineAttempt && factory === auth.factoryId && revision === auth.revision) selectedLine.value = row
-  } catch(error) {
+  } catch (error) {
     if (attempt === lineAttempt) lineError.value = error instanceof Error ? error.message : '明细读取失败'
-  } finally { if (attempt === lineAttempt) lineLoading.value = false }
+  } finally {
+    if (attempt === lineAttempt) lineLoading.value = false
+  }
 }
-function closeDirectLines(value: boolean) { if (!value) { directDocumentId.value = ''; directLines.value = []; selectedLine.value = null; lineAttempt++ } }
+
+function closeDirectLines(value: boolean) {
+  if (!value) {
+    directDocumentId.value = ''
+    directLines.value = []
+    selectedLine.value = null
+    lineAttempt++
+  }
+}
+
 async function readDirectLines() {
   if (!/^[1-9]\d*$/.test(directDocumentId.value) || !canIssueLines.value) return
   const attempt = ++lineAttempt, factory = auth.factoryId, revision = auth.revision
-  directLines.value = []; directBasis.value = null; lineError.value = ''; lineLoading.value = true
+  directLines.value = []
+  directBasis.value = null
+  lineError.value = ''
+  lineLoading.value = true
   try {
     const [lines, basis] = await Promise.allSettled([stockDocuments.materialIssueLines(directDocumentId.value), stockDocuments.productionInputBasis(directDocumentId.value, true)])
     if (attempt === lineAttempt && factory === auth.factoryId && revision === auth.revision) {
@@ -70,11 +88,20 @@ async function readDirectLines() {
       if (basis.status === 'fulfilled') directBasis.value = basis.value
       else lineError.value = lineError.value ? '明细及投入依据读取失败' : '投入依据读取失败'
     }
-  } catch(error) { if (attempt === lineAttempt) lineError.value = error instanceof Error ? error.message : '明细读取失败' } finally { if (attempt === lineAttempt) lineLoading.value = false }
+  } catch (error) {
+    if (attempt === lineAttempt) lineError.value = error instanceof Error ? error.message : '明细读取失败'
+  } finally {
+    if (attempt === lineAttempt) lineLoading.value = false
+  }
 }
+
 const originalLines = new Map<string, Row>()
 const quantityValidity = new WeakMap<object, boolean>()
-function setQuantityValidity(row: object, valid: boolean) { quantityValidity.set(row, valid) }
+
+function setQuantityValidity(row: object, valid: boolean) {
+  quantityValidity.set(row, valid)
+}
+
 function validateItems(items: Row[]) {
   for (const [index, item] of items.entries()) {
     const quantity = normalizedQuantityInput(String(item.quantity ?? ''))
@@ -83,13 +110,24 @@ function validateItems(items: Row[]) {
   }
   return null
 }
+
 function remember(document: { header: Row; items: Row[] }) {
   originalLines.clear()
-  document.items.forEach(row => { if (row.id != null) originalLines.set(String(row.id), { ...row }) })
+  document.items.forEach(row => {
+    if (row.id != null) originalLines.set(String(row.id), { ...row })
+  })
   return document
 }
+
 const aggregateApi = {
-  detail: async(id:string) => { lineAttempt++; lineId.value = ''; selectedLine.value = null; lineError.value = ''; lineLoading.value = false; return remember(await baseAggregateApi.detail(id)) },
+  detail: async(id:string) => {
+    lineAttempt++
+    lineId.value = ''
+    selectedLine.value = null
+    lineError.value = ''
+    lineLoading.value = false
+    return remember(await baseAggregateApi.detail(id))
+  },
   create: async(body:unknown) => remember(await baseAggregateApi.create(body)),
   update: async(id:string, body:unknown) => remember(await baseAggregateApi.update(id, body))
 }
@@ -99,15 +137,12 @@ const initialSearch = computed<Record<string, string>>((): Record<string, string
   ...(typeof route.query.documentType === 'string' && typeOptions.value.some(t => t.value === route.query.documentType)
     ? { documentType: route.query.documentType } : {}) }))
 const actionDialog = ref<InstanceType<typeof StockActionDialog> | null>(null)
-let linkAttempt = 0, typeAttempt = 0
-async function loadTypes() {
-  const attempt = ++typeAttempt, factory = auth.factoryId, revision = auth.revision
-  typeOptionsError.value = ''
-  try {
-    const result = await stockDocuments.types(direction.value)
-    if (attempt === typeAttempt && factory === auth.factoryId && revision === auth.revision) typeOptions.value = result
-  } catch(error) { if (attempt === typeAttempt) typeOptionsError.value = error instanceof Error ? error.message : '单据类型读取失败' }
+let linkAttempt = 0
+
+function loadTypes() {
+  return readTypes(direction.value)
 }
+
 async function openLinkedDocument() {
   const id = route.query.documentId
   const requestId = route.query.requestId
@@ -124,39 +159,88 @@ async function openLinkedDocument() {
     return
   }
   // The document component owns the authoritative detail read, including direction and permission checks.
-  if (hasDocument) { await document.value?.open({ id }); return }
+  if (hasDocument) {
+    await document.value?.open({ id })
+    return
+  }
   const attempt = ++linkAttempt, factory = auth.factoryId, revision = auth.revision
   try {
     const detail = await stockDocuments.byRequest(requestId as string)
     if (attempt !== linkAttempt || factory !== auth.factoryId || revision !== auth.revision) return
     await router.replace({ path: route.path, query: { ...route.query, documentId: detail.document.id }})
-  } catch(error) { if (attempt === linkAttempt) lineError.value = error instanceof Error ? error.message : '单据读取失败' }
+  } catch (error) {
+    if (attempt === linkAttempt) lineError.value = error instanceof Error ? error.message : '单据读取失败'
+  }
 }
-onMounted(() => { void loadTypes();void openLinkedDocument() })
-watch(() => props.direction, () => { void loadTypes(); if (!route.query.documentId) void document.value?.back() })
-watch(() => [route.query.documentId, route.query.requestId], openLinkedDocument)
-watch(() => route.query.documentType, () => { if (!route.query.documentId) void document.value?.back() })
-let numberingAttempt = 0
-function reset() { linkAttempt++;lineAttempt++; directDocumentId.value = ''; directLines.value = []; directBasis.value = null; lineId.value = ''; selectedLine.value = null; lineError.value = ''; lineLoading.value = false; originalLines.clear();pendingDocument.value = null;numberingAttempt++;numberingRules.value = [];selectedNumberRule.value = null;numberingRulesLoading.value = false;numberingRulesError.value = '';actionDialog.value?.clear() }
-watch(() => auth.factoryId, () => {
-  if (route.query.stockId) { const query = { ...route.query }; delete query.stockId; void router.replace({ path: route.path, query }) }
+
+onMounted(() => {
+  void loadTypes()
+  void openLinkedDocument()
 })
-watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { reset();void loadTypes() })
+watch(() => props.direction, () => {
+  void loadTypes()
+  if (!route.query.documentId) void document.value?.back()
+})
+watch(() => [route.query.documentId, route.query.requestId], openLinkedDocument)
+watch(() => route.query.documentType, () => {
+  if (!route.query.documentId) void document.value?.back()
+})
+let numberingAttempt = 0
+
+function reset() {
+  linkAttempt++
+  lineAttempt++
+  directDocumentId.value = ''
+  directLines.value = []
+  directBasis.value = null
+  lineId.value = ''
+  selectedLine.value = null
+  lineError.value = ''
+  lineLoading.value = false
+  originalLines.clear()
+  pendingDocument.value = null
+  numberingAttempt++
+  numberingRules.value = []
+  selectedNumberRule.value = null
+  numberingRulesLoading.value = false
+  numberingRulesError.value = ''
+  actionDialog.value?.clear()
+}
+
+watch(() => auth.factoryId, () => {
+  if (route.query.stockId) {
+    const query = { ...route.query }
+    delete query.stockId
+    void router.replace({ path: route.path, query })
+  }
+})
+watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => {
+  reset()
+  void loadTypes()
+})
 onBeforeUnmount(reset)
-function showAction(id: unknown) { void actionDialog.value?.open(id) }
-const manualDocumentTypes = computed(() => typeOptions.value.filter(t => t.enabled && t.approvalAvailable
+
+function showAction(id: unknown) {
+  void actionDialog.value?.open(id)
+}
+
+const manualDocumentTypes = computed(() => typeOptions.value.filter(t => stockDocumentPurpose(t.value)?.approvalAvailable
   && !t.value.startsWith('TRANSFER_')))
 const ruleCodeVisibility: Field['showWhen'] = Object.freeze({
   key: 'isNew',
   value: 'Y'
 })
+
 function numberingType(documentType: unknown): 'STOCK_IN' | 'STOCK_OUT' | null {
   const type = typeOptions.value.find(option => option.value === documentType)
   return type?.direction === 'IN' ? 'STOCK_IN' : type?.direction === 'OUT' ? 'STOCK_OUT' : null
 }
+
 async function loadNumberingRules(documentType: unknown, draft?: Row) {
   const type = numberingType(documentType), attempt = ++numberingAttempt, factory = auth.factoryId, revision = auth.revision
-  numberingRules.value = [];selectedNumberRule.value = null;numberingRulesError.value = ''
+  numberingRules.value = []
+  selectedNumberRule.value = null
+  numberingRulesError.value = ''
   if (!type || !factory || !auth.hasPermission(p + ':create', 'factory')) return
   numberingRulesLoading.value = true
   try {
@@ -172,9 +256,24 @@ async function loadNumberingRules(documentType: unknown, draft?: Row) {
       ruleName: rule.ruleName ?? rule.ruleCode, prefix: rule.prefix ?? '',
       preview: rule.preview, available: true, issue: null }]
     if (draft && !draft.id) draft.ruleCode = rule.ruleCode
-  } catch(e) { if (attempt === numberingAttempt) numberingRulesError.value = e instanceof Error ? e.message : '编码规则读取失败' } finally { if (attempt === numberingAttempt) numberingRulesLoading.value = false }
+  } catch (e) {
+    if (attempt === numberingAttempt) numberingRulesError.value = e instanceof Error ? e.message : '编码规则读取失败'
+  } finally {
+    if (attempt === numberingAttempt) numberingRulesLoading.value = false
+  }
 }
-function documentTypeChanged(draft: Row) { draft.sourceExecutionCode = null;draft.supplierName = null;draft.supplierId = null;draft.businessDate = draft.documentType === 'PURCHASE_RECEIPT' ? new Date().toLocaleDateString('en-CA') : null;draft.currency = draft.documentType === 'PURCHASE_RECEIPT' ? 'CNY' : null;draft.supplierDocumentNo = null;draft.ruleCode = null;void loadNumberingRules(draft.documentType, draft) }
+
+function documentTypeChanged(draft: Row) {
+  draft.sourceExecutionCode = null
+  draft.supplierName = null
+  draft.supplierId = null
+  draft.businessDate = draft.documentType === 'PURCHASE_RECEIPT' ? new Date().toLocaleDateString('en-CA') : null
+  draft.currency = draft.documentType === 'PURCHASE_RECEIPT' ? 'CNY' : null
+  draft.supplierDocumentNo = null
+  draft.ruleCode = null
+  void loadNumberingRules(draft.documentType, draft)
+}
+
 const documentTitle = computed(() => direction.value === 'IN' ? '入库单' : '出库单')
 const headerFields = computed<Field[]>(() => [
   { key: 'isNew', label: '新建状态', kind: 'text', readonly: true, hidden: true, defaultValue: 'Y' },
@@ -248,17 +347,17 @@ const itemFields:Field[] = [
       @back="reset"
     >
       <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
-      <template #header-fields="{draft,disabled}">
-        <template v-if="disabled">
-          <StockDocumentHeader :document="draft" :type-label="typeOptions.find(type=>type.value===draft.documentType)?.label" />
+      <template #header-fields="{draft: headerDraft,disabled: headerDisabled}">
+        <template v-if="headerDisabled">
+          <StockDocumentHeader :document="headerDraft" :type-label="typeLabel(headerDraft.documentType)" />
         </template>
         <template v-else>
-          <section v-for="group in [{title:'',keys:['documentType','ruleCode','sourceExecutionCode']},{title:'采购信息',keys:['supplierId','businessDate','currency','supplierDocumentNo']},{title:'收发说明',keys:['reason','remark']}] .filter(group=>group.title!=='采购信息'||draft.documentType==='PURCHASE_RECEIPT')" :key="group.title" class="header-field-group">
+          <section v-for="group in [{title:'',keys:['documentType','ruleCode','sourceExecutionCode']},{title:'采购信息',keys:['supplierId','businessDate','currency','supplierDocumentNo']},{title:'收发说明',keys:['reason','remark']}] .filter(group=>group.title!=='采购信息'||headerDraft.documentType==='PURCHASE_RECEIPT')" :key="group.title" class="header-field-group">
             <h3 v-if="group.title">{{ group.title }}</h3>
-            <DocumentFields :fields="group.keys.flatMap(key=>headerFields.filter(field=>field.key===key))" :draft="draft" :disabled="disabled">
+            <DocumentFields :fields="group.keys.flatMap(key=>headerFields.filter(field=>field.key===key))" :draft="headerDraft" :disabled="headerDisabled">
               <template #field-supplierId="{draft,disabled}"><span v-if="disabled">{{ draft.supplierName || '—' }}</span><div v-else><SupplierSelect v-model="draft.supplierId as string | null" status="ENABLED" /></div></template>
 
-              <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>documentTypeChanged(draft)"><el-option v-for="type in draft.id?typeOptions:manualDocumentTypes" :key="type.value" :label="type.label+(type.approvalAvailable?'':'（仅草稿）')" :value="type.value" :disabled="!type.enabled" /></el-select></template>
+              <template #field-documentType="{draft,disabled}"><el-select v-model="draft.documentType as string" :disabled="disabled||!!draft.id" @change="()=>documentTypeChanged(draft)"><el-option v-for="type in draft.id?typeOptions:manualDocumentTypes" :key="type.value" :label="type.label+(stockDocumentPurpose(type.value)?.approvalAvailable?'':'（仅草稿）')" :value="type.value" /></el-select></template>
               <template #field-ruleCode="{draft}"><div @vue:mounted="!draft.id && loadNumberingRules(draft.documentType,draft)"><el-alert v-if="numberingRulesError" :title="numberingRulesError" type="error" :closable="false" /><span class="secondary">{{ numberingRulesLoading ? '读取编号…' : selectedNumberRule?.preview || '保存时自动生成' }}</span></div></template>
               <template #field-sourceExecutionCode="{draft,disabled}"><ProductionExecutionSelect v-model="(draft.sourceExecutionCode as string|null)" :statuses="['RUNNING']" :disabled="disabled||!!draft.id||draft.documentType!=='PRODUCTION_RECEIPT'" /></template>
 

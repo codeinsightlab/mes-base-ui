@@ -133,3 +133,9 @@ BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分�
 工艺节点使用 RoutingOperationSelect，各行候选和请求序号独立；打开工艺详情不批量逐节点预载工序候选，已存节点名称直接回显。选择工序后向页面传递已选名称用于当前工艺图，图的名称表不作为各行共享的搜索候选。参考接口没有分页契约，达到100条时提示细化名称，不显示虚假的下一页。
 
 ProductionReportManager 的历史操作人员输入复用 SearchSelect/useRemoteOptions 的防抖、面板内分页和同页重试。仍调用 report-operators 历史补报目录，不增加当前工序能力或派工名单过滤；切厂、关闭编辑和撤权清除候选并拒绝迟到响应，未决命令的原人员ID保持原样，禁用时不读取新候选。
+
+### 出入库单据类型的统一读取
+
+所有前端单据类型名称、候选与排序统一通过 `getStockDocumentTypes(direction)`（[stockDocumentTypes.ts](../src/lib/stockDocumentTypes.ts)）读取。函数复用公共 `dictionary`：入库读取 `stock_document_in_type`，出库读取 `stock_document_out_type`，缓存、请求去重、失效及重试沿用公共字典机制。Vue 调用方可使用 [useStockDocumentTypes](../src/composables/useStockDocumentTypes.ts) 取得响应式类型、错误与名称；禁止页面自建名称映射或另调库存单 `/types` 合并接口。
+
+当前消费者为出入库单列表／表单、来源单据详情和库存流水。库存流水以正式关联单据的 `documentType` 显示类型，不能将通用库存动作 `OTHER_RECEIPT` 当成采购、生产等具体单据类型；无可靠关联显示待确认，独立盘盈／盘亏／撤销仍展示其动作语义。名称读取失败保留原流水及余额，展示错误与重试。字典只负责名称和候选，业务来源、审核和库存校验由后端执行。

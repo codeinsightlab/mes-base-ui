@@ -8,6 +8,7 @@ export interface StockAction {
   id: string; stockId: string; materialId: string; unitId: string; warehouseId: string; batchNo: string | null; binCode: string | null;
   actionType: string; quantityDelta: string; availableDelta: string; quantityBefore: string; quantityAfter: string;
   availableBefore: string; availableAfter: string; sourceType: string; sourceId: string | null; referenceActionId: string | null;
+  documentType?: string | null; documentDirection?: 'IN' | 'OUT' | null;
   documentLineId?: string | null; operationId?: string | null;
   executionCode: string | null; operatorUserId: string; occurredAt: string; reason: string
 }

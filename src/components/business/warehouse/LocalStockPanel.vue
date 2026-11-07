@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useStockDocumentTypes } from '@/composables/useStockDocumentTypes'
+import { stockActionLabel } from '@/lib/stockActionLabel'
 import { usePageMessageBox } from '@/lib/pageMessageBox'
 
 import MaterialIssueDocumentSelect from './MaterialIssueDocumentSelect.vue'
@@ -32,6 +34,7 @@ import {
 } from '@/api/wm/localStock'
 
 const ElMessageBox = usePageMessageBox()
+const { error: typesError, load: loadTypes, clear: clearTypes, label: typeLabel } = useStockDocumentTypes()
 
 const emit = defineEmits<{ changed: [] }>()
 const sourceDetail = ref<InstanceType<typeof StockDocumentDetailDialog> | null>(null)
@@ -66,6 +69,7 @@ let generation = 0, attempt = 0, issueLineAttempt = 0, uncertain = false, lastLe
 const key = () => `mes-stock-pending:${auth.username}:${auth.factoryId}:${stockId.value}`
 
 function clear() {
+  clearTypes()
   sourceDetail.value?.clear()
   lastLedgerOffset = 0
   activeTab.value = 'ledger'
@@ -110,6 +114,9 @@ async function load() {
     }
     if (ledger.status === 'fulfilled') {
       rows.value = ledger.value.items
+      clearTypes()
+      const directions = [...new Set(rows.value.flatMap(row => row.documentDirection ? [row.documentDirection] : []))]
+      void loadTypes(directions)
       total.value = ledger.value.total
       lastLedgerOffset = requestedOffset
     } else {
@@ -285,7 +292,7 @@ async function openInbound() {
   const path = inboundPath.value, id = stockId.value
   await beforeClose(() => {
     visible.value = false
-    void router.push({ path, query: { stockId: id } })
+    void router.push({ path, query: { stockId: id }})
   })
 }
 
@@ -320,16 +327,6 @@ onDeactivated(() => {
   visible.value = false
   clear()
 })
-const actionLabels: Record<string, string> = {
-  OPENING: '期初建账', RECEIPT: '原材料入库', ISSUE: '生产领料', RETURN: '生产退料',
-  GAIN: '盘盈', LOSS: '盘亏', CORRECTION: '业务纠错', REVERSAL: '原操作撤销',
-  PRODUCT_RECEIPT: '成品入库', PRODUCT_REVERSAL: '成品入库撤回',
-  PURCHASE_RECEIPT: '采购入库', PRODUCTION_RECEIPT: '生产入库', OUTSOURCE_RECEIPT: '委外入库',
-  MATERIAL_RETURN_RECEIPT: '生产退料入库', REWORK_RECEIPT: '返工入库', SALES_RETURN_RECEIPT: '销售退货入库',
-  DEFECT_RECEIPT: '不良品入库', SCRAP_RECEIPT: '报废品入库', OTHER_RECEIPT: '其他入库',
-  MATERIAL_ISSUE: '材料领用', OTHER_ISSUE: '其他出库', TRANSFER_RECEIPT: '调拨入库', TRANSFER_ISSUE: '调拨出库',
-}
-const label = (value: string) => actionLabels[value] ?? value
 const operationHints: Record<StockOperation, string> = {
   opening: '仅适用于尚无余额和流水的库存，填写期初数量及依据。',
   gain: '填写盘点后需要增加的数量，并记录实物盘点依据。',
@@ -410,6 +407,7 @@ function changePage({ page }: { page: number }) {
       <el-tab-pane label="库存流水" name="ledger">
         <div class="stock-section-heading"><h3>库存变动记录</h3><span class="secondary">每次变动的数量及前后余额</span>
         </div>
+        <el-alert v-if="typesError" :title="typesError" type="error" :closable="false"><el-button link @click="load">重试</el-button></el-alert>
         <el-alert v-if="actionsError" :title="'库存流水读取失败：' + actionsError" type="error" :closable="false">
           <el-button link @click="load">重试</el-button>
         </el-alert>
@@ -423,7 +421,7 @@ function changePage({ page }: { page: number }) {
               </template>
             </el-table-column>
             <el-table-column label="变动类型" min-width="120">
-              <template #default="{row}">{{ label(row.actionType) }}</template>
+              <template #default="{row}">{{ stockActionLabel(row, typeLabel) }}</template>
             </el-table-column>
             <el-table-column label="实存变动" min-width="180">
               <template #default="{row}">
@@ -515,7 +513,7 @@ function changePage({ page }: { page: number }) {
                              @validity="quantityValid = $event" />
             </el-form-item>
             <el-form-item v-if="operation === 'return'" label="原领料单" class="form-span">
-              <MaterialIssueDocumentSelect v-model="form.documentId" :disabled="busy" />
+              <MaterialIssueDocumentSelect v-model="form.documentId" :stock-id="stockId" :disabled="busy" />
               <el-button v-if="canReadIssueLines" :loading="issueLinesLoading" @click="readIssueLines">读取原领料明细
               </el-button>
             </el-form-item>
