@@ -43,3 +43,19 @@ it('keeps aggregate item controls read only when the document freezes its lines'
   const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;await s.open({ id: parent });await flushPromises()
   expect(wrapper.get('[data-test="writable"]').text()).toBe('false');expect(wrapper.text()).toContain('保存主单')
 })
+
+it('requires conditional purchase fields only while the purchase type is active', async() => {
+  const { s } = await setup({ headerFields: [
+    { key: 'documentType', label: '类型', kind: 'text', defaultValue: 'OTHER_RECEIPT' },
+    { key: 'reason', label: '依据', kind: 'text', required: true },
+    { key: 'supplierId', label: '供应商', kind: 'text', required: true, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
+    { key: 'businessDate', label: '日期', kind: 'date', required: true, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }}
+  ] })
+  header.create.mockResolvedValue({ id: parent, reason: 'QA' })
+  await s.open();s.draft.reason = 'QA';await s.save()
+  expect(header.create).toHaveBeenCalledWith({ documentType: 'OTHER_RECEIPT', reason: 'QA' })
+  await s.open();Object.assign(s.draft, { documentType: 'PURCHASE_RECEIPT', reason: 'QA' });await s.save()
+  expect(header.create).toHaveBeenCalledTimes(1)
+  Object.assign(s.draft, { supplierId: '20', businessDate: '2026-11-07' });await s.save()
+  expect(header.create).toHaveBeenCalledTimes(2)
+})

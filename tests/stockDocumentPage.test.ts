@@ -5,12 +5,13 @@ import { createPinia } from 'pinia'
 import ElementPlus, { ElSelect } from 'element-plus'
 import { useAuth } from '../src/stores/auth'
 import Page from '../src/views/wm/stockDocuments/StockDocumentPage.vue'
+import { commandFromDraft } from '../src/lib/crud'
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), query: {} as Record<string, string>, router: { push: vi.fn(), replace: vi.fn() }}))
 vi.mock('../src/lib/request', () => ({ request: mocks.request }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: mocks.query }), useRouter: () => mocks.router }))
 const Document = defineComponent({
-  props: ['aggregateApi', 'headerFields'],
+  props: ['aggregateApi', 'headerFields', 'itemFields'],
   setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft } },
   template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="field-documentType" :draft="draft" :disabled="false"/><slot name="field-ruleCode" :draft="draft" :disabled="false"/><slot name="field-sourceExecutionCode" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
 })
@@ -57,4 +58,20 @@ it('links each transfer direction directly to the paired transfer detail through
     const link = wrapper.findAllComponents(RouterLinkStub).find(item => item.text() === '查看关联调拨')
     expect(link?.props('to')).toEqual({ path: '/custom/transfers', query: { documentId: '9007199254740999' }})
   }
+})
+
+it('preserves a negotiated purchase price through the page field whitelist and aggregate adapter', async() => {
+  const document = await setup()
+  const line = commandFromDraft(document.props('itemFields'), {
+    materialId: '2', stockId: '3', warehouseId: '4', unitId: '5', quantity: '3',
+    unitPrice: '1.005', amount: '999', referencePriceId: 'forged'
+  }, false, 'id')
+  await document.props('aggregateApi').create({
+    documentType: 'PURCHASE_RECEIPT', ruleCode: 'PURCHASE_RECEIPT', supplierId: '20',
+    businessDate: '2026-11-07', currency: 'CNY', reason: 'TEST', items: [line]
+  })
+  const request = mocks.request.mock.calls.find(call => call[1]?.method === 'POST')?.[1].body
+  expect(request.items[0]).toMatchObject({ quantity: '3', unitPrice: '1.005' })
+  expect(request.items[0]).not.toHaveProperty('amount')
+  expect(request.items[0]).not.toHaveProperty('referencePriceId')
 })

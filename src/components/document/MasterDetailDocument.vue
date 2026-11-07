@@ -115,7 +115,7 @@ async function refresh() {
 }
 async function save() {
   if (!writable.value || loading.value || saving.value) return
-  for (const field of props.headerFields.filter(f => !f.readonly && f.required)) {
+  for (const field of props.headerFields.filter(f => !f.readonly && f.required && (!f.showWhen || draft[f.showWhen.key] === f.showWhen.value))) {
     if (draft[field.key] == null || String(draft[field.key]).trim() === '') {
       ElMessage.warning('请填写' + field.label)
       return

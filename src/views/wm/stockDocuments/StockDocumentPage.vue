@@ -201,6 +201,7 @@ const itemFields:Field[] = [
   { key: 'batchNo', label: '批次', kind: 'text' }, { key: 'binCode', label: '库位', kind: 'text' },
   { key: 'unitId', label: '基本单位ID', kind: 'text', required: true },
   { key: 'quantity', label: '本次收发数量', kind: 'decimal', required: true, format: value => formatQuantity(value as string) },
+  { key: 'unitPrice', label: '实际成交单价', kind: 'decimal' },
   { key: 'remark', label: '明细 / 实物清点依据', kind: 'textarea', maxLength: 500 },
   { key: 'stockActionId', label: '库存动作', kind: 'text', readonly: true, columnMinWidth: 260 }
 ]
