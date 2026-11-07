@@ -17,7 +17,7 @@ vi.mock('../src/api/basic/unitMeasure', () => ({ api: { detail: vi.fn().mockReso
 let wrapper: ReturnType<typeof mount>
 beforeEach(() => { sessionStorage.clear();vi.clearAllMocks();invalidateQuantityRules();vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}});calls.detail.mockResolvedValue({ id: '9007199254740999', quantity: '800.000001', availableQuantity: '700.000001', materialId: '1', warehouseId: '2', warehouseSource: 'LOCAL', batchNo: 'LOT', binCode: 'BIN' });calls.actions.mockResolvedValue({ items: [], total: 0 });calls.execute.mockResolvedValue({ id: 'done' }) })
 afterEach(() => { wrapper?.unmount();document.body.innerHTML = '';vi.unstubAllGlobals();vi.restoreAllMocks() })
-async function setup(write = true, selectGain = true) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryMenus = [{ id: 'inbound', name: '入库单', path: '/wm/inboundDocuments', component: 'wm/inboundDocuments/index', kind: 'MENU', permission: 'business:wm:stock:document:list', children: [] }, { id: 'stock', name: '出入库单', path: '/wm/stockDocuments', component: 'wm/outboundDocuments/index', kind: 'MENU', permission: 'business:wm:stock:document:list', children: [] }];auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:wm:inventory:query', 'business:wm:stock:action:list', ...(write ? ['business:wm:stock:gain'] : [])];const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' }}, { path: '/wm/stockDocuments', component: { template: '<div />' }}] });await router.push('/');wrapper = mount(Panel, { attachTo: document.body, global: { plugins: [pinia, ElementPlus, router] }});const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;s.open('9007199254740999');await flushPromises();if (selectGain && s.options.some((option:any) => option.value === 'gain')) s.operation = 'gain';await flushPromises();return { s, auth, router } }
+async function setup(write = true, selectGain = true, permissions: string[] = []) { const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'A';auth.runtimeMode = 'LOCAL';auth.factoryMenus = [{ id: 'inbound', name: '入库单', path: '/wm/inboundDocuments', component: 'wm/inboundDocuments/index', kind: 'MENU', permission: 'business:wm:stock:document:list', children: [] }, { id: 'stock', name: '出入库单', path: '/wm/stockDocuments', component: 'wm/outboundDocuments/index', kind: 'MENU', permission: 'business:wm:stock:document:list', children: [] }];auth.factoryPermissions = ['business:material:query', 'business:unit:measure:query', 'business:wm:inventory:query', 'business:wm:stock:action:list', ...permissions, ...(write ? ['business:wm:stock:gain'] : [])];const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: { template: '<div />' }}, { path: '/wm/stockDocuments', component: { template: '<div />' }}, { path: '/wm/inboundDocuments', component: { template: '<div />' }}] });await router.push('/');wrapper = mount(Panel, { attachTo: document.body, global: { plugins: [pinia, ElementPlus, router] }});const s = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState;s.open('9007199254740999');await flushPromises();if (selectGain && s.options.some((option:any) => option.value === 'gain')) s.operation = 'gain';await flushPromises();return { s, auth, router } }
 it('sends exact decimal strings and server balance preconditions without client actor or fabricated facts', async() => { const { s } = await setup();Object.assign(s.form, { quantity: '0.000001', reason: 'TEST 盘盈核对' });await flushPromises();await s.submit();const command = calls.execute.mock.calls[0]![1];expect(command).toMatchObject({ stockId: '9007199254740999', quantity: '0.000001', expectedQuantity: '800.000001', expectedAvailable: '700.000001' });expect(command).not.toHaveProperty('operatorUserId');expect(command).not.toHaveProperty('quantityAfter');expect(s.pending).toBeNull() })
 it('freezes the request after uncertainty and restores it on reopen', async() => { const { s } = await setup();Object.assign(s.form, { quantity: '3', reason: 'TEST arrival' });calls.execute.mockRejectedValueOnce(new Error('lost response'));await flushPromises();await s.submit();const first = JSON.parse(JSON.stringify(calls.execute.mock.calls[0]![1]));wrapper.unmount();const { s: again } = await setup();Object.assign(again.form, { quantity: '999', reason: 'changed' });await flushPromises();await again.submit();expect(calls.execute.mock.calls[1]![1]).toEqual(first) })
 it.each(['factory', 'permission'])('rejects late balance and action results after %s changes', async type => { const { s, auth } = await setup();let release!:(v:unknown) => void;calls.detail.mockImplementationOnce(() => new Promise(r => release = r));const waiting = s.load();if (type === 'factory')auth.factoryId = 'B';else auth.factoryPermissions = [];await flushPromises();release({ id: 'old', quantity: '999' });await waiting;expect(s.stock).toBeNull();expect(s.rows).toEqual([]);expect(s.visible).toBe(false) })
@@ -194,4 +194,47 @@ it('keeps the last successful page position when the next ledger page fails', as
   expect(s.offset).toBe(0)
   expect(s.total).toBe(21)
   expect(s.actionsError).toBe('下一页读取失败')
+})
+
+it.each([
+  ['OTHER_RECEIPT', '/wm/inboundDocuments', {}],
+  ['OTHER_ISSUE', '/wm/stockDocuments', {}],
+  ['MATERIAL_ISSUE', '/wm/stockDocuments', { documentType: 'MATERIAL_ISSUE', lineId: '9007199254740998' }]
+])('opens the exact source document for %s, preserving string identities', async(sourceType, path, extraQuery) => {
+  const { s, router } = await setup(false, false, ['business:wm:stock:document:query'])
+  await s.openSourceDocument({ sourceType, sourceId: '9007199254740997', documentLineId: '9007199254740998' })
+  await flushPromises()
+  expect(router.currentRoute.value.path).toBe(path)
+  expect(router.currentRoute.value.query).toEqual({ documentId: '9007199254740997', ...extraQuery })
+  expect(s.visible).toBe(false)
+  expect(calls.execute).not.toHaveBeenCalled()
+})
+
+it('does not infer a document from inventory IDs, unknown source types, or missing authorization', async() => {
+  const { s, router } = await setup(false, false)
+  expect(s.sourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' })).toBeNull()
+  for (const row of [{ sourceType: 'INVENTORY', sourceId: '12', actionType: 'OTHER_RECEIPT' }, { sourceType: 'UNKNOWN', sourceId: '12' }, { sourceType: 'OTHER_RECEIPT', sourceId: null }]) {
+    await s.openSourceDocument(row)
+  }
+  expect(router.currentRoute.value.path).toBe('/')
+  expect(s.visible).toBe(true)
+})
+
+it('preserves the source link and unsaved edits when navigation is cancelled', async() => {
+  const { s, router } = await setup(true, true, ['business:wm:stock:document:query'])
+  s.form.reason = '未保存的盘点依据'
+  vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel')
+  await s.openSourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' })
+  expect(router.currentRoute.value.path).toBe('/')
+  expect(s.form.reason).toBe('未保存的盘点依据')
+  expect(s.visible).toBe(true)
+})
+
+it('links an item-query-only role to the exact issue line but never grants other document access', async() => {
+  const { s, router } = await setup(false, false, ['business:mes:material:issue:item:query'])
+  expect(s.sourceDocument({ sourceType: 'MATERIAL_ISSUE', sourceId: '12' })).toBeNull()
+  expect(s.sourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' })).toBeNull()
+  await s.openSourceDocument({ sourceType: 'MATERIAL_ISSUE', sourceId: '12', documentLineId: '34' })
+  await flushPromises()
+  expect(router.currentRoute.value.query).toEqual({ documentId: '12', documentType: 'MATERIAL_ISSUE', lineId: '34' })
 })

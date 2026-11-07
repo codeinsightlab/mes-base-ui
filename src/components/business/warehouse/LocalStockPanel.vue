@@ -161,6 +161,36 @@ async function openIssues() {
     if (outboundPath.value) void router.push({ path: outboundPath.value, query: { documentType: 'MATERIAL_ISSUE' }})
   })
 }
+function sourceDocument(row: StockAction) {
+  if (!row.sourceId || !/^[1-9]\d*$/.test(row.sourceId)) return null
+  const canQueryDocument = auth.hasPermission('business:wm:stock:document:query', 'factory')
+  const query: Record<string, string> = { documentId: row.sourceId }
+  if (row.sourceType === 'OTHER_RECEIPT') {
+    if (!inboundPath.value || !canQueryDocument) return null
+    return { path: inboundPath.value, query, label: '查看入库单' }
+  }
+  if (row.sourceType === 'OTHER_ISSUE') {
+    if (!outboundPath.value || !canQueryDocument) return null
+    return { path: outboundPath.value, query, label: '查看出库单' }
+  }
+  if (row.sourceType !== 'MATERIAL_ISSUE' || !outboundPath.value) return null
+  const canQueryIssue = auth.hasPermission('business:mes:material:issue:query', 'factory')
+  const canListLines = auth.hasPermission('business:mes:material:issue:item:list', 'factory')
+  const canQueryLine = auth.hasPermission('business:mes:material:issue:item:query', 'factory')
+  const hasLine = !!row.documentLineId && /^[1-9]\d*$/.test(row.documentLineId)
+  if (!canQueryDocument && !canQueryIssue && !canListLines && !(canQueryLine && hasLine)) return null
+  query.documentType = 'MATERIAL_ISSUE'
+  if (hasLine) query.lineId = row.documentLineId!
+  return { path: outboundPath.value, query, label: '查看领料单' }
+}
+async function openSourceDocument(row: StockAction) {
+  const target = sourceDocument(row)
+  if (!target || busy.value) return
+  await beforeClose(() => {
+    visible.value = false
+    void router.push({ path: target.path, query: target.query })
+  })
+}
 watch(() => [auth.factoryId, auth.revision, granted.value.map(o => o.value).join(','), readable.value], () => { clear(); visible.value = false }, { flush: 'sync' })
 onBeforeUnmount(clear)
 onDeactivated(() => { visible.value = false; clear() })
@@ -232,14 +262,15 @@ function changePage({ page }: { page: number }) { offset.value = (page - 1) * 20
             <el-table-column label="变动类型" min-width="120"><template #default="{row}">{{ label(row.actionType) }}</template></el-table-column>
             <el-table-column label="实存变动" min-width="180"><template #default="{row}"><div class="stock-delta">{{ deltaLabel(row.quantityDelta) }} <small>{{ actionUnitNames[row.unitId] || '单位待确认' }}</small></div><div class="stock-transition"><QuantityText :value="row.quantityBefore" /> → <QuantityText :value="row.quantityAfter" /></div></template></el-table-column>
             <el-table-column label="可用变动" min-width="180"><template #default="{row}"><div class="stock-delta">{{ deltaLabel(row.availableDelta) }} <small>{{ actionUnitNames[row.unitId] || '单位待确认' }}</small></div><div class="stock-transition"><QuantityText :value="row.availableBefore" /> → <QuantityText :value="row.availableAfter" /></div></template></el-table-column>
-            <el-table-column prop="reason" label="业务原因" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="reason" label="业务原因" min-width="180" show-overflow-tooltip />
+            <el-table-column label="来源单据" width="120" fixed="right"><template #default="{row}"><el-button v-if="sourceDocument(row)" link type="primary" :disabled="busy" @click="openSourceDocument(row)">{{ sourceDocument(row)?.label }}</el-button><span v-else>—</span></template></el-table-column>
             <el-table-column type="expand" width="48"><template #default="{row}"><dl class="action-details"><dt>业务依据</dt><dd>{{ row.reason || '—' }}</dd><dt>批次</dt><dd>{{ row.batchNo || '无批次' }}</dd><dt>库位</dt><dd>{{ row.binCode || '无库位' }}</dd><dt>关联生产码</dt><dd>{{ row.executionCode || '—' }}</dd><dt>关联原操作</dt><dd>{{ row.referenceActionId ? '本记录为原操作的关联变动' : '无' }}</dd></dl></template></el-table-column>
           </el-table>
           <Pagination :total="total" :page="Math.floor(offset / 20) + 1" :limit="20" layout="total, prev, pager, next" :auto-scroll="false" :disabled="loading" @pagination="changePage" />
         </template>
       </el-tab-pane>
       <el-tab-pane v-if="options.length || inboundPath || outboundPath" label="库存操作" name="operations">
-        <div v-if="inboundPath || outboundPath" class="stock-document-links"><span>单据业务</span><el-button v-if="inboundPath" :disabled="busy" @click="openInbound">办理入库单</el-button><el-button v-if="outboundPath" :disabled="busy" @click="openIssues">原领料状态及撤销</el-button></div>
+        <div v-if="inboundPath || outboundPath" class="stock-document-links"><span>单据业务</span><el-button v-if="inboundPath" :disabled="busy" @click="openInbound">入库单列表</el-button><el-button v-if="outboundPath" :disabled="busy" @click="openIssues">领料出库单列表</el-button></div>
         <section v-if="options.length" class="stock-operation-section" aria-label="库存操作">
           <div class="stock-section-heading"><h3>{{ pending ? '核实上次操作' : '库存调整与退料' }}</h3><span class="secondary">数量使用物料基本单位</span></div>
           <el-alert v-if="error" :title="error" type="error" :closable="false" />
