@@ -6,6 +6,35 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import vueParser from 'vue-eslint-parser'
 
+// Stylistic detects compressed statements but does not fix them. Split only
+// sibling statements; keep guards, for headers and const declarations intact.
+const statementNewline = {
+  meta: {
+    type: 'layout',
+    fixable: 'whitespace',
+    schema: [],
+    messages: { newline: 'Write each statement on its own line.' }
+  },
+  create(context) {
+    function check(node) {
+      const statements = node.body ?? node.consequent
+      for (let index = 1; index < statements.length; index++) {
+        const previous = statements[index - 1]
+        const current = statements[index]
+        if (previous.loc.end.line === current.loc.start.line) {
+          context.report({
+            node: current,
+            messageId: 'newline',
+            fix: fixer => fixer.insertTextBefore(current, '\n')
+          })
+        }
+      }
+    }
+
+    return { Program: check, BlockStatement: check, SwitchCase: check, TSModuleBlock: check }
+  }
+}
+
 export default defineConfig([
   globalIgnores(['**/node_modules/**', '**/dist/**', '**/target/**', '**/coverage/**', '**/.local/**', '**/.idea/**']),
   {
@@ -29,7 +58,7 @@ export default defineConfig([
     languageOptions: { globals: globals.browser }
   },
   {
-    files: ['tests/**/*.{js,ts}', '*.{js,mjs,cjs,ts}'],
+    files: ['tests/**/*.{js,ts}', 'scripts/*.mjs', '*.{js,mjs,cjs,ts}'],
     languageOptions: { globals: globals.node }
   },
   {
@@ -40,11 +69,11 @@ export default defineConfig([
       parserOptions: { parser: tseslint.parser, extraFileExtensions: ['.vue'] }
     },
     rules: {
-      'vue/html-indent': ['error', 2],
-      'vue/max-attributes-per-line': ['error', {
-        singleline: 10,
-        multiline: { max: 1 }
-      }],
+      // JetBrains aligns wrapped attributes and interpolations as in bomExplosion.
+      'vue/html-indent': 'off',
+      'vue/first-attribute-linebreak': 'off',
+      'vue/html-closing-bracket-newline': 'off',
+      'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
       'vue/multiline-html-element-content-newline': 'off',
       'vue/component-definition-name-casing': ['error', 'PascalCase'],
@@ -55,16 +84,25 @@ export default defineConfig([
   },
   {
     files: ['**/*.{js,mjs,cjs,ts,vue}'],
-    plugins: { '@stylistic': stylistic },
+    plugins: { '@stylistic': stylistic, mes: { rules: { 'statement-newline': statementNewline }}},
     rules: {
       '@stylistic/indent': ['error', 2, { SwitchCase: 1 }],
       '@stylistic/quotes': ['error', 'single', { avoidEscape: true, allowTemplateLiterals: 'always' }],
       '@stylistic/semi': ['error', 'never'],
-      '@stylistic/comma-dangle': ['error', 'never'],
-      '@stylistic/space-before-function-paren': ['error', 'never'],
+      // The reference allows trailing commas on wrapped lists, without requiring them.
+      '@stylistic/comma-dangle': ['error', 'only-multiline'],
+      '@stylistic/space-before-function-paren': ['error', {
+        named: 'never', anonymous: 'never', asyncArrow: 'never', catch: 'always'
+      }],
       '@stylistic/arrow-spacing': ['error', { before: true, after: true }],
       '@stylistic/block-spacing': ['error', 'always'],
-      '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: true }],
+      '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: false }],
+      '@stylistic/max-statements-per-line': ['error', { max: 1 }],
+      'mes/statement-newline': 'error',
+      '@stylistic/padding-line-between-statements': ['error',
+        { blankLine: 'always', prev: '*', next: 'function' },
+        { blankLine: 'always', prev: 'function', next: '*' }
+      ],
       '@stylistic/comma-spacing': ['error', { before: false, after: true }],
       '@stylistic/comma-style': ['error', 'last'],
       '@stylistic/key-spacing': ['error', { beforeColon: false, afterColon: true }],

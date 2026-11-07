@@ -11,11 +11,17 @@
     "build": "vue-tsc --noEmit && vite build --mode production",
     "build:prod": "npm run build",
     "build:dev": "vue-tsc --noEmit && vite build --mode development",
-    "verify": "npm run lint && npm test && npm run build",
+    "verify": "npm run test:format && npm run lint && npm test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "format": "eslint --fix",
+    "format:check": "eslint --max-warnings 0",
+    "check:staged": "node scripts/check-staged.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs",
+    "prepare": "npm run hooks:install",
+    "test:format": "node --test scripts/format-workflow.test.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.16",

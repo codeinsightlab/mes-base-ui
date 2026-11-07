@@ -52,20 +52,32 @@ Vite 开发代理还处理健康检查、OpenAPI 及接口文档相关路径，�
 
 ## 格式与检查
 
-使用仓库的 ESLint flat config 与 EditorConfig：两空格缩进、单引号、无分号、无尾逗号、LF。Vue/TypeScript 的检查和自动修复统一使用 ESLint。
+以 `src/views/basic/bomExplosion/index.vue` 的展开风格为基准：两空格、单引号、无语句末尾分号、LF；每条语句独立成行，函数体和 CSS 声明展开，函数间留空行。允许单行提前返回、同一 const 的多个声明，以及多行列表的尾逗号（不强制补齐）。不把短模板标签强制拆成每行一个属性。
+
+格式配置随仓库分发：
+
+- `.editorconfig`：编码、基础缩进、换行和行尾。
+- `.idea/codeStyles/`：用户样本对应的 JetBrains Project Code Style，负责原生 Vue 模板属性对齐、换行及 CSS 排版。选择 Project scheme，使用 Reformat Code；在 IDE 的 Actions on Save 中启用 Reformat code。此保存动作是 IDE 个人选项，仓库配置不能替用户启用。
+- `.vscode/settings.json`：Vue / TypeScript / JavaScript 使用项目本地 ESLint，保存时格式化和修复；推荐扩展见 `.vscode/extensions.json`。ESLint 只修复其支持的规则，不承诺重现 JetBrains 的全部模板换行及 CSS 排版；需要完全一致的模板排版时使用共享 JetBrains 设置。
+- `eslint.config.mjs`：脚本格式与代码质量检查；接受样本的模板属性布局和多行尾逗号。不要再启用与这套设置竞争的 Prettier 保存格式化。
 
 ```sh
-npm run lint
-npm run lint -- --max-warnings 0
-npm run test
+npm ci                         # prepare 自动安装本仓库 Git hook
+npm run hooks:install           # 已安装依赖的工作区手动启用一次
+npm run format -- src/views/Home.vue
+npm run format:check -- src/views/Home.vue
+npm run check:staged            # 检查本次暂存的 JS / TS / Vue
+npm run lint                   # 全库代码检查
+npm run test:format            # 格式、暂存区保护及样本稳定性测试
+npm test
 npm run build
-# 只修复指定文件；先确认工作区差异
-npm exec eslint -- src/views/Home.vue --fix
 ```
 
-`npm run lint:fix` 会修复整个检查范围，执行前确认没有不应改动的工作。Markdown 不在现有 ESLint 检查范围。
+提交顺序为：编辑器格式化 → `git add` → `git commit` → pre-commit 检查暂存内容。检查失败会阻止提交，修复后重新暂存再提交。钩子不会修改文件、执行 `git add` 或自动提交，部分暂存时也只检查索引中的版本。新克隆或更换工作区需安装依赖；若使用 `--ignore-scripts`，需手动执行 `npm run hooks:install`。已有自定义 hooksPath 或 pre-commit 时安装器拒绝覆盖，应在现有钩子中接入 `npm run check:staged`。Git 的 `--no-verify` 可以绕过本地钩子，因此本地检查不是远端强制策略。
 
-编辑器使用项目本地 `node_modules/eslint` 和 `eslint.config.mjs`；Vue 语言支持与格式检查分别由语言服务和 ESLint 负责。构建包含 `vue-tsc` 类型检查。
+历史文件在触及时逐步统一，不为规则调整全量重排。`npm run lint:fix` 会修复整个检查范围，执行前确认工作区差异；日常优先指定文件运行 `format`。暂存检查与 ESLint 覆盖 JS / TS / Vue，独立 CSS 和 Markdown 不在该钩子的校验范围；Vue 内 CSS 由编辑器按共享样式排版。构建包含 `vue-tsc` 类型检查。
+
+2026-11-07 调整：原先仅 ESLint、禁止尾逗号及多行标签每行一个属性的约定由上述样本风格取代。
 
 ## 协作入口
 

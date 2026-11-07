@@ -164,3 +164,9 @@ Vue3 + TypeScript + Vue Router4 + Pinia + Element Plus；.nvmrc Node22，不改�
 单对象缓存必须复用通用详情 Key：同一数据库范围、业务资源和 ID 只使用同一个 `<资源前缀>detail:<编码ID>`，由 DetailCacheKeys 统一生成。BusinessDirectoryService 可以保留批量缓存读取和未命中 IDs 一次 IN 查询，不强制循环调用 findById/selectById；但不得另建 reference/directory/label 或 IDs 组合形式的对象缓存 Key，也不得在同一 Key 下混存 Entity 与窄 DTO/VO。批量读取与通用详情查询必须能双向命中同一份 Entity 数据，使用同一提交后失效规则。资源级失效版本仅作为通用详情的写入屏障元数据，不是另一份对象缓存。
 
 新增目录对象时同时验证生成的新增/修改/删除及导入/同步入口均触发通用淘汰；中心用户等对象通过其统一写入边界失效。验收覆盖真实 Redis 的详情与批量双向复用、完整 Entity 字段保留、提交后刷新、回滚保留及迟到回填被拒绝，不仅验证 key 含有 detail 字样。
+
+## 前端代码格式（2026-11-07 用户确认）
+
+- 以 `src/views/basic/bomExplosion/index.vue` 用户格式化后的展开风格为基准：两空格、单引号、无语句末尾分号、LF；语句分别成行、函数体及 CSS 声明展开，函数间留空行。保留单行提前返回及同一 const 的多个声明。多行列表允许尾逗号，不强制补齐。
+- 唯一格式与检查说明为 `docs/development.md`“格式与检查”。共享 JetBrains Code Style 负责原生模板属性对齐与 CSS 排版；ESLint 负责脚本格式及代码质量，不能恢复与该样本冲突的每行一个模板属性或禁止多行尾逗号规则。
+- 新增和修改的代码遵守此格式，不因调整规则批量改写无关历史文件。提交钩子只读检查暂存区，不自动修复、暂存或提交；禁止用工作区检查代替暂存版本检查。
