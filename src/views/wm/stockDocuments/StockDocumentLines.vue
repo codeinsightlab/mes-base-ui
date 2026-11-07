@@ -10,7 +10,7 @@ import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import PurchasePriceInput from '@/components/business/purchase/PurchasePriceInput.vue'
-const props = defineProps<{ header: Row; items: Row[]; writable: boolean; saving: boolean; canIssueLine: boolean; originalLines: Map<string, Row> }>()
+const props = withDefaults(defineProps<{ header: Row; items: Row[]; writable: boolean; saving: boolean; canIssueLine: boolean; showActionLinks?: boolean; originalLines: Map<string, Row> }>(), { showActionLinks: true })
 const emit = defineEmits<{ remove: [number]; 'show-action': [unknown]; 'read-line': [Row]; validity: [object, boolean] }>()
 const auth = useAuth(), labels = ref<LineLabel[]>([]), loading = ref(false), error = ref('')
 let generation = 0
@@ -48,7 +48,7 @@ onBeforeUnmount(() => { generation++; labels.value = [] })
       <el-table-column v-if="header.documentType==='PURCHASE_RECEIPT'" label="成交单价 / 参考价" min-width="180"><template #default="{row}"><PurchasePriceInput :header="header" :row="row" :disabled="!writable" @change="Object.assign(row,$event)" /></template></el-table-column>
       <el-table-column v-if="header.documentType==='PURCHASE_RECEIPT'" label="成交金额（元）" min-width="130"><template #default="{row}">{{ row.amount ?? '—' }}</template></el-table-column>
       <el-table-column label="备注" min-width="160"><template #default="{row}"><el-input v-if="writable" v-model="row.remark" maxlength="500" /><span v-else>{{ row.remark || '—' }}</span></template></el-table-column>
-      <el-table-column v-if="!writable" label="库存记录" width="120" fixed="right"><template #default="{row}"><el-button v-if="row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="$emit('show-action', row.stockActionId)">查看变动</el-button><span v-else>{{ row.stockActionId ? '已记录' : '—' }}</span></template></el-table-column>
+      <el-table-column v-if="!writable" label="库存记录" width="120" fixed="right"><template #default="{row}"><el-button v-if="showActionLinks !== false && row.stockActionId&&auth.hasPermission('business:wm:stock:action:query','factory')" link type="primary" @click="$emit('show-action', row.stockActionId)">查看变动</el-button><span v-else>{{ row.stockActionId ? '已记录' : '—' }}</span></template></el-table-column>
       <el-table-column v-if="writable || header.documentType === 'MATERIAL_ISSUE' && canIssueLine" label="操作" width="100" fixed="right"><template #default="{row,$index}"><el-button v-if="writable" link type="danger" :disabled="saving" @click="$emit('remove', $index)">移除</el-button><el-button v-else-if="row.id" link type="primary" @click="$emit('read-line', row)">查看明细</el-button></template></el-table-column>
     </el-table>
   </div>

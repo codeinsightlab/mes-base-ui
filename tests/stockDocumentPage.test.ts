@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({ request: vi.fn(), query: {} as Record<string, 
 vi.mock('../src/lib/request', () => ({ request: mocks.request }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: mocks.query }), useRouter: () => mocks.router }))
 const Document = defineComponent({
-  props: ['aggregateApi', 'headerFields', 'itemFields'],
+  props: ['aggregateApi', 'headerFields', 'itemFields', 'initialSearch'],
   setup(props) { const draft = reactive(Object.fromEntries(props.headerFields.map((field:any) => [field.key, field.defaultValue ?? null])));draft.reason = '实物交接';draft.ruleCode = 'IN_RULE';return { draft } },
   template: `<section><slot name="header-actions" :row="draft" :refresh="()=>Promise.resolve()" :dirty="false"/><slot name="header-fields" :draft="draft" :disabled="false"/><button @click="aggregateApi.create({...draft, items:[{materialId:'2',stockId:'3',warehouseId:'4',unitId:'5',quantity:'1'}]})">保存主单</button></section>`
 })
@@ -74,4 +74,14 @@ it('preserves a negotiated purchase price through the page field whitelist and a
   expect(request.items[0]).toMatchObject({ quantity: '3', unitPrice: '1.005' })
   expect(request.items[0]).not.toHaveProperty('amount')
   expect(request.items[0]).not.toHaveProperty('referencePriceId')
+})
+
+it('keeps the exact stock scope in the list query and clears it when switching factories', async() => {
+  mocks.query = { stockId: '9007199254740999' }
+  const document = await setup()
+  expect(document.props('initialSearch')).toMatchObject({ direction: 'IN', stockId: '9007199254740999' })
+  expect(wrapper.text()).toContain('仅显示当前库存')
+  const state = (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState
+  state.auth.factoryId = 'B'; await flushPromises()
+  expect(mocks.router.replace).toHaveBeenCalledWith(expect.objectContaining({ query: {}}))
 })

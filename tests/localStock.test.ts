@@ -9,7 +9,8 @@ import { invalidateQuantityRules } from '../src/lib/production/quantityRuleInval
 import { ApiError } from '../src/lib/request'
 import Panel from '../src/components/business/warehouse/LocalStockPanel.vue'
 import QuantityInput from '../src/components/business/material/QuantityInput.vue'
-const calls = vi.hoisted(() => ({ detail: vi.fn(), actions: vi.fn(), execute: vi.fn() }))
+const calls = vi.hoisted(() => ({ detail: vi.fn(), actions: vi.fn(), execute: vi.fn(), documentDetail: vi.fn(), documentLine: vi.fn() }))
+vi.mock('../src/api/wm/stockDocuments', () => ({ stockDocuments: { detail: calls.documentDetail, materialIssueLine: calls.documentLine, types: vi.fn().mockResolvedValue([]), lineLabels: vi.fn().mockResolvedValue([]) }}))
 vi.mock('../src/api/wm/wmInventory', () => ({ api: { detail: calls.detail }}))
 vi.mock('../src/api/wm/localStock', async importOriginal => ({ ...(await importOriginal<object>()), localStock: { actions: calls.actions, execute: calls.execute }}))
 vi.mock('../src/api/basic/material', () => ({ api: { detail: vi.fn().mockResolvedValue({ unitId: '77' }) }}))
@@ -37,7 +38,7 @@ it('closes the stock drawer before navigating to material issues and rejects lat
   const { s, router } = await setup();let release!:(v:unknown) => void
   calls.detail.mockImplementationOnce(() => new Promise(r => release = r));const reading = s.load()
   await s.openIssues();await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/wm/stockDocuments');expect(router.currentRoute.value.query).toEqual({ documentType: 'MATERIAL_ISSUE' });expect(s.visible).toBe(false)
+  expect(router.currentRoute.value.path).toBe('/wm/stockDocuments');expect(router.currentRoute.value.query).toEqual({ documentType: 'MATERIAL_ISSUE', stockId: '9007199254740999' });expect(s.visible).toBe(false)
   release({ id: 'late', quantity: '999' });await reading;expect(s.stock).toBeNull()
   expect(calls.execute).not.toHaveBeenCalled()
 })
@@ -196,17 +197,15 @@ it('keeps the last successful page position when the next ledger page fails', as
   expect(s.actionsError).toBe('下一页读取失败')
 })
 
-it.each([
-  ['OTHER_RECEIPT', '/wm/inboundDocuments', {}],
-  ['OTHER_ISSUE', '/wm/stockDocuments', {}],
-  ['MATERIAL_ISSUE', '/wm/stockDocuments', { documentType: 'MATERIAL_ISSUE', lineId: '9007199254740998' }]
-])('opens the exact source document for %s, preserving string identities', async(sourceType, path, extraQuery) => {
+it.each(['OTHER_RECEIPT', 'OTHER_ISSUE', 'MATERIAL_ISSUE'])('opens %s in place with exact document identity', async(sourceType) => {
+  calls.documentDetail.mockResolvedValue({ document: { id: '9007199254740997', direction: sourceType === 'OTHER_RECEIPT' ? 'IN' : 'OUT', documentType: sourceType }, lines: [] })
   const { s, router } = await setup(false, false, ['business:wm:stock:document:query'])
   await s.openSourceDocument({ sourceType, sourceId: '9007199254740997', documentLineId: '9007199254740998' })
   await flushPromises()
-  expect(router.currentRoute.value.path).toBe(path)
-  expect(router.currentRoute.value.query).toEqual({ documentId: '9007199254740997', ...extraQuery })
-  expect(s.visible).toBe(false)
+  expect(router.currentRoute.value.path).toBe('/')
+  expect(s.visible).toBe(true)
+  expect(calls.documentDetail).toHaveBeenCalledWith('9007199254740997', sourceType === 'OTHER_RECEIPT' ? 'IN' : 'OUT', false)
+  expect(document.body.textContent).toContain('来源单据 · 只读查看')
   expect(calls.execute).not.toHaveBeenCalled()
 })
 
@@ -220,10 +219,10 @@ it('does not infer a document from inventory IDs, unknown source types, or missi
   expect(s.visible).toBe(true)
 })
 
-it('preserves the source link and unsaved edits when navigation is cancelled', async() => {
+it('preserves unsaved inventory edits while reading a source document', async() => {
   const { s, router } = await setup(true, true, ['business:wm:stock:document:query'])
   s.form.reason = '未保存的盘点依据'
-  vi.spyOn(ElMessageBox, 'confirm').mockRejectedValueOnce('cancel')
+  calls.documentDetail.mockResolvedValue({ document: { id: '12', direction: 'IN' }, lines: [] })
   await s.openSourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' })
   expect(router.currentRoute.value.path).toBe('/')
   expect(s.form.reason).toBe('未保存的盘点依据')
@@ -234,7 +233,36 @@ it('links an item-query-only role to the exact issue line but never grants other
   const { s, router } = await setup(false, false, ['business:mes:material:issue:item:query'])
   expect(s.sourceDocument({ sourceType: 'MATERIAL_ISSUE', sourceId: '12' })).toBeNull()
   expect(s.sourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' })).toBeNull()
+  calls.documentLine.mockResolvedValue({ id: '34', documentId: '12', quantity: '1' })
   await s.openSourceDocument({ sourceType: 'MATERIAL_ISSUE', sourceId: '12', documentLineId: '34' })
   await flushPromises()
-  expect(router.currentRoute.value.query).toEqual({ documentId: '12', documentType: 'MATERIAL_ISSUE', lineId: '34' })
+  expect(router.currentRoute.value.path).toBe('/')
+  expect(calls.documentLine).toHaveBeenCalledWith('12', '34')
+  expect(calls.documentDetail).not.toHaveBeenCalled()
+})
+
+it('passes the current inventory scope to the inbound list', async() => {
+  const { s, router } = await setup(false, false)
+  await s.openInbound(); await flushPromises()
+  expect(router.currentRoute.value.path).toBe('/wm/inboundDocuments')
+  expect(router.currentRoute.value.query).toEqual({ stockId: '9007199254740999' })
+})
+it('does not refill a closed source popup with a late response', async() => {
+  let resolve!:(v:unknown) => void
+  calls.documentDetail.mockReturnValue(new Promise(done => { resolve = done }))
+  const { s } = await setup(false, false, ['business:wm:stock:document:query'])
+  s.openSourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' }); await flushPromises()
+  const popup = s.sourceDetail.$.setupState
+  popup.clear()
+  resolve({ document: { id: '12', direction: 'IN' }, lines: [] }); await flushPromises()
+  expect(popup.visible).toBe(false); expect(popup.document).toBeNull(); expect(s.visible).toBe(true)
+})
+it('keeps the inventory readable when reading the source document fails', async() => {
+  calls.documentDetail.mockRejectedValue(new Error('来源单据读取失败'))
+  const { s, auth } = await setup(false, false, ['business:wm:stock:document:query'])
+  s.openSourceDocument({ sourceType: 'OTHER_RECEIPT', sourceId: '12' }); await flushPromises()
+  expect(s.visible).toBe(true); expect(s.stock.batchNo).toBe('LOT')
+  expect(document.body.textContent).toContain('来源单据读取失败')
+  auth.factoryId = 'B'; await flushPromises()
+  expect(s.sourceDetail.$.setupState.visible).toBe(false)
 })

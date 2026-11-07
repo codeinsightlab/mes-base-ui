@@ -7,6 +7,7 @@ import { formatQuantity } from '@/lib/quantity'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StockActionDialog from './StockActionDialog.vue'
 import StockDocumentLines from './StockDocumentLines.vue'
+import StockDocumentHeader from '@/components/business/warehouse/StockDocumentHeader.vue'
 import DocumentFields from '@/components/document/DocumentFields.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import SupplierSelect from '@/components/business/SupplierSelect.vue'
@@ -16,7 +17,7 @@ import StockDocumentActions from '@/components/business/warehouse/StockDocumentA
 import { stockDocumentApis, stockDocumentPermission as p, stockDocuments, type NumberingRuleOption, type StockDocumentDirection, type StockDocumentTypeOption } from '@/api/wm/stockDocuments'
 import { useAuth } from '@/stores/auth'
 import type { ProductionInputBasis } from '@/api/wm/stockDocuments'
-import { formatValue, type Field, type Row } from '@/lib/crud'
+import { type Field, type Row } from '@/lib/crud'
 const route = useRoute(), router = useRouter()
 const props = defineProps<{ direction: StockDocumentDirection }>()
 const direction = computed(() => props.direction)
@@ -93,6 +94,7 @@ const aggregateApi = {
   update: async(id:string, body:unknown) => remember(await baseAggregateApi.update(id, body))
 }
 const initialSearch = computed<Record<string, string>>((): Record<string, string> => ({ direction: direction.value,
+  ...(typeof route.query.stockId === 'string' && /^[1-9]\d*$/.test(route.query.stockId) ? { stockId: route.query.stockId } : {}),
   ...(issueListOnly.value && direction.value === 'OUT' ? { documentType: 'MATERIAL_ISSUE' } : {}),
   ...(typeof route.query.documentType === 'string' && typeOptions.value.some(t => t.value === route.query.documentType)
     ? { documentType: route.query.documentType } : {}) }))
@@ -141,6 +143,9 @@ watch(() => [route.query.documentId, route.query.requestId], openLinkedDocument)
 watch(() => route.query.documentType, () => { if (!route.query.documentId) void document.value?.back() })
 let numberingAttempt = 0
 function reset() { linkAttempt++;lineAttempt++; directDocumentId.value = ''; directLines.value = []; directBasis.value = null; lineId.value = ''; selectedLine.value = null; lineError.value = ''; lineLoading.value = false; originalLines.clear();pendingDocument.value = null;numberingAttempt++;numberingRules.value = [];selectedNumberRule.value = null;numberingRulesLoading.value = false;numberingRulesError.value = '';actionDialog.value?.clear() }
+watch(() => auth.factoryId, () => {
+  if (route.query.stockId) { const query = { ...route.query }; delete query.stockId; void router.replace({ path: route.path, query }) }
+})
 watch(() => [auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], () => { reset();void loadTypes() })
 onBeforeUnmount(reset)
 function showAction(id: unknown) { void actionDialog.value?.open(id) }
@@ -223,6 +228,7 @@ const itemFields:Field[] = [
         <p v-if="directBasis">工单 {{ directBasis.workorderCode }}，投入 {{ formatQuantity(directBasis.outputQty) }}</p>
       </PageDialog>
     </template>
+    <el-alert v-if="initialSearch.stockId" title="仅显示当前库存（物料、仓库、批次、库位）关联的单据" type="info" :closable="false" />
     <MasterDetailDocument
       ref="document"
       presentation="dialog"
@@ -249,16 +255,7 @@ const itemFields:Field[] = [
       <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
       <template #header-fields="{draft,disabled}">
         <template v-if="disabled">
-          <el-descriptions :column="draft.documentType==='PURCHASE_RECEIPT' ? 3 : 2" border>
-            <el-descriptions-item label="单据类型">{{ typeOptions.find(type=>type.value===draft.documentType)?.label || '类型待确认' }}</el-descriptions-item>
-            <el-descriptions-item v-if="draft.documentType==='PURCHASE_RECEIPT'" label="供应商">{{ draft.supplierName || '—' }}</el-descriptions-item>
-            <el-descriptions-item v-if="draft.businessDate" label="业务日期">{{ draft.businessDate }}</el-descriptions-item>
-            <el-descriptions-item v-if="draft.currency" label="币种">{{ draft.currency==='CNY' ? '人民币' : draft.currency }}</el-descriptions-item>
-            <el-descriptions-item v-if="draft.supplierDocumentNo" label="送货单号">{{ draft.supplierDocumentNo }}</el-descriptions-item>
-            <el-descriptions-item v-if="draft.postedAt" label="审核时间">{{ formatValue(draft.postedAt, 'datetime') }}</el-descriptions-item>
-            <el-descriptions-item label="收发原因" :span="draft.documentType==='PURCHASE_RECEIPT' ? 3 : 2">{{ draft.reason || '—' }}</el-descriptions-item>
-            <el-descriptions-item v-if="draft.remark" label="备注" :span="draft.documentType==='PURCHASE_RECEIPT' ? 3 : 2">{{ draft.remark }}</el-descriptions-item>
-          </el-descriptions>
+          <StockDocumentHeader :document="draft" :type-label="typeOptions.find(type=>type.value===draft.documentType)?.label" />
         </template>
         <template v-else>
           <section v-for="group in [{title:'',keys:['documentType','ruleCode','sourceExecutionCode']},{title:'采购信息',keys:['supplierId','businessDate','currency','supplierDocumentNo']},{title:'收发说明',keys:['reason','remark']}] .filter(group=>group.title!=='采购信息'||draft.documentType==='PURCHASE_RECEIPT')" :key="group.title" class="header-field-group">

@@ -4,6 +4,8 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 import MaterialIssueDocumentSelect from './MaterialIssueDocumentSelect.vue'
 import PageDrawer from '@/components/page/PageDrawer.vue'
 import Pagination from '@/components/Pagination/index.vue'
+import StockDocumentDetailDialog from './StockDocumentDetailDialog.vue'
+import { stockDocumentReference, canReadStockDocument } from '@/lib/stockDocumentReference'
 
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import { computed, onBeforeUnmount, onDeactivated, reactive, ref, watch } from 'vue'
@@ -25,6 +27,7 @@ import { localStock, stockOperations, type StockOperation, type StockCommand, ty
 const ElMessageBox = usePageMessageBox()
 
 const emit = defineEmits<{ changed: [] }>()
+const sourceDetail = ref<InstanceType<typeof StockDocumentDetailDialog> | null>(null)
 const router = useRouter()
 const auth = useAuth(), visible = ref(false), stockId = ref(''), stock = ref<WmInventoryVo | null>(null)
 const operation = ref<StockOperation | ''>(''), error = ref(''), busy = ref(false), loading = ref(false)
@@ -54,7 +57,7 @@ const outboundPath = computed(() => menuPathForComponent(auth.factoryMenus, 'wm/
 const readable = computed(() => auth.hasPermission('business:wm:stock:action:list', 'factory'))
 let generation = 0, attempt = 0, issueLineAttempt = 0, uncertain = false, lastLedgerOffset = 0
 const key = () => `mes-stock-pending:${auth.username}:${auth.factoryId}:${stockId.value}`
-function clear() { lastLedgerOffset = 0; activeTab.value = 'ledger'; stockError.value = ''; actionsError.value = ''; issueLines.value = [];issueLineError.value = '';issueLinesLoading.value = false;generation++; attempt++; stock.value = null; rows.value = []; total.value = offset.value = 0; error.value = ''; unitError.value = '';unitName.value = '';actionUnitNames.value = {};operation.value = ''; busy.value = loading.value = false; pending.value = null; quantityValid.value = false; uncertain = false; Object.assign(form, { quantity: '', reason: '', documentId: '', documentLineId: '' }) }
+function clear() { sourceDetail.value?.clear(); lastLedgerOffset = 0; activeTab.value = 'ledger'; stockError.value = ''; actionsError.value = ''; issueLines.value = [];issueLineError.value = '';issueLinesLoading.value = false;generation++; attempt++; stock.value = null; rows.value = []; total.value = offset.value = 0; error.value = ''; unitError.value = '';unitName.value = '';actionUnitNames.value = {};operation.value = ''; busy.value = loading.value = false; pending.value = null; quantityValid.value = false; uncertain = false; Object.assign(form, { quantity: '', reason: '', documentId: '', documentLineId: '' }) }
 async function load() {
   const scope = generation, ticket = ++attempt, requestedOffset = offset.value; loading.value = true; error.value = ''
   try {
@@ -155,42 +158,22 @@ async function beforeClose(done: () => void) {
   if (scope !== generation) return
   clear(); done()
 }
-async function openInbound() { if (!inboundPath.value) return;const path = inboundPath.value;await beforeClose(() => { visible.value = false;void router.push({ path, query: {}}) }) }
+async function openInbound() { if (!inboundPath.value) return;const path = inboundPath.value, id = stockId.value;await beforeClose(() => { visible.value = false;void router.push({ path, query: { stockId: id }}) }) }
 async function openIssues() {
+  const id = stockId.value
   await beforeClose(() => {
     visible.value = false
-    if (outboundPath.value) void router.push({ path: outboundPath.value, query: { documentType: 'MATERIAL_ISSUE' }})
+    if (outboundPath.value) void router.push({ path: outboundPath.value, query: { documentType: 'MATERIAL_ISSUE', stockId: id }})
   })
 }
 function sourceDocument(row: StockAction) {
-  if (!row.sourceId || !/^[1-9]\d*$/.test(row.sourceId)) return null
-  const canQueryDocument = auth.hasPermission('business:wm:stock:document:query', 'factory')
-  const query: Record<string, string> = { documentId: row.sourceId }
-  if (row.sourceType === 'OTHER_RECEIPT') {
-    if (!inboundPath.value || !canQueryDocument) return null
-    return { path: inboundPath.value, query, label: '查看入库单' }
-  }
-  if (row.sourceType === 'OTHER_ISSUE') {
-    if (!outboundPath.value || !canQueryDocument) return null
-    return { path: outboundPath.value, query, label: '查看出库单' }
-  }
-  if (row.sourceType !== 'MATERIAL_ISSUE' || !outboundPath.value) return null
-  const canQueryIssue = auth.hasPermission('business:mes:material:issue:query', 'factory')
-  const canListLines = auth.hasPermission('business:mes:material:issue:item:list', 'factory')
-  const canQueryLine = auth.hasPermission('business:mes:material:issue:item:query', 'factory')
-  const hasLine = !!row.documentLineId && /^[1-9]\d*$/.test(row.documentLineId)
-  if (!canQueryDocument && !canQueryIssue && !canListLines && !(canQueryLine && hasLine)) return null
-  query.documentType = 'MATERIAL_ISSUE'
-  if (hasLine) query.lineId = row.documentLineId!
-  return { path: outboundPath.value, query, label: '查看领料单' }
+  const reference = stockDocumentReference(row)
+  if (!reference || !canReadStockDocument(reference, permission => auth.hasPermission(permission, 'factory'))) return null
+  return reference
 }
-async function openSourceDocument(row: StockAction) {
-  const target = sourceDocument(row)
-  if (!target || busy.value) return
-  await beforeClose(() => {
-    visible.value = false
-    void router.push({ path: target.path, query: target.query })
-  })
+function openSourceDocument(row: StockAction) {
+  const reference = sourceDocument(row)
+  if (reference && !busy.value) sourceDetail.value?.open(reference)
 }
 watch(() => [auth.factoryId, auth.revision, granted.value.map(o => o.value).join(','), readable.value], () => { clear(); visible.value = false }, { flush: 'sync' })
 onBeforeUnmount(clear)
@@ -294,6 +277,7 @@ function changePage({ page }: { page: number }) { offset.value = (page - 1) * 20
         </section>
       </el-tab-pane>
     </el-tabs>
+    <StockDocumentDetailDialog ref="sourceDetail" />
   </PageDrawer>
 </template>
 <style scoped>
@@ -302,8 +286,9 @@ function changePage({ page }: { page: number }) { offset.value = (page - 1) * 20
 .stock-overview { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 24px; padding: 0 0 20px; border-bottom: 1px solid var(--mes-border); }
 .stock-identity h3 { margin: 0 0 16px; font-size: 16px; line-height: 1.6; overflow-wrap: anywhere; }
 .stock-identity dl { display: grid; gap: 8px; margin: 0; }
-.stock-identity dl > div { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; }
+.stock-identity dl > div { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: baseline; }
 .stock-identity dt, .stock-balances > div > span, .stock-balances p { color: var(--mes-text-secondary); font-size: 12px; }
+.stock-identity dt, .stock-identity dd { line-height: 22px; }
 .stock-identity dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .stock-balances { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-content: center; padding-left: 24px; border-left: 1px solid var(--mes-border); }
 .stock-balances > div { display: flex; min-width: 0; flex-direction: column; gap: 8px; }

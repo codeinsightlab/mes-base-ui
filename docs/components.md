@@ -118,3 +118,9 @@ const { items, selected, loading, resolving, error, resolveError, hasMore,
 该组件复用`BomVersionSelect`的候选分页及回显和`defaultBom`接口，不另建版本体系。创建/编辑工单与详情用料维护共用`WorkorderMaterialEditor`；它调用服务端`direct-components`读取直接组件和数量，产量变化只重算未调整的BOM行，保留人工调整及新增行并在保存前确认。标准数量仍由服务端保存时复验，客户端不自行复制BOM公式。
 
 BOM组成中的可选子BOM仍允许不选以表示叶项，独立BOM展开分析仍可读取各状态版本；这两种语义不套用工单默认选择策略。
+
+### 库存来源单据只读详情
+
+`StockDocumentDetailDialog` 接收明确的单据方向、单据ID及可选领料明细ID，通过正式查询接口展示来源单据；库存流水使用 `stockDocumentReference` 解析可信来源，不从动作名称或库存ID猜测单据。弹窗只读，复用 `StockDocumentHeader` 和 `StockDocumentLines`，不承载审核、编辑或作废。完整单据、领料列表和单条领料明细分别遵循既有查询权限；关闭、切厂、撤权和卸载清空内容并拒绝迟到响应。
+
+库存操作的列表入口继续路由跳转，携带字符串 `stockId`；列表初始化查询及重置保留该筛选，切厂移除旧库存范围。过滤、去重、分页和总数由后端完成。
