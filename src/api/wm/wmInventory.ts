@@ -58,3 +58,5 @@ export const api = {
 
 export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
 export const sync = () => request<SyncResult>('/api/wm/wm-inventory/actions/sync', { method: 'POST', scope: 'factory' })
+
+export const inventoryUnitLabels = (stockIds: string[]) => request<{ stockId: string; unitName: string | null }[]>('/api/wm/wm-inventory/unit-labels', { query: { stockIds: stockIds.join(',') }, scope: 'factory' })

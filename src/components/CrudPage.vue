@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<{
   appendOnly?: boolean;
   beforeCreate?: () => Promise<Row | null>;
   editorWidth?: string;
+  recordLabel?: string;
   actionColumnWidth?: number;
   editorAccess?: boolean;
   keepEditorOpen?: boolean;
@@ -398,7 +399,7 @@ defineExpose({ load })
     />
     <PageDialog
       v-model="dialog"
-      :title="editId?'编辑'+title:'新增'+title"
+      :title="(editId ? '编辑' : '新增') + (recordLabel || title)"
       :width="editorWidth || 'min(640px,92vw)'"
       destroy-on-close
       :before-close="closeEditor"

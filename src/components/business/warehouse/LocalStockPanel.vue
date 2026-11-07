@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { usePageMessageBox } from '@/lib/pageMessageBox'
 
+import MaterialIssueDocumentSelect from './MaterialIssueDocumentSelect.vue'
 import PageDrawer from '@/components/page/PageDrawer.vue'
 import Pagination from '@/components/Pagination/index.vue'
 
@@ -117,7 +118,7 @@ async function submit() {
       directionValid ? null : '数量不符合当前操作方向',
       requiredFieldError(form.reason, '业务原因'),
       textLengthError(form.reason, '业务原因', { max: 500 }),
-      selectedOperation === 'return' ? requiredFieldError(form.documentId, '原领料出库单ID') : null
+      selectedOperation === 'return' ? requiredFieldError(form.documentId, '原领料单') : null
     ])
     if (validationError) { error.value = validationError; return }
     pending.value = { operation: selectedOperation, command: { requestId: crypto.randomUUID(), stockId: stockId.value, quantity, expectedQuantity: stock.value.quantity, expectedAvailable: stock.value.availableQuantity ?? stock.value.quantity, reason: form.reason, documentId: selectedOperation === 'return' ? form.documentId : null, documentLineId: selectedOperation === 'return' ? form.documentLineId || null : null }}
@@ -205,7 +206,7 @@ const actionLabels: Record<string, string> = {
 }
 const label = (value: string) => actionLabels[value] ?? value
 const operationHints: Record<StockOperation, string> = {
-  opening: '仅用于尚无余额、也无库存流水的新库存身份。请填写期初数量和建账依据。',
+  opening: '仅适用于尚无余额和流水的库存，填写期初数量及依据。',
   gain: '填写盘点后需要增加的数量，并记录实物盘点依据。',
   loss: '填写盘点后需要减少的数量，使用正数，并记录实物盘点依据。',
   correction: '填写有符号的调整量：正数增加，负数减少。请说明纠错依据。',
@@ -213,7 +214,7 @@ const operationHints: Record<StockOperation, string> = {
   receipt: '正在核实先前保留的原材料入库请求。新入库业务请使用入库单。'
 }
 const operationHelp = computed(() => {
-  if (!operation.value) return '先选择需要办理的库存操作，再填写数量和业务依据。'
+  if (!operation.value) return '选择操作后填写数量与依据。'
   return operationHints[operation.value]
 })
 const quantityLabel = computed(() => {
@@ -230,7 +231,7 @@ function changePage({ page }: { page: number }) { offset.value = (page - 1) * 20
 <template>
   <PageDrawer v-model="visible" title="库存明细" size="min(1120px, 96vw)" :before-close="beforeClose" @closed="clear">
     <div class="stock-panel-toolbar">
-      <span class="secondary">查看当前库存与历史变动</span>
+      <span class="secondary">当前库存与变动记录</span>
       <el-button :loading="loading" :disabled="busy" @click="load">刷新</el-button>
     </div>
     <el-alert v-if="error && !stock" :title="error" type="error" :closable="false" />
@@ -257,7 +258,7 @@ function changePage({ page }: { page: number }) { offset.value = (page - 1) * 20
         <el-alert v-if="actionsError" :title="'库存流水读取失败：' + actionsError" type="error" :closable="false"><el-button link @click="load">重试</el-button></el-alert>
         <el-alert v-if="!readable" title="当前账号未获库存流水查询权限" type="info" :closable="false" />
         <template v-else>
-          <el-table v-loading="loading" :data="rows" :empty-text="actionsError ? '流水未能读取，请重试' : '暂无库存流水；历史余额不会自动补记流水'" :aria-busy="loading">
+          <el-table v-loading="loading" :data="rows" :empty-text="actionsError ? '流水未能读取，请重试' : '暂无库存变动记录'" :aria-busy="loading">
             <el-table-column label="发生时间" width="180"><template #default="{row}"><DateTimeText :value="row.occurredAt" /></template></el-table-column>
             <el-table-column label="变动类型" min-width="120"><template #default="{row}">{{ label(row.actionType) }}</template></el-table-column>
             <el-table-column label="实存变动" min-width="180"><template #default="{row}"><div class="stock-delta">{{ deltaLabel(row.quantityDelta) }} <small>{{ actionUnitNames[row.unitId] || '单位待确认' }}</small></div><div class="stock-transition"><QuantityText :value="row.quantityBefore" /> → <QuantityText :value="row.quantityAfter" /></div></template></el-table-column>
@@ -281,8 +282,12 @@ function changePage({ page }: { page: number }) { offset.value = (page - 1) * 20
           <el-form v-else class="stock-action-form" label-position="top" :disabled="busy">
             <el-form-item label="业务动作" class="form-span"><el-select v-model="operation" placeholder="请选择库存动作"><el-option v-for="o in options" :key="o.value" :value="o.value" :disabled="o.value === 'opening' && openingUnavailable" :label="o.value === 'opening' && openingUnavailable ? o.label + '（已有余额或流水）' : o.label" /></el-select><p class="stock-operation-help">{{ operationHelp }}</p></el-form-item>
             <el-form-item :label="quantityLabel"><QuantityInput v-model="form.quantity" :material-id="stock?.materialId" :remainder-value="settlementQuantity" show-unit required :disabled="busy || !operation" :placeholder="operation === 'correction' ? '正数增加，负数减少' : '填写本次操作数量'" @validity="quantityValid = $event" /></el-form-item>
-            <el-form-item v-if="operation === 'return'" label="原领料单" class="form-span"><el-input v-model="form.documentId" placeholder="统一出库单 ID" /><el-button v-if="canReadIssueLines" :loading="issueLinesLoading" @click="readIssueLines">读取原领料明细</el-button></el-form-item>
-            <el-form-item v-if="operation === 'return'" label="原领料明细" class="form-span"><el-select v-if="issueLines.length" v-model="form.documentLineId" placeholder="选择当前库存对应的原明细"><el-option v-for="line in issueLines" :key="line.id" :value="line.id" :label="`第 ${line.lineNo} 行 · 批次 ${line.batchNo ?? '未分批'} · 原领用 ${formatQuantity(line.quantity)}`" /></el-select><el-input v-else v-model="form.documentLineId" placeholder="多行单据需填写明细 ID；单行单据可留空" /><el-alert v-if="issueLineError" :title="issueLineError" type="error" :closable="false" /></el-form-item>
+            <el-form-item v-if="operation === 'return'" label="原领料单" class="form-span"><MaterialIssueDocumentSelect v-model="form.documentId" :disabled="busy" /><el-button v-if="canReadIssueLines" :loading="issueLinesLoading" @click="readIssueLines">读取原领料明细</el-button></el-form-item>
+            <el-form-item v-if="operation === 'return'" label="原领料明细" class="form-span">
+              <el-select v-if="issueLines.length" v-model="form.documentLineId" placeholder="选择当前库存对应的原明细"><el-option v-for="line in issueLines" :key="line.id" :value="line.id" :label="`第 ${line.lineNo} 行 · 批次 ${line.batchNo ?? '未分批'} · 原领用 ${formatQuantity(line.quantity)}`" /></el-select>
+              <span v-else class="secondary">{{ canReadIssueLines ? '选择原领料单后读取可退料明细' : '没有查询原领料明细的权限' }}</span>
+              <el-alert v-if="issueLineError" :title="issueLineError" type="error" :closable="false" />
+            </el-form-item>
             <el-form-item label="业务依据" class="form-span"><el-input v-model="form.reason" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="填写盘点、期初或调整的具体依据" /></el-form-item>
           </el-form>
           <div class="stock-submit-bar"><el-button type="primary" :loading="busy" :disabled="!stock || !!stockError || loading || (!operation && !pending)" @click="submit">{{ pending ? '核实上次操作结果' : '确认库存动作' }}</el-button></div>

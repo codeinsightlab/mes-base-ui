@@ -95,3 +95,12 @@ it('keeps hidden request identities out of the form while preserving the command
   expect(wrapper.text()).not.toContain('内部请求标识');expect(wrapper.html()).not.toContain('PRIVATE-REQUEST')
   await s.save();expect(header.create).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'PRIVATE-REQUEST' }))
 })
+
+it('renders modal commands in the dialog footer outside its scrolling document body', async() => {
+  const { s } = await setup({ presentation: 'dialog', documentNumberKey: 'documentNo' })
+  await s.open();await flushPromises()
+  const commands = wrapper.get('.document-commands').element
+  expect(commands.closest('.el-dialog__footer')).not.toBeNull()
+  expect(commands.closest('.el-dialog__body')).toBeNull()
+  expect(wrapper.get('.document-dialog-content').element.querySelector('.document-commands')).toBeNull()
+})

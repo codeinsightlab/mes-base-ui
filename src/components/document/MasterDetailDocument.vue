@@ -273,19 +273,26 @@ onBeforeUnmount(clear)
           </CrudPage>
         </template>
       </section>
-      <div v-if="presentation === 'dialog'" class="document-commands">
+
+    </div>
+    <template v-if="presentation === 'dialog'" #footer>
+      <div class="document-commands">
         <el-button :disabled="saving" @click="back">{{ presentation === 'dialog' ? '关闭' : '返回列表' }}</el-button>
         <el-button v-if="deletable && id && !readonly && can('delete')" type="danger" plain :disabled="saving || loading" @click="remove">删除单据</el-button>
         <el-button v-if="writable" type="primary" :loading="saving" :disabled="loading" @click="save">{{ presentation === 'dialog' ? '保存草稿' : '保存主单' }}</el-button>
       </div>
-    </div>
+    </template>
   </component>
 </template>
 <style scoped>
-.document-dialog-content { max-height: 78vh; overflow: auto; }
+/* The dialog body owns vertical scrolling; the shell and editor never add a second scroll area. */
+:global(.document-dialog.el-dialog:not(.is-fullscreen)) { display: flex; flex-direction: column; max-height: 92vh; margin: 4vh auto; }
+:global(.document-dialog > .el-dialog__header), :global(.document-dialog > .el-dialog__footer) { flex: none; }
+:global(.document-dialog > .el-dialog__body) { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; }
+.document-dialog-content { min-width: 0; }
 .document-context { margin-bottom: var(--ui-space-4); }
 .document-context:empty { display: none; }
-.document-commands { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: flex-end; gap: var(--ui-space-2); padding: var(--ui-space-4) 0 0; background: var(--mes-bg-surface); border-top: 1px solid var(--ui-border); }
+.document-commands { display: flex; justify-content: flex-end; gap: var(--ui-space-2); }
 .document-header, .document-items { margin-bottom: 16px; padding: 16px; }
 h2 { margin: 0 0 16px; font-size: 16px; }
 .document-header :deep(.form-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
