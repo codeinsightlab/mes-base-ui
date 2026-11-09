@@ -252,6 +252,7 @@ onBeforeUnmount(clear)
     :initial-search="initialSearch"
   >
     <template v-for="name in Object.keys($slots).filter(name => name.startsWith('search-'))" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
+    <template v-for="name in Object.keys($slots).filter(name => name.startsWith('cell-'))" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
     <template #toolbar><el-button v-if="creatable !== false && can('create')" type="primary" icon="Plus" @click="open()">新增单据</el-button></template>
     <template #actions="{ row, refresh: refreshList }"><el-button v-if="can('query')" text type="primary" @click="open(row)">打开单据</el-button><slot name="header-list-actions" :row="row" :refresh="refreshList" /></template>
   </CrudPage>

@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { bomRatio } from '@/lib/bomRatio'
 import { useAuth } from '@/stores/auth'
-import { loadQuantityRule, normalizedQuantityInput, positiveQuantity, quantityInputError, QUANTITY_RULE_TTL_MS, type QuantityRule } from '@/lib/production/quantityRules'
+import { loadQuantityRule, normalizedQuantityInput, positiveQuantity, quantityInputError, type QuantityRule } from '@/lib/production/quantityRules'
 import { quantityRuleRevision } from '@/lib/production/quantityRuleInvalidation'
 
 defineOptions({ inheritAttrs: false })
@@ -19,7 +19,12 @@ const allowed = computed(() => !!auth.factoryId && !auth.factorySwitching
 const inputError = computed(() => {
   const value = props.modelValue == null ? '' : String(props.modelValue)
   if (props.semantic === 'bom-ratio') {
-    try { bomRatio(value); return null } catch(reason) { return reason instanceof Error ? reason.message : '请输入BOM配比' }
+    try {
+      bomRatio(value)
+      return null
+    } catch (reason) {
+      return reason instanceof Error ? reason.message : '请输入BOM配比'
+    }
   }
   if (value === '') return props.required ? '请输入数量' : null
   if (props.positive && !positiveQuantity(normalizedQuantityInput(value))) return '请输入正数量'
@@ -33,12 +38,10 @@ const inputError = computed(() => {
 const unitError = computed(() => props.showUnit && rule.value && !rule.value.unitName ? '基本单位名称缺失' : '')
 const inputDisabled = computed(() => props.disabled || !props.materialId || !allowed.value || loading.value || !rule.value || !!unitError.value)
 let generation = 0
-let expiry: ReturnType<typeof setTimeout> | undefined
 let lastUserValue: string | undefined
 
 async function refreshRule() {
   const ticket = ++generation
-  clearTimeout(expiry)
   loading.value = false
   rule.value = null
   error.value = ''
@@ -54,34 +57,41 @@ async function refreshRule() {
     const loaded = await loadQuantityRule(props.materialId, factoryId!, revision, () => factoryId === auth.factoryId && revision === auth.revision && allowed.value)
     if (ticket !== generation || factoryId !== auth.factoryId || revision !== auth.revision) return
     rule.value = loaded
-    expiry = setTimeout(() => { void refreshRule() }, QUANTITY_RULE_TTL_MS)
-  } catch(reason) {
+  } catch (reason) {
     if (ticket === generation) error.value = reason instanceof Error ? reason.message : '单位规则读取失败'
   } finally {
     if (ticket === generation) loading.value = false
   }
 }
+
 function update(value: string) {
   lastUserValue = value
   emit('update:modelValue', value)
   touched.value = true
 }
+
 function normalize() {
   touched.value = true
   if (props.modelValue != null) emit('update:modelValue', normalizedQuantityInput(String(props.modelValue)))
 }
+
 watch(() => props.modelValue, (value, previous) => {
   if ((value == null || value === '') && previous != null && previous !== '') {
     if (lastUserValue !== '') touched.value = false
     lastUserValue = undefined
   }
 }, { flush: 'sync' })
-watch(() => props.materialId, () => { touched.value = false }, { flush: 'sync' })
+watch(() => props.materialId, () => {
+  touched.value = false
+}, { flush: 'sync' })
 watch(() => [props.materialId, auth.factoryId, auth.revision, allowed.value, quantityRuleRevision.value], () => {
   void refreshRule()
 }, { immediate: true, flush: 'sync' })
 watch([rule, inputError, allowed, loading, unitError], ([loadedRule, value, canRead, pending, missingUnit]) => emit('validity', canRead && !pending && !missingUnit && loadedRule != null && value == null), { immediate: true, flush: 'sync' })
-onBeforeUnmount(() => { generation++; clearTimeout(expiry); rule.value = null })
+onBeforeUnmount(() => {
+  generation++
+  rule.value = null
+})
 </script>
 
 <template>

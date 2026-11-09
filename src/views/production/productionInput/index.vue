@@ -5,13 +5,25 @@ import QueryForm from '@/components/QueryForm.vue'
 import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import PageDialog from '@/components/page/PageDialog.vue'
 import { extendInputPath, inputPathCandidates, inputPathComplete } from '@/lib/production/inputRoutingPath'
 import RoutingGraphPreview from '@/components/business/RoutingGraphPreview.vue'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
 import { normalizedQuantityInput } from '@/lib/production/quantityRules'
-import { productionInput as api, inputPermission, type Preview, type Command, type Result } from '@/api/production/productionInput'
-import { productionCombination as combinations, type Calculation, type Combination } from '@/api/production/productionCombination'
+import {
+  productionInput as api,
+  inputPermission,
+  type Preview,
+  type Command,
+  type Result,
+} from '@/api/production/productionInput'
+import {
+  productionCombination as combinations,
+  type Calculation,
+  type Combination,
+} from '@/api/production/productionCombination'
+
 const auth = useAuth()
 const allowed = computed(() => auth.hasPermission(inputPermission, 'factory') && auth.runtimeMode === 'LOCAL')
 const code = ref(''), quantity = ref(''), valid = ref(false)
@@ -19,6 +31,7 @@ const combination = ref<Combination | null>(null)
 const calculation = ref<Calculation | null>(null), preview = ref<Preview | null>(null)
 const selected = ref<string[]>([]), pending = ref<Command | null>(null), result = ref<Result | null>(null)
 const error = ref(''), pathError = ref(''), busy = ref(false)
+const graphVisible = ref(false)
 const demandById = computed(() => new Map(combination.value?.items.map(item => [item.demandLineId, item]) ?? []))
 let sequence = 0
 const storageKey = () => `mes-combination-input:${auth.username}:${auth.factoryId}`
@@ -71,6 +84,7 @@ function reset() {
   result.value = null
   error.value = ''
   pathError.value = ''
+  graphVisible.value = false
   busy.value = false
 }
 
@@ -152,7 +166,14 @@ async function submit() {
   if (!allowed.value || busy.value) return
   if (!pending.value) {
     if (!canSubmit.value || !preview.value || !calculation.value) return
-    pending.value = { requestId: crypto.randomUUID(), code: code.value, outputQty: normalizedQuantityInput(quantity.value), routingId: preview.value.definition?.routing.id ?? null, routingNodeIds: [...selected.value], calculationKey: calculation.value.calculationKey }
+    pending.value = {
+      requestId: crypto.randomUUID(),
+      code: code.value,
+      outputQty: normalizedQuantityInput(quantity.value),
+      routingId: preview.value.definition?.routing.id ?? null,
+      routingNodeIds: [...selected.value],
+      calculationKey: calculation.value.calculationKey,
+    }
   }
   const key = storageKey(), ticket = sequence
   sessionStorage.setItem(key, JSON.stringify(pending.value))
@@ -191,11 +212,15 @@ async function submit() {
         <h2 id="scan-title">1. 扫码读取</h2>
         <QueryForm label-position="top" class="scan-form" @submit="query()">
           <el-form-item class="scan-field">
-            <el-input v-model="code" placeholder="扫描或粘贴工单生成的材料组合码" :disabled="busy || !!pending" aria-label="材料组合二维码" />
+            <el-input v-model="code" placeholder="扫描或粘贴工单生成的材料组合码" :disabled="busy || !!pending"
+                      aria-label="材料组合二维码" />
           </el-form-item>
           <div class="input-actions">
-            <CodeScanner v-model="code" :disabled="busy || !!pending" :context-key="auth.factoryId + ':' + auth.revision" @confirm="query()" />
-            <el-button native-type="submit" type="primary" :disabled="!code || !!pending" :loading="busy">读取当前可领数量</el-button>
+            <CodeScanner v-model="code" :disabled="busy || !!pending"
+                         :context-key="auth.factoryId + ':' + auth.revision" @confirm="query()" />
+            <el-button native-type="submit" type="primary" :disabled="!code || !!pending" :loading="busy">
+              读取当前可领数量
+            </el-button>
           </div>
         </QueryForm>
         <p class="secondary">二维码固定材料及批次；可领数量按当前库存计算。</p>
@@ -209,76 +234,141 @@ async function submit() {
         <section class="panel input-section" aria-labelledby="quantity-title">
           <div class="section-heading">
             <h2 id="quantity-title">2. 核对数量与用料</h2>
-            <el-tag :type="combination.closed ? 'warning' : 'info'">{{ combination.closed ? '执行已结束' : combination.executionCode ? '追加领料' : '首次领料' }}</el-tag>
           </div>
-          <el-descriptions :column="3" direction="vertical" border>
-            <el-descriptions-item label="工单">{{ combination.workorderCode }}</el-descriptions-item>
-            <el-descriptions-item label="生产执行">{{ combination.executionCode ? '沿用该码的生产执行' : '首次成功领料后创建' }}</el-descriptions-item>
-            <el-descriptions-item label="当前最大可领"><QuantityText v-if="calculation" :value="calculation.maximumQty" /><span v-else>待重新计算</span><span v-if="calculation"> 套</span></el-descriptions-item>
-          </el-descriptions>
-          <el-alert v-if="combination.closed" title="该组合的执行已结束，仅供查询，不能再次领料" type="warning" :closable="false" />
+          <dl class="combination-summary" aria-label="工单及领料摘要">
+            <div><dt>工单</dt><dd>{{ combination.workorderCode }}</dd></div>
+            <div><dt>生产执行</dt><dd>{{ combination.executionCode ? '沿用该码的生产执行' : '首次成功领料后创建' }}</dd></div>
+            <div><dt>当前最大可领</dt><dd><QuantityText v-if="calculation" :value="calculation.maximumQty" /><span v-else>待重新计算</span><span v-if="calculation"> 套</span></dd></div>
+          </dl>
+          <el-alert v-if="combination.closed" title="该组合的执行已结束，仅供查询，不能再次领料" type="warning"
+                    :closable="false" />
           <div class="quantity-row">
             <el-form label-position="top" @submit.prevent="query(false)">
               <el-form-item label="本次产出数量" class="quantity-field">
-                <QuantityInput v-model="quantity" :material-id="combination.productId" show-unit required positive :disabled="busy || !!pending || combination.closed" aria-label="本次产出数量" @validity="valid=$event" />
+                <QuantityInput v-model="quantity" :material-id="combination.productId" show-unit required positive
+                               :disabled="busy || !!pending || combination.closed" aria-label="本次产出数量"
+                               @validity="valid=$event" />
               </el-form-item>
             </el-form>
-            <el-button :disabled="!valid || busy || !!pending || combination.closed" @click="query(false)">重新计算用料</el-button>
+            <el-button :disabled="!valid || busy || !!pending || combination.closed" @click="query(false)">
+              重新计算用料
+            </el-button>
           </div>
           <p class="secondary">按当前最大完整配套量带出，可调小。修改后重新计算；下方为本次数量对应的材料出库量。</p>
-          <el-alert v-if="calculation && !calculatedQuantity" title="数量已改变，请重新计算后确认" type="info" :closable="false" />
+          <el-alert v-if="calculation && !calculatedQuantity" title="数量已改变，请重新计算后确认" type="info"
+                    :closable="false" />
           <h3>材料与固定批次</h3>
           <el-table :data="combination.items" row-key="demandLineId">
             <el-table-column prop="lineNo" label="行号" width="65" />
             <el-table-column prop="materialCode" label="材料品号" min-width="145" />
-            <el-table-column label="原料批次" min-width="150"><template #default="{row}">{{ row.batches.map((batch: string | null) => batch ?? '未分批').join('、') }}</template></el-table-column>
+            <el-table-column label="原料批次" min-width="150">
+              <template #default="{row}">{{ row.batches.map((batch: string | null) => batch ?? '未分批').join('、') }}
+              </template>
+            </el-table-column>
           </el-table>
           <h3>本次出库明细</h3>
           <el-table v-if="calculation" :data="calculation.allocations">
-            <el-table-column label="材料品号" min-width="145"><template #default="{row}">{{ demandById.get(row.demandLineId)?.materialCode }}</template></el-table-column>
-            <el-table-column label="批次" min-width="140"><template #default="{row}">{{ row.batchNo ?? '未分批' }}</template></el-table-column>
-            <el-table-column label="仓库" min-width="100"><template #default="{row}">{{ calculation.warehouses?.find(warehouse => warehouse.id === row.warehouseId)?.name || '仓库名称待确认' }}</template></el-table-column>
-            <el-table-column label="库位" min-width="100"><template #default="{row}">{{ row.binCode ?? '未指定库位' }}</template></el-table-column>
-            <el-table-column label="出库数量" min-width="110" align="right"><template #default="{row}"><QuantityText :value="row.quantity" /></template></el-table-column>
+            <el-table-column label="材料品号" min-width="145">
+              <template #default="{row}">{{ demandById.get(row.demandLineId)?.materialCode }}</template>
+            </el-table-column>
+            <el-table-column label="批次" min-width="140">
+              <template #default="{row}">{{ row.batchNo ?? '未分批' }}</template>
+            </el-table-column>
+            <el-table-column label="仓库" min-width="100">
+              <template #default="{row}">
+                {{ calculation.warehouses?.find(warehouse => warehouse.id === row.warehouseId)?.name || '仓库名称待确认'
+                }}
+              </template>
+            </el-table-column>
+            <el-table-column label="库位" min-width="100">
+              <template #default="{row}">{{ row.binCode ?? '未指定库位' }}</template>
+            </el-table-column>
+            <el-table-column label="出库数量" min-width="110" align="right">
+              <template #default="{row}">
+                <QuantityText :value="row.quantity" />
+              </template>
+            </el-table-column>
           </el-table>
           <el-alert v-else title="出库明细待重新计算，请读取当前可领数量。" type="info" :closable="false" />
         </section>
         <section class="panel input-section path-section" aria-labelledby="path-title">
           <h2 id="path-title">3. 确认生产路径</h2>
-          <p class="secondary">沿用工单已选工艺。直线路径自动带出，仅有分支时选择本批次走向；领料成功后锁定，供后续报工使用。</p>
-          <el-alert v-if="pathError" :title="pathError" type="error" :closable="false"><el-button :disabled="pathBusy || busy || !!pending" @click="loadPath(sequence, combination.workorderId)">重试读取路径</el-button></el-alert>
+          <p class="secondary">
+            沿用工单已选工艺。直线路径自动带出，仅有分支时选择本批次走向；领料成功后锁定，供后续报工使用。</p>
+          <el-alert v-if="pathError" :title="pathError" type="error" :closable="false">
+            <el-button :disabled="pathBusy || busy || !!pending" @click="loadPath(sequence, combination.workorderId)">
+              重试读取路径
+            </el-button>
+          </el-alert>
           <p v-else-if="pathBusy" role="status">正在读取生产工艺…</p>
           <template v-else-if="preview">
             <template v-if="preview.definition">
               <div class="section-heading">
                 <strong>{{ preview.definition.routing.name }} · V{{ preview.definition.routing.version }}</strong>
-                <el-tag :type="pathComplete ? 'success' : 'warning'">{{ preview.actual ? '沿用已有路径' : pathComplete ? '路径已就绪' : '待选择分支' }}</el-tag>
+                <el-tag :type="pathComplete ? 'success' : 'warning'">
+                  {{ preview.actual ? '沿用已有路径' : pathComplete ? '路径已就绪' : '待选择分支' }}
+                </el-tag>
               </div>
               <ol v-if="selectedNodes.length" class="path-list" aria-label="本批次工序顺序">
-                <li v-for="node in selectedNodes" :key="node.id"><span>{{ node.operationName || node.operationCode || node.nodeCode }}</span><small v-if="node.isKey" class="secondary">关键工序</small></li>
+                <li v-for="node in selectedNodes" :key="node.id">
+                  <span>{{ node.operationName || node.operationCode || node.nodeCode }}</span><small v-if="node.isKey"
+                                                                                                     class="secondary">关键工序</small>
+                </li>
               </ol>
-              <div v-if="!preview.actual && pathCandidates.length > 1" class="branch-picker" role="group" aria-label="选择工艺分支">
+              <div v-if="!preview.actual && pathCandidates.length > 1" class="branch-picker" role="group"
+                   aria-label="选择工艺分支">
                 <strong>{{ selected.length ? '请选择下一分支' : '请选择起始分支' }}</strong>
-                <el-button v-for="node in pathCandidates" :key="node.id" :disabled="busy || !!pending || combination.closed" @click="chooseBranch(node.id!)">{{ node.operationName || node.operationCode || node.nodeCode }} · {{ node.nodeCode }}</el-button>
+                <el-button v-for="node in pathCandidates" :key="node.id"
+                           :disabled="busy || !!pending || combination.closed" @click="chooseBranch(node.id!)">
+                  {{ node.operationName || node.operationCode || node.nodeCode }} · {{ node.nodeCode }}
+                </el-button>
               </div>
-              <p v-if="!pathComplete && !pathCandidates.length" role="alert">路径未满足完整性或关键工序要求，请核对工艺或重新选择分支。</p>
-              <el-button v-if="!preview.actual && hasBranchChoice" :disabled="busy || !!pending || combination.closed" @click="resetBranches">重新选择分支</el-button>
-              <p v-if="pathComplete && !preview.actual && !hasBranchChoice" class="secondary">直线工艺已自动带出完整路径，无需逐个选择工序。</p>
-              <el-collapse class="graph-details"><el-collapse-item title="查看完整工艺图" name="graph"><RoutingGraphPreview :nodes="preview.definition.nodes" :edges="preview.definition.edges" :selected-node-ids="selected" /></el-collapse-item></el-collapse>
+              <p v-if="!pathComplete && !pathCandidates.length" role="alert">
+                路径未满足完整性或关键工序要求，请核对工艺或重新选择分支。</p>
+              <el-button v-if="!preview.actual && hasBranchChoice" :disabled="busy || !!pending || combination.closed"
+                         @click="resetBranches">重新选择分支
+              </el-button>
+              <p v-if="pathComplete && !preview.actual && !hasBranchChoice" class="secondary">
+                直线工艺已自动带出完整路径，无需逐个选择工序。</p>
+              <el-button class="graph-open" text @click="graphVisible=true">查看完整工艺图</el-button>
             </template>
-            <el-alert v-else title="此工单无工艺，无需工序报工；领料成功后按确认套数办理成品入库。" type="info" :closable="false" />
+            <el-alert v-else title="此工单无工艺，无需工序报工；领料成功后按确认套数办理成品入库。" type="info"
+                      :closable="false" />
           </template>
-          <div class="confirm-area">
-            <p role="status">{{ submitHint }}</p>
-            <el-button type="primary" :disabled="!canSubmit" :loading="busy" @click="submit">确认领料并投入</el-button>
-          </div>
         </section>
       </div>
-      <el-empty v-else-if="!pending && !result" description="扫描工单材料组合码后，查看可领数量和材料明细" :image-size="70" />
-      <el-result v-if="result" :icon="result.stockApplied ? 'success' : 'warning'" :title="result.stockApplied ? '领料成功' : '该笔领料已撤销'">
-        <template #sub-title><p class="result-code">生产码 {{ result.executionCode }}</p><p>累计正式投入 <QuantityText :value="result.confirmedInputQty" /> 套</p></template>
-        <template #extra><el-button @click="query()">读取下一次可领数量</el-button></template>
+      <section v-if="combination" class="panel input-section submit-section" aria-labelledby="confirm-title">
+        <div class="submit-summary">
+          <h2 id="confirm-title">4. 确认领料并投入</h2>
+          <div class="submit-facts">
+            <span><span class="fact-label">本次产出数量</span><strong>{{ quantity || '待填写' }}</strong></span>
+            <el-tag :type="combination.closed ? 'warning' : 'info'">{{ combination.closed ? '执行已结束' : combination.executionCode ? '追加领料' : '首次领料' }}</el-tag>
+          </div>
+          <p role="status" class="submit-hint">{{ submitHint }}</p>
+        </div>
+        <el-button class="submit-button" type="primary" :disabled="!canSubmit" :loading="busy" @click="submit">确认领料并投入</el-button>
+      </section>
+      <el-empty v-else-if="!pending && !result" description="扫描工单材料组合码后，查看可领数量和材料明细"
+                :image-size="70" />
+      <el-result v-if="result" :icon="result.stockApplied ? 'success' : 'warning'"
+                 :title="result.stockApplied ? '领料成功' : '该笔领料已撤销'">
+        <template #sub-title><p class="result-code">生产码 {{ result.executionCode }}</p>
+          <p>累计正式投入
+            <QuantityText :value="result.confirmedInputQty" />
+            套
+          </p>
+        </template>
+        <template #extra>
+          <el-button @click="query()">读取下一次可领数量</el-button>
+        </template>
       </el-result>
+      <PageDialog v-model="graphVisible" title="完整工艺图" width="min(960px, 94vw)" append-to-body>
+        <RoutingGraphPreview v-if="preview?.definition" :nodes="preview.definition.nodes"
+                             :edges="preview.definition.edges" :selected-node-ids="selected" />
+        <template #footer>
+          <el-button @click="graphVisible=false">关闭</el-button>
+        </template>
+      </PageDialog>
     </template>
   </section>
 </template>
@@ -286,94 +376,221 @@ async function submit() {
 <style scoped>
 .production-input {
   display: grid;
-  gap: var(--ui-space-4);
-}
-.input-section {
-  padding: var(--ui-space-5);
+  width: 100%;
+  max-width: 1440px;
   min-width: 0;
+  margin-inline: auto;
+  gap: var(--ui-space-4);
+  container: production-input / inline-size;
 }
+
+.input-section {
+  padding: var(--ui-space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .input-section h2 {
-  margin: 0 0 var(--ui-space-4);
-  font-size: var(--ui-text-lg);
+  margin: 0 0 var(--ui-space-3);
+  font-size: 16px;
 }
+
 .input-section h3 {
   margin: var(--ui-space-5) 0 var(--ui-space-3);
   font-size: var(--ui-text-base);
 }
+
 .input-section p {
   margin: var(--ui-space-3) 0;
 }
+
 .scan-form, .input-actions, .quantity-row, .section-heading {
   display: flex;
   align-items: center;
   gap: var(--ui-space-3);
   flex-wrap: wrap;
 }
+
 .scan-form {
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, min(800px, calc(100% - 276px))) auto;
+  align-items: end;
+  justify-content: start;
+  gap: var(--ui-space-3);
 }
+
 .scan-field {
-  flex: 1 1 360px;
+  width: 100%;
+  min-width: 0;
   margin-bottom: 0;
 }
+
+.scan-form :deep(.el-form-item__content) {
+  min-width: 0;
+}
+
+.input-actions {
+  flex-wrap: nowrap;
+  gap: var(--ui-space-2);
+}
+
+.production-input > .input-section > .secondary {
+  margin-bottom: 0;
+}
+
 .input-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.55fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--ui-space-4);
   align-items: start;
+  min-width: 0;
 }
+
+.combination-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-space-3);
+  margin: 0 0 var(--ui-space-4);
+  padding: var(--ui-space-3);
+  background: var(--ui-surface-soft);
+  border-radius: var(--ui-radius-sm);
+}
+
+.combination-summary > div,
+.submit-facts > span {
+  min-width: 0;
+}
+
+.combination-summary dt,
+.fact-label {
+  display: block;
+  margin-bottom: var(--ui-space-1);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-xs);
+}
+
+.combination-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--ui-text-sm);
+}
+
 .section-heading {
   justify-content: space-between;
   margin-bottom: var(--ui-space-3);
 }
+
 .section-heading h2 {
   margin: 0;
 }
+
 .quantity-row {
   align-items: flex-end;
   margin-top: var(--ui-space-5);
 }
+
 .quantity-row :deep(.el-form-item) {
   margin: 0;
 }
+
 .path-list {
   padding-left: var(--ui-space-6);
   margin-block: var(--ui-space-4);
 }
+
 .path-list li {
   padding: var(--ui-space-2) 0;
+  overflow-wrap: anywhere;
 }
+
 .path-list small {
   margin-left: var(--ui-space-3);
 }
+
 .branch-picker {
   display: grid;
   gap: var(--ui-space-2);
   margin-block: var(--ui-space-4);
 }
+
 .branch-picker :deep(.el-button) {
   margin: 0;
   white-space: normal;
   height: auto;
   min-height: var(--ui-control-height);
 }
-.graph-details {
-  margin-top: var(--ui-space-4);
+
+.graph-open {
+  margin-top: var(--ui-space-3);
 }
-.confirm-area {
-  border-top: 1px solid var(--ui-border);
-  margin-top: var(--ui-space-5);
-  padding-top: var(--ui-space-3);
+
+.submit-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ui-space-5);
 }
-.confirm-area .el-button {
-  width: 100%;
+
+.submit-summary h2 {
+  margin-bottom: var(--ui-space-2);
 }
+
+.submit-facts {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  flex-wrap: wrap;
+}
+
+.submit-facts strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.submit-hint {
+  margin: var(--ui-space-2) 0 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-text-xs);
+}
+
+.submit-button {
+  min-width: 220px;
+}
+
 .result-code {
   overflow-wrap: anywhere;
 }
-@media (max-width: 1100px) {
+
+@container production-input (min-width: 960px) {
   .input-workspace {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, calc(12.5cqi + 160px), 340px);
+  }
+}
+
+@container production-input (max-width: 639px) {
+  .input-section {
+    padding: var(--ui-space-3);
+  }
+
+  .scan-form {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .input-actions {
+    flex-wrap: wrap;
+  }
+
+  .combination-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .submit-section {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--ui-space-3);
+  }
+
+  .submit-button {
+    width: 100%;
   }
 }
 </style>

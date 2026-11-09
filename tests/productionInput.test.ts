@@ -4,6 +4,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import Input from '../src/views/production/productionInput/index.vue'
+import PageDialog from '../src/components/page/PageDialog.vue'
 import { useAuth } from '../src/stores/auth'
 import { ApiError } from '../src/lib/request'
 const rules = vi.hoisted(() => ({ material: vi.fn(), unit: vi.fn() }))
@@ -144,6 +145,15 @@ it('automatically supplies the full straight path and uses the shared quantity i
   expect(wrapper.text()).not.toContain('加入路径')
   await s.submit()
   expect(submit.mock.calls[0]![0]).toMatchObject({ routingId: '7', routingNodeIds: ['11'] })
+})
+it('opens the full routing graph in a dialog without expanding the input panel', async() => {
+  await setup()
+  expect(wrapper.text()).toContain('查看完整工艺图')
+  expect(wrapper.find('.el-collapse').exists()).toBe(false)
+  await wrapper.find('.graph-open').trigger('click')
+  await flushPromises()
+  expect((wrapper.vm as unknown as State & { graphVisible: boolean }).graphVisible).toBe(true)
+  expect(wrapper.findComponent(PageDialog).exists()).toBe(true)
 })
 it('waits only at a fork and automatically continues after the chosen branch', async() => {
   const node = (id: string) => ({ ...definition.nodes[0]!, id, nodeCode: id, operationName: id })

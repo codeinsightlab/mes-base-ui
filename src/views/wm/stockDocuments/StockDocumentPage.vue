@@ -2,6 +2,7 @@
 import { useStockDocumentTypes } from '@/composables/useStockDocumentTypes'
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import PageDialog from '@/components/page/PageDialog.vue'
+import DateTimeText from '@/components/DateTimeText.vue'
 
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { formatQuantity } from '@/lib/quantity'
@@ -358,6 +359,7 @@ const itemFields:Field[] = [
       @back="reset"
     >
       <template #search-materialId="{search}"><MaterialSelect :model-value="search.materialId || null" @update:model-value="search.materialId = $event ?? ''" /></template>
+      <template #cell-postedAt="{row}"><DateTimeText :value="row.postedAt" /></template>
       <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
       <template #header-fields="{draft: headerDraft,disabled: headerDisabled}">
         <template v-if="headerDisabled">

@@ -16,7 +16,12 @@ beforeEach(() => {
   calls.material.mockReset().mockImplementation(async id => ({ unitId: 'u-' + id }))
   calls.unit.mockReset().mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 2 })
 })
-afterEach(() => { for (const w of wrappers.splice(0)) w.unmount(); vi.useRealTimers(); document.body.innerHTML = '' })
+afterEach(() => {
+  for (const w of wrappers.splice(0)) w.unmount()
+  vi.useRealTimers()
+  document.body.innerHTML = ''
+})
+
 function setup(props: Record<string, unknown> = {}) {
   const pinia = createPinia(), auth = useAuth(pinia)
   auth.factoryId = 'F1'
@@ -25,6 +30,7 @@ function setup(props: Record<string, unknown> = {}) {
   wrappers.push(w)
   return { w, auth }
 }
+
 const valid = (w: ReturnType<typeof mount>) => w.emitted('validity')?.at(-1)?.[0]
 
 it('deduplicates one context but isolates factory and session rule reads', async() => {
@@ -37,22 +43,30 @@ it('deduplicates one context but isolates factory and session rule reads', async
 
 it('drops a late material response after switching to another material', async() => {
   let release!: (value: unknown) => void
-  calls.material.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+  calls.material.mockImplementationOnce(() => new Promise(resolve => {
+    release = resolve
+  }))
   calls.unit.mockImplementation(async id => ({ mustBeWholeNumber: id === 'old' ? 1 : 0, quantityPrecision: 2 }))
   const { w } = setup({ modelValue: '1.2' })
-  await w.setProps({ materialId: 'B' }); await flushPromises()
+  await w.setProps({ materialId: 'B' })
+  await flushPromises()
   expect(valid(w)).toBe(true)
-  release({ unitId: 'old' }); await flushPromises()
+  release({ unitId: 'old' })
+  await flushPromises()
   expect(valid(w)).toBe(true)
   expect(calls.unit).toHaveBeenCalledWith('old')
 })
 
 it('fails closed on rule failure and retries without keeping a rejected cache entry', async() => {
   calls.unit.mockRejectedValueOnce(new Error('规则服务不可用'))
-  const { w } = setup(); await flushPromises()
-  expect(valid(w)).toBe(false); expect(w.text()).toContain('规则服务不可用')
-  await w.get('button').trigger('click'); await flushPromises()
-  expect(valid(w)).toBe(true); expect(calls.unit).toHaveBeenCalledTimes(2)
+  const { w } = setup()
+  await flushPromises()
+  expect(valid(w)).toBe(false)
+  expect(w.text()).toContain('规则服务不可用')
+  await w.get('button').trigger('click')
+  await flushPromises()
+  expect(valid(w)).toBe(true)
+  expect(calls.unit).toHaveBeenCalledTimes(2)
 })
 
 it.each([
@@ -61,45 +75,63 @@ it.each([
   { mustBeWholeNumber: 0, quantityPrecision: 7 }
 ])('rejects malformed rule payloads instead of guessing defaults: %j', async rule => {
   calls.unit.mockResolvedValue(rule)
-  const { w } = setup(); await flushPromises()
-  expect(valid(w)).toBe(false); expect(w.text()).toContain('配置无效')
+  const { w } = setup()
+  await flushPromises()
+  expect(valid(w)).toBe(false)
+  expect(w.text()).toContain('配置无效')
 })
 
 it('refreshes an already mounted input when unit or material configuration changes', async() => {
-  const { w } = setup({ modelValue: '1.5' }); await flushPromises(); expect(valid(w)).toBe(true)
+  const { w } = setup({ modelValue: '1.5' })
+  await flushPromises()
+  expect(valid(w)).toBe(true)
   calls.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 6 })
   invalidateQuantityRules()
   expect(valid(w)).toBe(false)
-  await flushPromises(); expect(valid(w)).toBe(false)
+  await flushPromises()
+  expect(valid(w)).toBe(false)
   await w.get('input').trigger('blur')
   expect(w.text()).toContain('只允许整数')
   calls.material.mockResolvedValue({ unitId: 'new-unit' })
   calls.unit.mockResolvedValue({ mustBeWholeNumber: 0, quantityPrecision: 6 })
-  invalidateQuantityRules(); await flushPromises()
-  expect(calls.unit).toHaveBeenLastCalledWith('new-unit'); expect(valid(w)).toBe(true)
+  invalidateQuantityRules()
+  await flushPromises()
+  expect(calls.unit).toHaveBeenLastCalledWith('new-unit')
+  expect(valid(w)).toBe(true)
 })
 
-it('expires a live rule so another client cannot leave it cached indefinitely', async() => {
+it('does not poll expired rules and reloads them only on the next explicit request', async() => {
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
-  const { w } = setup({ modelValue: '1.5' }); await flushPromises()
+  const { w } = setup({ modelValue: '1.5' })
+  await flushPromises()
   calls.unit.mockResolvedValue({ mustBeWholeNumber: 1, quantityPrecision: 6 })
-  await vi.advanceTimersByTimeAsync(QUANTITY_RULE_TTL_MS + 1); await flushPromises()
-  expect(calls.material).toHaveBeenCalledTimes(2); expect(valid(w)).toBe(false)
+  await vi.advanceTimersByTimeAsync(QUANTITY_RULE_TTL_MS + 1)
+  await flushPromises()
+  expect(calls.material).toHaveBeenCalledTimes(1)
+  expect(valid(w)).toBe(true)
+  await loadQuantityRule('A', 'F1', 0)
+  expect(calls.material).toHaveBeenCalledTimes(2)
 })
 
 it.each(['factory', 'permission', 'material'])('clears validity synchronously on %s removal and ignores late results', async mode => {
   let release!: (value: unknown) => void
-  calls.unit.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
-  const { w, auth } = setup(); await flushPromises()
+  calls.unit.mockImplementationOnce(() => new Promise(resolve => {
+    release = resolve
+  }))
+  const { w, auth } = setup()
+  await flushPromises()
   if (mode === 'factory') auth.factoryId = ''
   else if (mode === 'permission') auth.factoryPermissions = []
   else await w.setProps({ materialId: null })
-  release({ mustBeWholeNumber: 0, quantityPrecision: 6 }); await flushPromises()
-  expect(valid(w)).toBe(false); expect(w.get('input').attributes('disabled')).toBeDefined()
+  release({ mustBeWholeNumber: 0, quantityPrecision: 6 })
+  await flushPromises()
+  expect(valid(w)).toBe(false)
+  expect(w.get('input').attributes('disabled')).toBeDefined()
 })
 
 it('preserves continuous input and only strips insignificant zeroes on blur', async() => {
-  const { w } = setup({ modelValue: '2.' }); await flushPromises()
+  const { w } = setup({ modelValue: '2.' })
+  await flushPromises()
   expect(w.get('input').element.value).toBe('2.')
   expect(w.emitted('update:modelValue')).toBeUndefined()
   await w.setProps({ modelValue: '99999999999999.1234560000' })
@@ -108,27 +140,39 @@ it('preserves continuous input and only strips insignificant zeroes on blur', as
 })
 
 it('distinguishes optional, required, positive, and signed quantities', async() => {
-  const { w } = setup({ modelValue: '' }); await flushPromises(); expect(valid(w)).toBe(true)
-  await w.setProps({ required: true }); expect(valid(w)).toBe(false)
-  await w.setProps({ modelValue: '-1.5' }); expect(valid(w)).toBe(true)
-  await w.setProps({ positive: true }); expect(valid(w)).toBe(false)
-  await w.setProps({ modelValue: '0' }); expect(valid(w)).toBe(false)
+  const { w } = setup({ modelValue: '' })
+  await flushPromises()
+  expect(valid(w)).toBe(true)
+  await w.setProps({ required: true })
+  expect(valid(w)).toBe(false)
+  await w.setProps({ modelValue: '-1.5' })
+  expect(valid(w)).toBe(true)
+  await w.setProps({ positive: true })
+  expect(valid(w)).toBe(false)
+  await w.setProps({ modelValue: '0' })
+  expect(valid(w)).toBe(false)
 })
 
 it('allows an unchanged precise stored value but applies current rules to edits', async() => {
   const { w } = setup({ modelValue: '1.234500', unchangedValue: '1.2345', positive: true })
-  await flushPromises(); expect(valid(w)).toBe(true)
-  await w.setProps({ modelValue: '1.2346' }); expect(valid(w)).toBe(false)
-  await w.setProps({ modelValue: '1.2345', unchangedValue: null }); expect(valid(w)).toBe(false)
+  await flushPromises()
+  expect(valid(w)).toBe(true)
+  await w.setProps({ modelValue: '1.2346' })
+  expect(valid(w)).toBe(false)
+  await w.setProps({ modelValue: '1.2345', unchangedValue: null })
+  expect(valid(w)).toBe(false)
 })
 
 it('does not query a unit in a different factory after the material read resolves', async() => {
   let finish!: (value: unknown) => void
-  calls.material.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  calls.material.mockImplementationOnce(() => new Promise(resolve => {
+    finish = resolve
+  }))
   let current = true
   const original = loadQuantityRule('A', 'F1', 1, () => current)
   const rejected = expect(original).rejects.toThrow('工厂上下文已变化')
-  current = false;finish({ unitId: 'same-id' })
+  current = false
+  finish({ unitId: 'same-id' })
   await rejected
   expect(calls.unit).not.toHaveBeenCalled()
   calls.material.mockResolvedValue({ unitId: 'same-id' })
