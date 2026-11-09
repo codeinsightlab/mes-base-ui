@@ -139,6 +139,21 @@ it('preserves continuous input and only strips insignificant zeroes on blur', as
   expect(w.emitted('update:modelValue')?.at(-1)).toEqual(['99999999999999.123456'])
 })
 
+it.each([
+  ['2.0000', '2'],
+  ['2.0030', '2.003'],
+])('keeps %s intact in the input until the existing blur normalization', async(input, normalized) => {
+  const { w } = setup({ modelValue: input })
+  await flushPromises()
+
+  expect(w.get('input').element.value).toBe(input)
+  expect(w.emitted('update:modelValue')).toBeUndefined()
+
+  await w.get('input').trigger('blur')
+
+  expect(w.emitted('update:modelValue')?.at(-1)).toEqual([normalized])
+})
+
 it('distinguishes optional, required, positive, and signed quantities', async() => {
   const { w } = setup({ modelValue: '' })
   await flushPromises()

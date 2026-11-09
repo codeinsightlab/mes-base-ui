@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { StockMovement } from '@/api/wm/stockDocuments'
+import { formatQuantity } from '@/lib/quantity'
 
 const props = defineProps<{ movements?: unknown }>()
 const rows = computed(() => Array.isArray(props.movements) ? props.movements as StockMovement[] : [])
@@ -13,8 +14,14 @@ const labels: Record<string, string> = {
   REVERSAL: '撤销冲销'
 }
 
-function signed(value: string) {
-  return value.startsWith('-') ? value : `+${value}`
+function isDecrease(value: unknown) {
+  return formatQuantity(value).startsWith('-')
+}
+
+function signed(value: unknown) {
+  const quantity = formatQuantity(value)
+  if (quantity === '—') return quantity
+  return quantity.startsWith('-') ? quantity : `+${quantity}`
 }
 </script>
 
@@ -27,7 +34,7 @@ function signed(value: string) {
         <template #default="{ row }">{{ labels[row.actionType] || '库存动作' }}</template>
       </el-table-column>
       <el-table-column label="库存变化" width="130" align="right">
-        <template #default="{ row }"><span :class="row.quantityDelta.startsWith('-') ? 'decrease' : 'increase'">{{ signed(row.quantityDelta) }}</span></template>
+        <template #default="{ row }"><span :class="isDecrease(row.quantityDelta) ? 'decrease' : 'increase'">{{ signed(row.quantityDelta) }}</span></template>
       </el-table-column>
       <el-table-column label="明细 / 批次" min-width="150">
         <template #default="{ row }">#{{ row.documentLineId }} · {{ row.batchNo || '无批次' }}{{ row.binCode ? ` / ${row.binCode}` : '' }}</template>

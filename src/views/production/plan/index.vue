@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import QuantityText from '@/components/business/production/QuantityText.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import { productionPlanApi } from '@/api/production/plan'
 import { formatQuantity } from '@/lib/quantity'
@@ -27,8 +28,15 @@ const itemFields: Field[] = [
 ]
 
 const quantityValidity = new WeakMap<object, boolean>()
-function setQuantityValidity(row: object, valid: boolean) { quantityValidity.set(row, valid) }
-function materialIdFor(row: Row) { return row.materialId as string | null }
+
+function setQuantityValidity(row: object, valid: boolean) {
+  quantityValidity.set(row, valid)
+}
+
+function materialIdFor(row: Row) {
+  return row.materialId as string | null
+}
+
 function validate(items: Row[]) {
   for (const [index, item] of items.entries()) {
     const quantity = normalizedQuantityInput(String(item.plannedQty ?? ''))
@@ -77,7 +85,8 @@ function validate(items: Row[]) {
         </el-table-column>
         <el-table-column label="计划数量" width="150" align="right">
           <template #default="{ row }">
-            <QuantityInput v-model="row.plannedQty as any" required positive :material-id="materialIdFor(row)" :disabled="!writable" @validity="setQuantityValidity(row, $event)" />
+            <QuantityInput v-if="writable" v-model="row.plannedQty as any" required positive :material-id="materialIdFor(row)" @validity="setQuantityValidity(row, $event)" />
+            <QuantityText v-else :value="row.plannedQty as any" />
           </template>
         </el-table-column>
         <el-table-column label="计划开始" min-width="190">

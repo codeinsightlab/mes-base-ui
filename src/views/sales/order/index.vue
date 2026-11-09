@@ -2,6 +2,7 @@
 import CustomerSelect from '@/components/business/CustomerSelect.vue'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
+import QuantityText from '@/components/business/production/QuantityText.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import { salesOrderApi } from '@/api/sales/order'
 import { formatQuantity } from '@/lib/quantity'
@@ -32,8 +33,15 @@ const itemFields: Field[] = [
 ]
 
 const quantityValidity = new WeakMap<object, boolean>()
-function setQuantityValidity(row: object, valid: boolean) { quantityValidity.set(row, valid) }
-function materialIdFor(row: Row) { return row.materialId as string | null }
+
+function setQuantityValidity(row: object, valid: boolean) {
+  quantityValidity.set(row, valid)
+}
+
+function materialIdFor(row: Row) {
+  return row.materialId as string | null
+}
+
 function validate(items: Row[]) {
   for (const [index, item] of items.entries()) {
     const quantity = normalizedQuantityInput(String(item.orderedQty ?? ''))
@@ -82,7 +90,8 @@ function validate(items: Row[]) {
         </el-table-column>
         <el-table-column label="订购数量" width="160" align="right">
           <template #default="{ row }">
-            <QuantityInput v-model="row.orderedQty as any" required positive :material-id="materialIdFor(row)" :disabled="!writable" @validity="setQuantityValidity(row, $event)" />
+            <QuantityInput v-if="writable" v-model="row.orderedQty as any" required positive :material-id="materialIdFor(row)" @validity="setQuantityValidity(row, $event)" />
+            <QuantityText v-else :value="row.orderedQty as any" />
           </template>
         </el-table-column>
         <el-table-column label="要求交期" width="190">
