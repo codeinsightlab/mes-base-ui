@@ -5,6 +5,7 @@ import CodeScanner from '@/components/scanner/CodeScanner.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { formatQuantity, quantityColumn } from '@/lib/quantity'
+import { formatDateTime } from '@/lib/dateTime'
 import { executionStatusLabel } from '@/lib/production/executionState'
 import DefectDeclarationPanel from '@/components/business/quality/DefectDeclarationPanel.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -36,67 +37,127 @@ const graphEdges = computed<RoutingEdge[]>(() => {
   return context.value?.path.edges.map(e => ({ fromNodeCode: codes.get(e.fromNodeId)!, toNodeCode: codes.get(e.toNodeId)! })) ?? []
 })
 const statusNames: Record<string, string> = { AVAILABLE: '可报工', QUALITY_PENDING: '受待核实不良影响', NO_QUANTITY: '无可报数量', NOT_ASSIGNED: '未被派工', NO_CAPABILITY: '无工序能力', EXECUTION_NOT_READY: '执行未就绪' }
+
 function clearView(preserveConfirmed = false) {
-  version++; context.value = null; selectedId.value = ''; quantity.value = ''; quantityValid.value = false
+  version++
+  context.value = null
+  selectedId.value = ''
+  quantity.value = ''
+  quantityValid.value = false
   if (!preserveConfirmed || !pending.value) result.value = null
-  error.value = ''; busy.value = loading.value = false; showAll.value = false
+  error.value = ''
+  busy.value = loading.value = false
+  showAll.value = false
 }
+
 function restore() {
-  pending.value = null; recoveryError.value = ''
+  pending.value = null
+  recoveryError.value = ''
   if (!allowed.value) return
-  try { pending.value = readReportingRecovery({ userId: auth.userId, factoryId: auth.factoryId }) } catch(e) { recoveryError.value = e instanceof Error ? e.message : '原报工请求无法读取，暂不能新报工' }
+  try {
+    pending.value = readReportingRecovery({ userId: auth.userId, factoryId: auth.factoryId })
+  } catch (e) {
+    recoveryError.value = e instanceof Error ? e.message : '原报工请求无法读取，暂不能新报工'
+  }
 }
-watch(() => [auth.userId, auth.token, auth.sessionReady, auth.factoryId, auth.revision, allowed.value], () => { clearView(); code.value = ''; restore() }, { flush: 'sync', immediate: true })
-onBeforeUnmount(() => { mounted = false; clearView(); pending.value = null })
+
+watch(() => [auth.userId, auth.token, auth.sessionReady, auth.factoryId, auth.revision, allowed.value], () => {
+  clearView()
+  code.value = ''
+  restore()
+}, { flush: 'sync', immediate: true })
+onBeforeUnmount(() => {
+  mounted = false
+  clearView()
+  pending.value = null
+})
+
 async function locate(value?:string, inputMethod:ScanInputMethod = 'TEXT') {
   if (!allowed.value || busy.value) return
   if (value !== undefined)code.value = value
-  clearView(true); restore(); loading.value = true; const ticket = version
+  clearView(true)
+  restore()
+  loading.value = true
+  const ticket = version
   try {
     const identity = await scanExecution('REPORTING', code.value, inputMethod)
     if (ticket !== version) return
     const value = await productionReporting.context(identity.executionCode)
     if (ticket !== version) return
     context.value = value
-  } catch(e) { if (ticket === version) error.value = e instanceof Error ? e.message : '执行查询失败' } finally { if (ticket === version) loading.value = false }
+  } catch (e) {
+    if (ticket === version) error.value = e instanceof Error ? e.message : '执行查询失败'
+  } finally {
+    if (ticket === version) loading.value = false
+  }
 }
-function retryPending() { return submit(true) }
+
+function retryPending() {
+  return submit(true)
+}
+
 async function submit(recover = false) {
   if (!allowed.value || busy.value || recoveryError.value) return
   if (!!pending.value !== recover) return
   const fresh = !pending.value
-  if (fresh && (!context.value || selected.value?.status !== 'AVAILABLE' || !quantityValid.value || !positiveQuantity(normalizedQuantityInput(quantity.value)))) { error.value = '请选择可报工序，输入符合物料单位精度的正数量'; return }
+  if (fresh && (!context.value || selected.value?.status !== 'AVAILABLE' || !quantityValid.value || !positiveQuantity(normalizedQuantityInput(quantity.value)))) {
+    error.value = '请选择可报工序，输入符合物料单位精度的正数量'
+    return
+  }
   const command = pending.value ? { ...pending.value } : { executionCode: context.value!.identity.executionCode, routingNodeId: selectedId.value, reportQty: normalizedQuantityInput(quantity.value), workstationId: null, requestId: crypto.randomUUID() }
   const owner = { userId: auth.userId, factoryId: auth.factoryId }, token = auth.token, revision = auth.revision
   const trusted = () => allowed.value && auth.userId === owner.userId && auth.factoryId === owner.factoryId && auth.token === token && auth.revision === revision
-  try { saveReportingRecovery(owner, command) } catch(e) { recoveryError.value = e instanceof Error ? e.message : '无法保存原请求，尚未发送'; return }
+  try {
+    saveReportingRecovery(owner, command)
+  } catch (e) {
+    recoveryError.value = e instanceof Error ? e.message : '无法保存原请求，尚未发送'
+    return
+  }
   // A write invalidates earlier context reads, even when recovery has no loaded context.
   const ticket = ++version
   loading.value = false
   if (fresh) result.value = null
   pending.value = command
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   let saved: Ledger
   try {
     saved = await productionReporting.submit(command)
-  } catch(e) {
+  } catch (e) {
     if (!mounted || ticket !== version || !trusted()) return
     if (fresh && isDefiniteReportingRejection(e)) {
-      try { removeReportingRecovery(owner, command); pending.value = null } catch(failure) { recoveryError.value = failure instanceof Error ? failure.message : '原请求无法清理，暂不能新报工' }
+      try {
+        removeReportingRecovery(owner, command)
+        pending.value = null
+      } catch (failure) {
+        recoveryError.value = failure instanceof Error ? failure.message : '原请求无法清理，暂不能新报工'
+      }
     }
     error.value = e instanceof Error ? e.message : '报工结果未确认，请使用原请求重试'
     return
-  } finally { if (mounted && ticket === version) busy.value = false }
+  } finally {
+    if (mounted && ticket === version) busy.value = false
+  }
   if (!trusted()) return
   if (mounted && ticket === version) result.value = saved
-  try { removeReportingRecovery(owner, command) } catch(e) { if (mounted && ticket === version) recoveryError.value = e instanceof Error ? e.message : '报工已成功，原请求无法清理'; return }
+  try {
+    removeReportingRecovery(owner, command)
+  } catch (e) {
+    if (mounted && ticket === version) recoveryError.value = e instanceof Error ? e.message : '报工已成功，原请求无法清理'
+    return
+  }
   if (!mounted || ticket !== version) return
-  result.value = saved; pending.value = null; quantity.value = ''; selectedId.value = ''
+  result.value = saved
+  pending.value = null
+  quantity.value = ''
+  selectedId.value = ''
   if (context.value?.identity.executionCode !== command.executionCode) return
   try {
     const freshContext = await productionReporting.context(command.executionCode)
     if (mounted && ticket === version) context.value = freshContext
-  } catch(e) { if (mounted && ticket === version) error.value = '报工已成功，数量刷新失败，请重新定位执行单元：' + (e instanceof Error ? e.message : '读取失败') }
+  } catch (e) {
+    if (mounted && ticket === version) error.value = '报工已成功，数量刷新失败，请重新定位执行单元：' + (e instanceof Error ? e.message : '读取失败')
+  }
 }
 
 </script>
@@ -112,7 +173,7 @@ async function submit(recover = false) {
       </QueryForm>
       <p id="reporting-scan-help" class="secondary">使用已完成首次 MES 领料的组合二维码定位生产执行。</p>
       <el-alert v-if="error" :title="error" type="error" :closable="false" role="alert" />
-      <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${formatQuantity(result.quantityDelta)}，时间 ${result.reportTime}`" type="success" :closable="false" />
+      <el-alert v-if="result" :title="`报工成功：流水 ${result.id}，本次完成 ${formatQuantity(result.quantityDelta)}，时间 ${formatDateTime(result.reportTime)}`" type="success" :closable="false" />
       <el-alert v-if="recoveryError" :title="recoveryError" type="error" :closable="false" role="alert" />
       <el-button v-if="recoveryError" :disabled="busy" @click="restore">重新读取原报工请求</el-button>
       <section v-if="pending" class="panel" aria-label="待确认报工请求">

@@ -32,7 +32,7 @@ it('formats signed stock movement quantities through the shared display rule', a
   wrapper = mount(StockDocumentMovements, {
     props: {
       movements: [
-        { id: '1', documentLineId: '1', actionType: 'ISSUE', quantityDelta: '2.0030', occurredAt: '', referenceActionId: null, operationId: null, stockId: '1', batchNo: null, binCode: null, operatorUserId: '1', reason: '' },
+        { id: '1', documentLineId: '1', actionType: 'ISSUE', quantityDelta: '2.0030', occurredAt: '2026-03-04T05:06:07.987', referenceActionId: null, operationId: null, stockId: '1', batchNo: null, binCode: null, operatorUserId: '1', reason: '' },
         { id: '2', documentLineId: '2', actionType: 'RETURN', quantityDelta: '-0.0500', occurredAt: '', referenceActionId: null, operationId: null, stockId: '2', batchNo: null, binCode: null, operatorUserId: '1', reason: '' }
       ]
     },
@@ -41,6 +41,7 @@ it('formats signed stock movement quantities through the shared display rule', a
 
   expect(wrapper.text()).toContain('+2.003')
   expect(wrapper.text()).toContain('-0.05')
+  expect(wrapper.text()).toContain('2026-03-04 05:06:07')
   expect(wrapper.text()).not.toContain('2.0030')
   expect(wrapper.text()).not.toContain('-0.0500')
 })

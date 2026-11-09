@@ -80,13 +80,13 @@ export default {
 }
 </script>
 <style lang="css" scoped>
-::v-deep .el-transfer__button {
+:deep(.el-transfer__button) {
   border-radius: 50%;
   padding: 12px;
   display: block;
   margin-left: 0px;
 }
-::v-deep .el-transfer__button:first-child {
+:deep(.el-transfer__button:first-child) {
   margin-bottom: 10px;
 }
 </style>

@@ -8,6 +8,7 @@ import { useRemoteOptions } from '@/composables/useRemoteOptions'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput } from '@/lib/production/quantityRules'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import DateTimeText from '@/components/DateTimeText.vue'
 import { formatQuantity, quantityColumn } from '@/lib/quantity'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -304,7 +305,6 @@ function closeHistory() {
 }
 
 const person = (name: string | null | undefined, id: string) => name || `用户 ${id}（名称未记录）`
-const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
 </script>
 <template>
   <section v-if="visible && can('quantity')" aria-label="生产数量与报工管理">
@@ -345,8 +345,8 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
           <el-table-column prop="id" label="流水编号" min-width="120" /><el-table-column label="类型" width="100"><template #default="{row}">{{ row.recordType === 'REPORT' ? '原始报工' : '数量调整' }}</template></el-table-column>
           <el-table-column :formatter="quantityColumn" prop="quantityDelta" label="数量变化" min-width="140" /><el-table-column prop="referenceReportId" label="原始流水" min-width="120" />
           <el-table-column label="实际操作人" min-width="150"><template #default="{row}"><span :title="'用户 ID：' + row.operatorUserId">{{ person(row.operatorName,row.operatorUserId) }}</span></template></el-table-column><el-table-column label="提交人" min-width="150"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column>
-          <el-table-column label="生产时间" min-width="180"><template #default="{row}">{{ time(row.reportTime) }}</template></el-table-column>
-          <el-table-column label="记录时间" min-width="180"><template #default="{row}">{{ time(row.createTime) }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" show-overflow-tooltip />
+          <el-table-column label="生产时间" min-width="180"><template #default="{row}"><DateTimeText :value="row.reportTime" /></template></el-table-column>
+          <el-table-column label="记录时间" min-width="180"><template #default="{row}"><DateTimeText :value="row.createTime" /></template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" show-overflow-tooltip />
           <el-table-column label="操作" min-width="240" fixed="right"><template #default="{row}">
             <el-button text type="primary" @click="openHistory(row)">调整历史</el-button>
             <el-button v-if="row.recordType === 'REPORT' && can('adjust')" text type="primary" :disabled="!historyWritable" @click="openCommand('adjust', row)">数量订正</el-button>
@@ -360,7 +360,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
   <PageDialog v-model="historyVisible" title="原始报工与调整历史" width="min(1040px, 94vw)" append-to-body destroy-on-close @close="closeHistory">
     <el-alert v-if="historyError" :title="historyError" type="error" :closable="false" />
     <p v-if="detail">原始流水 {{ detail.record.id }} · 原始数量 <QuantityText :value="detail.record.quantityDelta" /> · 当前有效余额 <QuantityText :value="detail.originalEffectiveQty" /> · 操作人 {{ person(detail.record.operatorName,detail.record.operatorUserId) }}</p>
-    <el-table v-loading="historyLoading" :data="history" border empty-text="暂无调整记录"><el-table-column prop="id" label="流水编号" /><el-table-column :formatter="quantityColumn" prop="quantityDelta" label="调整数量" /><el-table-column label="订正提交人"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column><el-table-column label="订正时间" min-width="180"><template #default="{row}">{{ time(row.createTime) }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" /></el-table>
+    <el-table v-loading="historyLoading" :data="history" border empty-text="暂无调整记录"><el-table-column prop="id" label="流水编号" /><el-table-column :formatter="quantityColumn" prop="quantityDelta" label="调整数量" /><el-table-column label="订正提交人"><template #default="{row}"><span :title="'用户 ID：' + row.recordedBy">{{ person(row.recordedByName,row.recordedBy) }}</span></template></el-table-column><el-table-column label="订正时间" min-width="180"><template #default="{row}"><DateTimeText :value="row.createTime" /></template></el-table-column><el-table-column prop="reason" label="原因" min-width="200" /></el-table>
     <Pagination v-model:page="historyPage" v-model:limit="historyLimit" :total="historyTotal" :auto-scroll="false" @pagination="loadHistory()" />
   </PageDialog>
   <PageDialog :model-value="Boolean(command)" :title="commandTitle" width="min(640px, 94vw)" append-to-body destroy-on-close :before-close="closeCommand" :show-close="!saving" :close-on-click-modal="!saving" :close-on-press-escape="!saving" @update:model-value="setCommandVisible">
@@ -384,7 +384,7 @@ const time = (value: string) => value.replace('T', ' ').replace(/\.\d+$/, '')
           @open="historicalUsers.open"
           @retry="historicalUsers.retry"
         /><span class="secondary">不按当前工序能力或派工名单限制历史补录</span></el-form-item>
-        <el-form-item label="实际生产时间" required><el-date-picker v-model="form.reportTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择实际生产时间" /></el-form-item>
+        <el-form-item label="实际生产时间" required><el-date-picker v-model="form.reportTime" type="datetime" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="选择实际生产时间" /></el-form-item>
         <el-form-item label="工作站编号（可选）"><el-input v-model="form.workstationId" /></el-form-item>
       </template>
       <el-form-item label="操作原因" required><el-input v-model="form.reason" type="textarea" :maxlength="500" show-word-limit /></el-form-item>

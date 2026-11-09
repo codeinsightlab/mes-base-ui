@@ -17,11 +17,19 @@ defineEmits<{ submit: [] }>()
           <el-option v-for="option in field.options" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
         <el-switch v-else-if="field.kind === 'boolean'" v-model="draft[field.key] as any" />
+        <el-date-picker
+          v-else-if="field.kind === 'datetime'"
+          v-model="draft[field.key] as any"
+          type="datetime"
+          format="YYYY-MM-DD HH:mm:ss"
+          value-format="YYYY-MM-DDTHH:mm:ss"
+          :disabled="disabledKeys?.includes(field.key)"
+        />
         <el-input
           v-else
           v-model="draft[field.key] as any"
           :maxlength="field.maxLength"
-          :type="field.kind === 'password' ? 'password' : field.kind === 'textarea' || field.key === 'remark' ? 'textarea' : field.kind === 'datetime' ? 'datetime-local' : field.kind === 'date' ? 'date' : field.kind === 'number' ? 'number' : 'text'"
+          :type="field.kind === 'password' ? 'password' : field.kind === 'textarea' || field.key === 'remark' ? 'textarea' : field.kind === 'date' ? 'date' : field.kind === 'number' ? 'number' : 'text'"
           :show-password="field.kind === 'password'"
           :disabled="disabledKeys?.includes(field.key)"
           :inputmode="field.kind === 'decimal' ? 'decimal' : undefined"

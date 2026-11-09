@@ -11,6 +11,7 @@ import WarehouseSelect from '@/components/business/WarehouseSelect.vue'
 import StockSourceSelect from '@/components/business/warehouse/StockSourceSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import { formatDateTime } from '@/lib/dateTime'
 import { ApiError } from '@/lib/request'
 import { stockTransfers, transferView, transferCommand, type TransferCommand } from '@/api/wm/stockTransfers'
 import { stockDocumentPermission as p, type ApprovalIntent, type CancellationIntent } from '@/api/wm/stockDocuments'
@@ -272,7 +273,7 @@ onBeforeUnmount(clear)
         <el-descriptions v-if="disabled" :column="1" border>
           <el-descriptions-item label="状态">{{ draft.status==='POSTED'?'已审核':draft.status==='REVERSED'?'已撤销':draft.status==='CANCELLED'?'草稿已作废':'草稿' }}</el-descriptions-item>
           <el-descriptions-item label="调拨依据">{{ draft.reason || '—' }}</el-descriptions-item>
-          <el-descriptions-item v-if="draft.reversedAt" label="撤销时间">{{ draft.reversedAt }}</el-descriptions-item>
+          <el-descriptions-item v-if="draft.reversedAt" label="撤销时间">{{ formatDateTime(draft.reversedAt) }}</el-descriptions-item>
           <el-descriptions-item v-if="draft.reversedBy" label="撤销人">用户 {{ draft.reversedBy }}</el-descriptions-item>
           <el-descriptions-item v-if="draft.reversalReason" label="撤销原因">{{ draft.reversalReason }}</el-descriptions-item>
           <el-descriptions-item v-if="draft.remark" label="备注">{{ draft.remark }}</el-descriptions-item>

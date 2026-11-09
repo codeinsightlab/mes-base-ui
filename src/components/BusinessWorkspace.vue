@@ -20,7 +20,11 @@ const metrics = computed(() => [
 const sourceLabel = businessSourceLabel
 const readyTasks = computed(() => ready.value?.items.filter(row => row.workorderStatus === 'RELEASED') || [])
 const progress = ref<{ reload: () => Promise<void>; loading: boolean } | null>(null)
-function refreshWorkspace() { void reload(); void progress.value?.reload() }
+
+function refreshWorkspace() {
+  void reload()
+  void progress.value?.reload()
+}
 </script>
 <template>
   <div class="business-workspace">
@@ -47,7 +51,7 @@ function refreshWorkspace() { void reload(); void progress.value?.reload() }
                 <el-table-column label="产品 / 工序" min-width="155"><template #default="{ row }">{{ row.productName || row.productCode || '未提供' }}<div class="secondary">{{ row.operationName || row.routingNodeId }}</div></template></el-table-column>
                 <el-table-column label="类型 / 数量增量" min-width="180" align="right"><template #default="{ row }">{{ row.recordType === 'REPORT' ? '报工' : row.recordType === 'ADJUSTMENT' ? '调整 / 冲销' : row.recordType }}<div><QuantityText :value="row.quantityDelta" /></div><div class="secondary">{{ row.unitName || '单位未提供' }}</div></template></el-table-column>
                 <el-table-column label="报工人" min-width="110"><template #default="{ row }">{{ row.operatorName || row.operatorUserId }}</template></el-table-column>
-                <el-table-column label="登记时间" min-width="170"><template #default="{ row }">{{ parseTime(row.createTime) }}</template></el-table-column>
+                <el-table-column label="登记时间" min-width="180"><template #default="{ row }">{{ parseTime(row.createTime) }}</template></el-table-column>
                 <el-table-column label="操作" width="100"><template #default="{ row }"><RouterLink v-if="row.executionCode && auth.hasPermission('business:production:report:quantity', 'factory')" :to="{ path: '/production/productionReport', query: { executionCode: row.executionCode } }">查看数量</RouterLink></template></el-table-column>
               </el-table>
               <footer class="console-footer">包含历史补录、调整与冲销，数量增量不等于合格产出；单位为当前产品单位。</footer>

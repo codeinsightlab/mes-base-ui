@@ -3,6 +3,7 @@ import { api as workorders } from '@/api/production/workorder'
 import { api as executions } from '@/api/production/mesProductionExecution'
 import { qualityTreatment } from '@/api/quality/qualityTreatment'
 import { recentReports } from '@/api/production/workspace'
+import { formatDateTime } from '@/lib/dateTime'
 import type { WorkspaceResource } from './useWorkspaceStatus'
 
 export const businessWorkspacePermissions = {
@@ -35,29 +36,52 @@ export function useBusinessWorkspace(access: Access, loaders = businessWorkspace
   const permissions = () => Object.values(businessWorkspacePermissions).map(p => access.hasPermission(p, 'factory')).join(',')
   let sequence = 0, disposed = false
   const loading = computed(() => resources.some(r => r.state === 'loading'))
+
   function clear() {
     sequence++
-    for (const target of resources) { target.value = null; target.state = 'idle'; target.error = ''; target.updatedAt = '' }
+    for (const target of resources) {
+      target.value = null
+      target.state = 'idle'
+      target.error = ''
+      target.updatedAt = ''
+    }
   }
+
   async function reload() {
     if (disposed) return
     const ticket = ++sequence, factory = access.factoryId, revision = access.revision, grants = permissions()
     const current = () => !disposed && ticket === sequence && factory === access.factoryId && revision === access.revision && grants === permissions()
+
     async function load<T>(target: WorkspaceResource<T>, permission: string, fetch: () => Promise<T>) {
       target.error = ''
-      if (!factory) { target.value = null; target.updatedAt = ''; target.state = 'idle'; return }
-      if (!access.hasPermission(permission, 'factory')) { target.value = null; target.updatedAt = ''; target.state = 'forbidden'; return }
+      if (!factory) {
+        target.value = null
+        target.updatedAt = ''
+        target.state = 'idle'
+        return
+      }
+      if (!access.hasPermission(permission, 'factory')) {
+        target.value = null
+        target.updatedAt = ''
+        target.state = 'forbidden'
+        return
+      }
       target.state = 'loading'
       try {
         const result = await fetch()
         if (!current()) return
-        target.value = result; target.state = 'ready'; target.updatedAt = new Date().toLocaleTimeString('zh-CN', { hour12: false })
-      } catch(e) {
+        target.value = result
+        target.state = 'ready'
+        target.updatedAt = formatDateTime(new Date())
+      } catch (e) {
         if (!current()) return
-        target.value = null; target.updatedAt = ''
-        target.state = 'error'; target.error = e instanceof Error ? e.message : '读取失败，请重试'
+        target.value = null
+        target.updatedAt = ''
+        target.state = 'error'
+        target.error = e instanceof Error ? e.message : '读取失败，请重试'
       }
     }
+
     await Promise.all([
       load(drafts, businessWorkspacePermissions.orders, loaders.drafts),
       load(released, businessWorkspacePermissions.orders, loaders.released),
@@ -67,9 +91,14 @@ export function useBusinessWorkspace(access: Access, loaders = businessWorkspace
       load(defects, businessWorkspacePermissions.defects, loaders.defects)
     ])
   }
-  watch(() => [access.factoryId, access.revision, permissions()], () => { clear(); void reload() }, { immediate: true, flush: 'sync' })
+
+  watch(() => [access.factoryId, access.revision, permissions()], () => {
+    clear()
+    void reload()
+  }, { immediate: true, flush: 'sync' })
   onScopeDispose(() => {
-    disposed = true; clear()
+    disposed = true
+    clear()
   })
   return { drafts, released, ready, running, reports, defects, loading, reload }
 }

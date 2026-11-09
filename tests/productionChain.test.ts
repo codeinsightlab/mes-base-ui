@@ -18,7 +18,9 @@ const allocation = { workorderId: '1', plannedQty: '1000.000000', allocatedTarge
 const order = { id: '1', code: 'WO1', productId: '1', routingId: '1', plannedQty: '1000', status: 'DRAFT', revision: 0 }
 const detail = () => ({ workorder: order, productCode: 'P1', productName: '产品一', routing: { id: '1', code: 'R1', version: 1 }, allocation })
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {} unobserve() {} disconnect() {}
+  })
   for (const method of Object.values(wo)) method.mockReset()
   wo.list.mockResolvedValue({ items: [{ workorder: order, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
   wo.detail.mockResolvedValue(detail())
@@ -27,11 +29,15 @@ beforeEach(() => {
   wo.numberingRules.mockResolvedValue([{ ruleCode: 'WO_RULE', ruleName: '工单编码', prefix: 'WO' }])
   executions.list.mockReset().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 20 })
 })
+
 function setup(permissions: string[]) {
   const pinia = createPinia(), auth = useAuth(pinia)
-  auth.factoryId = 'A'; auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = [...permissions, 'business:material:query', 'business:unit:measure:query']
+  auth.factoryId = 'A'
+  auth.runtimeMode = 'LOCAL'
+  auth.factoryPermissions = [...permissions, 'business:material:query', 'business:unit:measure:query']
   return { auth, global: { plugins: [pinia, ElementPlus] }}
 }
+
 describe('single active execution chain', () => {
   it('shows the server creation time and current completed workorder status', async() => {
     wo.list.mockResolvedValueOnce({ items: [{ workorder: { ...order, status: 'COMPLETED', createTime: '2026-10-20T16:10:00' }, productCode: 'P1', productName: '产品一', routingCode: 'R1', routingVersion: 1, allocation }], total: 1 })
@@ -39,7 +45,7 @@ describe('single active execution chain', () => {
     await flushPromises()
     expect(w.find('.el-table__body .status-tag').text()).toBe('已完工')
     expect(w.find('.el-table__header').text()).toContain('创建时间')
-    expect(w.find('.el-table__body').text()).toContain('2026-10-20T16:10:00')
+    expect(w.find('.el-table__body').text()).toContain('2026-10-20 16:10:00')
     w.unmount()
   })
   it('keeps an unknown workorder status visible instead of inventing a released status', async() => {
@@ -70,15 +76,25 @@ describe('single active execution chain', () => {
   })
   it('opens a demand form with no batch array or path step and saves the exact demand', async() => {
     const c = setup(['workorder:list', 'workorder:create']), w = mount(WorkOrder, { global: c.global })
-    await flushPromises(); await w.findAll('button').find(b => b.text() === '新增工单')!.trigger('click'); await flushPromises()
+    await flushPromises()
+    await w.findAll('button').find(b => b.text() === '新增工单')!.trigger('click')
+    await flushPromises()
     const state = w.vm as unknown as { form: Record<string, unknown>; productChanged: (id: string) => Promise<void>; save: () => Promise<void> }
     expect(state.form).not.toHaveProperty('batches')
     expect(document.body.textContent).not.toContain('添加批次')
-    await state.productChanged('1'); await flushPromises()
-    Object.assign(state.form, { code: 'WO_NEW', ruleCode: 'WO_RULE', routingId: '1', plannedQty: '1000.01' }); await flushPromises()
-    state.form.plannedQty = '1000.001'; await flushPromises(); await state.save(); expect(wo.create).not.toHaveBeenCalled()
-    state.form.plannedQty = '1000.01'; await flushPromises()
-    wo.create.mockResolvedValue(detail()); await state.save(); await flushPromises()
+    await state.productChanged('1')
+    await flushPromises()
+    Object.assign(state.form, { code: 'WO_NEW', ruleCode: 'WO_RULE', routingId: '1', plannedQty: '1000.01' })
+    await flushPromises()
+    state.form.plannedQty = '1000.001'
+    await flushPromises()
+    await state.save()
+    expect(wo.create).not.toHaveBeenCalled()
+    state.form.plannedQty = '1000.01'
+    await flushPromises()
+    wo.create.mockResolvedValue(detail())
+    await state.save()
+    await flushPromises()
     expect(wo.create).toHaveBeenCalled()
     expect(wo.create.mock.calls[0]![0]).not.toHaveProperty('batches')
     expect(wo.create.mock.calls[0]![0].plannedQty).toBe('1000.01')
@@ -102,23 +118,34 @@ describe('single active execution chain', () => {
   })
   it('closing the workorder invalidates pending details and unmounts its execution context', async() => {
     let release!: (v: unknown) => void
-    wo.detail.mockImplementationOnce(() => new Promise(r => { release = r }))
+    wo.detail.mockImplementationOnce(() => new Promise(r => {
+      release = r
+    }))
     const c = setup(['workorder:list', 'workorder:query']), w = mount(WorkOrder, { global: c.global })
     await flushPromises()
     const state = w.vm as unknown as { open: (id: string) => Promise<void>; closeDetail: () => void; detail: unknown }
-    const pending = state.open('1'); state.closeDetail()
-    release(detail()); await pending; await flushPromises()
+    const pending = state.open('1')
+    state.closeDetail()
+    release(detail())
+    await pending
+    await flushPromises()
     expect(state.detail).toBeNull()
     expect(w.findComponent(ExecutionList).exists()).toBe(false)
     w.unmount()
   })
   it('rejects late workorder details after factory switch', async() => {
     let release!: (v: unknown) => void
-    wo.detail.mockImplementationOnce(() => new Promise(r => { release = r }))
+    wo.detail.mockImplementationOnce(() => new Promise(r => {
+      release = r
+    }))
     const c = setup(['workorder:list', 'workorder:query']), w = mount(WorkOrder, { global: c.global })
-    await flushPromises(); await w.findAll('button').find(b => b.text() === '详情 / 执行')!.trigger('click')
-    c.auth.factoryId = 'B'; c.auth.revision++; await flushPromises()
-    release({ ...detail(), productName: '过期工厂生产需求' }); await flushPromises()
+    await flushPromises()
+    await w.findAll('button').find(b => b.text() === '详情 / 执行')!.trigger('click')
+    c.auth.factoryId = 'B'
+    c.auth.revision++
+    await flushPromises()
+    release({ ...detail(), productName: '过期工厂生产需求' })
+    await flushPromises()
     expect(w.text()).not.toContain('过期工厂生产需求')
     w.unmount()
   })

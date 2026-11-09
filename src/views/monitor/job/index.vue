@@ -2,7 +2,7 @@
   <div class="app-container">
     <PageHeader section="MES BASE / MONITOR" title="任务调度" description="定时任务配置与运行状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px" @submit="handleQuery">
       <el-form-item label="任务名称" prop="jobName">
         <el-input
           v-model="queryParams.jobName"
@@ -261,7 +261,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="任务分组：">{{ jobGroupFormat(form) }}</el-form-item>
-            <el-form-item label="创建时间：">{{ form.createTime }}</el-form-item>
+            <el-form-item label="创建时间：">{{ parseTime(form.createTime) }}</el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="cron表达式：">{{ form.cronExpression }}</el-form-item>
@@ -372,8 +372,29 @@ export default {
     this.getList()
   },
   methods: {
-    async inspectRun(row) { this.stateJob = row;this.confirmedDead = false;this.stateLoading = true;try { const response = await request({ url: '/monitor/job/' + row.jobId + '/run-state', scope: 'platform' });this.runState = response.data;this.stateOpen = true } finally { this.stateLoading = false } },
-    async recoverRun() { await this.$modal.confirm('确认原执行进程已停止并恢复本次占用？');this.stateLoading = true;try { await request({ url: '/monitor/job/recover', method: 'post', scope: 'platform', data: { jobId: this.stateJob.jobId, expectedRunToken: this.runState.runToken, confirmedProcessDead: true }});this.$modal.msgSuccess('占用已恢复，结果记录为UNKNOWN');await this.inspectRun(this.stateJob) } finally { this.stateLoading = false } },
+    async inspectRun(row) {
+      this.stateJob = row
+      this.confirmedDead = false
+      this.stateLoading = true
+      try {
+        const response = await request({ url: '/monitor/job/' + row.jobId + '/run-state', scope: 'platform' })
+        this.runState = response.data
+        this.stateOpen = true
+      } finally {
+        this.stateLoading = false
+      }
+    },
+    async recoverRun() {
+      await this.$modal.confirm('确认原执行进程已停止并恢复本次占用？')
+      this.stateLoading = true
+      try {
+        await request({ url: '/monitor/job/recover', method: 'post', scope: 'platform', data: { jobId: this.stateJob.jobId, expectedRunToken: this.runState.runToken, confirmedProcessDead: true }})
+        this.$modal.msgSuccess('占用已恢复，结果记录为UNKNOWN')
+        await this.inspectRun(this.stateJob)
+      } finally {
+        this.stateLoading = false
+      }
+    },
     /** 查询定时任务列表 */
     getList() {
       return sourceList(this, () => listJob(this.queryParams), response => {
@@ -424,7 +445,8 @@ export default {
     // 更多操作触发
     handleCommand(command, row) {
       switch (command) {
-        case 'inspectRun': this.inspectRun(row);break
+        case 'inspectRun': this.inspectRun(row)
+          break
         case 'handleRun':
           this.handleRun(row)
           break

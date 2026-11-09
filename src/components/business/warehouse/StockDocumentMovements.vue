@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { StockMovement } from '@/api/wm/stockDocuments'
+import DateTimeText from '@/components/DateTimeText.vue'
 import { formatQuantity } from '@/lib/quantity'
 
 const props = defineProps<{ movements?: unknown }>()
@@ -39,7 +40,7 @@ function signed(value: unknown) {
       <el-table-column label="明细 / 批次" min-width="150">
         <template #default="{ row }">#{{ row.documentLineId }} · {{ row.batchNo || '无批次' }}{{ row.binCode ? ` / ${row.binCode}` : '' }}</template>
       </el-table-column>
-      <el-table-column label="时间" min-width="175" prop="occurredAt" />
+      <el-table-column label="时间" min-width="180"><template #default="{ row }"><DateTimeText :value="row.occurredAt" /></template></el-table-column>
       <el-table-column label="关联原动作" min-width="180">
         <template #default="{ row }">{{ row.referenceActionId || '—' }}</template>
       </el-table-column>

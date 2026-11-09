@@ -118,7 +118,7 @@
                 </tr>
                 <tr>
                   <td class="el-table__cell is-leaf"><div class="cell">启动时间</div></td>
-                  <td class="el-table__cell is-leaf"><div v-if="server.jvm" class="cell">{{ server.jvm.startTime }}</div></td>
+                  <td class="el-table__cell is-leaf"><div v-if="server.jvm" class="cell">{{ parseTime(server.jvm.startTime) }}</div></td>
                   <td class="el-table__cell is-leaf"><div class="cell">运行时长</div></td>
                   <td class="el-table__cell is-leaf"><div v-if="server.jvm" class="cell">{{ server.jvm.runTime }}</div></td>
                 </tr>
@@ -196,11 +196,14 @@ export default {
   methods: {
     /** 查询服务器信息 */
     getList() {
-      this.queryError = '';this.openLoading()
+      this.queryError = ''
+      this.openLoading()
       return getServer().then(response => {
         this.server = response.data
 
-      }).catch(error => { this.queryError = error.message }).finally(() => this.$modal.closeLoading())
+      }).catch(error => {
+        this.queryError = error.message
+      }).finally(() => this.$modal.closeLoading())
     },
     // 打开加载层
     openLoading() {

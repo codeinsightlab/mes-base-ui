@@ -2,7 +2,7 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="消息管理" description="站内消息、接收人与发送状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="100px">
+    <QueryForm v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="100px" @submit="handleQuery">
       <el-form-item label="消息类型" prop="messageType">
         <el-select v-model="queryParams.messageType" placeholder="请选择消息类型" clearable>
           <el-option
@@ -110,7 +110,7 @@
       <el-table-column label="接收人" align="center" prop="recipientId" />
       <el-table-column label="处理时间" align="center" prop="processTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.processTime, '{y}-{m}-{d}') }}</span>
+          <span>{{ parseTime(scope.row.processTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="回调地址" align="center" prop="callBack" />

@@ -13,7 +13,7 @@
       <el-table-column label="关联工厂" min-width="120"><template #default="s">{{ s.row.factoryName === null ? '未绑定' : s.row.factoryName }}</template></el-table-column>
       <el-table-column label="管理状态" width="105"><template #default="s"><StatusTag :label="s.row.statusName" :tone="s.row.status === 'ENABLED' ? 'running' : 'disabled'" /></template></el-table-column>
       <el-table-column label="本节点状态" min-width="120"><template #default="s"><div>{{ s.row.runtimeStatusName }}</div><span v-if="s.row.initialized" class="secondary">连接池已初始化</span></template></el-table-column>
-      <el-table-column label="Druid 最近建连异常" min-width="170" show-overflow-tooltip><template #default="s"><span v-if="s.row.runtimeError">{{ s.row.runtimeError }}<br>{{ s.row.lastErrorTime }}</span><span v-else class="secondary">暂无异常记录</span></template></el-table-column>
+      <el-table-column label="Druid 最近建连异常" min-width="180" show-overflow-tooltip><template #default="s"><span v-if="s.row.runtimeError">{{ s.row.runtimeError }}<br>{{ parseTime(s.row.lastErrorTime) }}</span><span v-else class="secondary">暂无异常记录</span></template></el-table-column>
       <el-table-column label="DDL 快照" min-width="185"><template #default="s">
         <div>{{ s.row.ddlGeneratedAt === null ? '尚未生成' : parseTime(s.row.ddlGeneratedAt) }}</div>
         <el-button v-hasPermi="['system:datasource:query']" link size="small" :loading="ddlBusyId === s.row.datasourceId && ddlAction === 'download'" :disabled="ddlBusyId !== null" @click="downloadDdl(s.row)">下载 DDL</el-button>
@@ -48,49 +48,102 @@ import PageDialog from '@/components/page/PageDialog.vue'
 import { listDatasources, createDatasource, updateDatasource, enableDatasource, disableDatasource, deleteDatasource, downloadDatasourceDdl, refreshDatasourceDdl } from '@/api/system/datasource'
 const empty = () => ({ datasourceId: null, revision: null, datasourceName: '', dbHost: '', dbPort: 3306, dbName: '', dbUsername: '', password: '' })
 export default {
-  components: { PageDialog },
   name: 'ManagedDatasource',
+  components: { PageDialog },
   data() {
     return { rows: [], pageNum: 1, pageSize: 20, total: 0, ddlBusyId: null, ddlAction: '', loading: false, saving: false, open: false, form: empty(), rules: {
       datasourceName: [{ required: true, message: '请输入名称', trigger: 'blur' }], dbHost: [{ required: true, message: '请输入服务器', trigger: 'blur' }],
       dbPort: [{ required: true, message: '请输入端口', trigger: 'blur' }], dbName: [{ required: true, message: '请输入数据库名', trigger: 'blur' }], dbUsername: [{ required: true, message: '请输入连接账号', trigger: 'blur' }]
     }}
   },
-  created() { this.load() },
+  created() {
+    this.load()
+  },
   methods: {
     async downloadDdl(row) {
-      this.ddlBusyId = row.datasourceId; this.ddlAction = 'download'
+      this.ddlBusyId = row.datasourceId
+      this.ddlAction = 'download'
       try {
         const response = await downloadDatasourceDdl(row.datasourceId)
         const file = response
         const url = URL.createObjectURL(new Blob([file.sql], { type: 'application/sql;charset=utf-8' }))
-        const link = document.createElement('a'); link.href = url; link.download = file.fileName
-        document.body.appendChild(link); link.click(); link.remove()
+        const link = document.createElement('a')
+        link.href = url
+        link.download = file.fileName
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
         await this.load()
-      } finally { this.ddlBusyId = null; this.ddlAction = '' }
+      } finally {
+        this.ddlBusyId = null
+        this.ddlAction = ''
+      }
     },
     async refreshDdl(row) {
-      this.ddlBusyId = row.datasourceId; this.ddlAction = 'refresh'
+      this.ddlBusyId = row.datasourceId
+      this.ddlAction = 'refresh'
       try {
         await refreshDatasourceDdl(row.datasourceId)
         this.$message.success('DDL 已重新生成，缓存已更新')
         await this.load()
-      } finally { this.ddlBusyId = null; this.ddlAction = '' }
+      } finally {
+        this.ddlBusyId = null
+        this.ddlAction = ''
+      }
     },
-    async load() { this.loading = true; try { const response = await listDatasources({ pageNum: this.pageNum, pageSize: this.pageSize }); this.rows = response.rows; this.total = response.total } finally { this.loading = false } },
-    edit(row) { this.form = empty(); if (row) Object.keys(this.form).filter(k => k !== 'password').forEach(k => { this.form[k] = row[k] }); this.open = true; this.$nextTick(() => this.$refs.form.clearValidate()) },
+    async load() {
+      this.loading = true
+      try {
+        const response = await listDatasources({ pageNum: this.pageNum, pageSize: this.pageSize })
+        this.rows = response.rows
+        this.total = response.total
+      } finally {
+        this.loading = false
+      }
+    },
+    edit(row) {
+      this.form = empty()
+      if (row) Object.keys(this.form).filter(k => k !== 'password').forEach(k => {
+        this.form[k] = row[k]
+      })
+      this.open = true
+      this.$nextTick(() => this.$refs.form.clearValidate())
+    },
     save() {
       this.$refs.form.validate(async valid => {
-        if (!valid) return; this.saving = true; try {
-          const data = { ...this.form }; if (data.datasourceId !== null && data.password === '') data.password = null
-          await (data.datasourceId === null ? createDatasource(data) : updateDatasource(data)); this.open = false; this.$message.success('已保存登记，尚未连接数据库'); await this.load()
-        } finally { this.saving = false }
+        if (!valid) return
+        this.saving = true
+        try {
+          const data = { ...this.form }
+          if (data.datasourceId !== null && data.password === '') data.password = null
+          await (data.datasourceId === null ? createDatasource(data) : updateDatasource(data))
+          this.open = false
+          this.$message.success('已保存登记，尚未连接数据库')
+          await this.load()
+        } finally {
+          this.saving = false
+        }
       })
     },
-    async enable(row) { await enableDatasource(row.datasourceId); this.$message.success('已启用，将在首次业务访问时加载'); await this.load() },
-    async disable(row) { await disableDatasource(row.datasourceId); this.$message.success('已停止管理'); await this.load() },
-    remove(row) { this.$confirm(`确认删除数据源“${row.datasourceName}”的登记？不会删除数据库。`, '删除登记', { type: 'warning' }).then(async() => { await deleteDatasource(row.datasourceId); await this.load() }).catch(error => { if (error !== 'cancel' && error !== 'close') throw error }) }
+    async enable(row) {
+      await enableDatasource(row.datasourceId)
+      this.$message.success('已启用，将在首次业务访问时加载')
+      await this.load()
+    },
+    async disable(row) {
+      await disableDatasource(row.datasourceId)
+      this.$message.success('已停止管理')
+      await this.load()
+    },
+    remove(row) {
+      this.$confirm(`确认删除数据源“${row.datasourceName}”的登记？不会删除数据库。`, '删除登记', { type: 'warning' }).then(async() => {
+        await deleteDatasource(row.datasourceId)
+        await this.load()
+      }).catch(error => {
+        if (error !== 'cancel' && error !== 'close') throw error
+      })
+    }
   }
 }
 </script>

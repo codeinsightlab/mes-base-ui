@@ -4,15 +4,19 @@ import { useAuth, type Menu } from '@/stores/auth'
 import { menuQuery } from '@/lib/sourceMenus'
 import { menuWorkspaces } from '@/lib/menuWorkspaces'
 import { operationStatus } from '@/lib/dataPresentation'
-import { parseTime } from '@/utils/ruoyi'
 import { useWorkspaceStatus } from '@/composables/useWorkspaceStatus'
 import ScopeTag from '@/components/ScopeTag.vue'
 import StatusTag from '@/components/StatusTag.vue'
 import CodeText from '@/components/CodeText.vue'
+import DateTimeText from '@/components/DateTimeText.vue'
 import MethodBadge from '@/components/MethodBadge.vue'
 import MetricValue from '@/components/MetricValue.vue'
 const auth = useAuth()
-function entries(menu: Menu): Menu[] { return menu.hidden ? [] : menu.children.length ? menu.children.flatMap(entries) : [menu] }
+
+function entries(menu: Menu): Menu[] {
+  return menu.hidden ? [] : menu.children.length ? menu.children.flatMap(entries) : [menu]
+}
+
 const navigation = computed(() => menuWorkspaces(auth.platformMenus, auth.factoryMenus))
 const groups = computed(() => [
   ...navigation.value.platform.filter(menu => !menu.hidden).map(menu => ({ menu, kind: 'PLATFORM' })),
@@ -57,7 +61,7 @@ const metrics = computed(() => [
             <el-table-column label="执行范围" width="132"><template #default="{ row }"><ScopeTag :kind="row.executionScope" :factory-id="row.factoryId" /></template></el-table-column>
             <el-table-column label="耗时" width="110" align="right"><template #default="{ row }"><MetricValue :value="row.costTime" unit="ms" latency /></template></el-table-column>
             <el-table-column label="结果" width="82"><template #default="{ row }"><StatusTag v-bind="operationStatus(row.status)" /></template></el-table-column>
-            <el-table-column label="操作日期" width="170"><template #default="{ row }"><span class="data-datetime">{{ parseTime(row.operTime) }}</span></template></el-table-column>
+            <el-table-column label="操作日期" width="180"><template #default="{ row }"><DateTimeText :value="row.operTime" /></template></el-table-column>
           </el-table>
           <div v-if="operations.state === 'ready'" class="console-footer">共 {{ operations.value?.total }} 条记录 · 查看完整日志可筛选与追踪</div>
         </div>
@@ -70,7 +74,7 @@ const metrics = computed(() => [
           <div v-else-if="jobs.state === 'error'" class="snapshot-error" role="alert"><StatusTag label="读取失败" tone="error" /><p>{{ jobs.error }}</p></div>
           <p v-else-if="jobs.state === 'forbidden'" class="console-empty">当前账号未授权查看调度任务</p>
           <div v-else-if="!jobs.value?.rows.length" class="schedule-empty"><el-icon><Timer /></el-icon><strong>暂无调度任务</strong><p>当前没有已配置的 Quartz 任务</p></div>
-          <ul v-else class="schedule-list"><li v-for="job in jobs.value.rows" :key="job.jobId"><div><strong>{{ job.jobName }}</strong><StatusTag :label="job.status === '0' ? '启用' : job.status === '1' ? '暂停' : job.status" /></div><p><CodeText :value="job.jobId" /><ScopeTag :kind="job.executionScope" :factory-id="job.factoryId" /></p><span class="data-datetime">下次计划：{{ job.nextValidTime || '未提供' }}</span></li></ul>
+          <ul v-else class="schedule-list"><li v-for="job in jobs.value.rows" :key="job.jobId"><div><strong>{{ job.jobName }}</strong><StatusTag :label="job.status === '0' ? '启用' : job.status === '1' ? '暂停' : job.status" /></div><p><CodeText :value="job.jobId" /><ScopeTag :kind="job.executionScope" :factory-id="job.factoryId" /></p><span class="data-datetime">下次计划：<DateTimeText :value="job.nextValidTime" /></span></li></ul>
           <footer class="console-footer">最多显示 5 项配置；启用状态不表示正在执行</footer>
         </div>
       </section>

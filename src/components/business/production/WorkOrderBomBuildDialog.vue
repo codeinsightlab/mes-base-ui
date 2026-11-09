@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import DateTimeText from '@/components/DateTimeText.vue'
 import MaterialSelect from '@/components/business/MaterialSelect.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
@@ -25,10 +26,21 @@ let restoring = false
 const pendingKey = () => pendingBomBuildKey(auth.userId, auth.factoryId)
 
 function reset() {
-  generation++; productId.value = ''; bomId.value = ''; plannedQty.value = '1'; quantityValid.value = false
-  versions.value = []; rules.value = []; preview.value = null; choices.value = {}; error.value = ''; busy.value = false
-  requestId.value = ''; retryConfirmation.value = null
+  generation++
+  productId.value = ''
+  bomId.value = ''
+  plannedQty.value = '1'
+  quantityValid.value = false
+  versions.value = []
+  rules.value = []
+  preview.value = null
+  choices.value = {}
+  error.value = ''
+  busy.value = false
+  requestId.value = ''
+  retryConfirmation.value = null
 }
+
 async function loadVersions(value: string) {
   if (!value || !auth.factoryId || auth.factorySwitching) return
   const current = ++generation
@@ -44,7 +56,7 @@ async function loadVersions(value: string) {
       if (!page.items.some(row => row.id === defaultVersion.id)) versions.value = [...page.items, defaultVersion]
       if (!bomId.value) bomId.value = defaultVersion.id
     }
-  } catch(reason) {
+  } catch (reason) {
     if (current === generation) error.value = reason instanceof Error ? reason.message : '读取已发布BOM版本失败'
   } finally {
     if (current === generation) loadingVersions.value = false
@@ -72,15 +84,21 @@ function restorePending() {
     ruleCode: choice.ruleCode || '', routingId: choice.routingId || '',
     plannedStartAt: choice.plannedStartAt, plannedEndAt: choice.plannedEndAt, remark: choice.remark || ''
   }]))
-  void nextTick().then(() => { restoring = false })
+  void nextTick().then(() => {
+    restoring = false
+  })
   error.value = '已恢复未确认结果的原请求；重试将使用相同请求键和完整内容'
 }
+
 watch(() => props.modelValue, async visible => {
-  if (!visible) { reset(); return }
+  if (!visible) {
+    reset()
+    return
+  }
   restorePending()
   try {
     rules.value = await api.numberingRules()
-  } catch(reason) {
+  } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '读取工单编码规则失败'
   }
 })
@@ -92,23 +110,38 @@ watch(() => [auth.userId, auth.factoryId, auth.revision], () => {
 }, { flush: 'sync' })
 watch(productId, async value => {
   if (restoring) return
-  bomId.value = ''; versions.value = []; preview.value = null; choices.value = {}; error.value = ''
-  requestId.value = ''; retryConfirmation.value = null
+  bomId.value = ''
+  versions.value = []
+  preview.value = null
+  choices.value = {}
+  error.value = ''
+  requestId.value = ''
+  retryConfirmation.value = null
   if (!value) return
   await loadVersions(value)
 })
-watch(bomId, () => { if (!restoring) { preview.value = null; choices.value = {} } })
+watch(bomId, () => {
+  if (!restoring) {
+    preview.value = null
+    choices.value = {}
+  }
+})
 watch(() => [productId.value, bomId.value, plannedQty.value], () => {
   if (busy.value || restoring) return
-  preview.value = null; choices.value = {}; requestId.value = ''; retryConfirmation.value = null
+  preview.value = null
+  choices.value = {}
+  requestId.value = ''
+  retryConfirmation.value = null
 })
 
 async function makePreview() {
   if (storageBlocked.value || retryConfirmation.value) return
   if (!productId.value || !bomId.value || !quantityValid.value || !positiveQuantity(source.value.plannedQty)) {
-    error.value = '请选择产品和已发布BOM版本，并填写有效计划数量'; return
+    error.value = '请选择产品和已发布BOM版本，并填写有效计划数量'
+    return
   }
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   try {
     const result = await api.bomBuildPreview(source.value)
     preview.value = result
@@ -118,7 +151,7 @@ async function makePreview() {
       ruleCode: order.defaultRuleCode || '', routingId: order.routingId || '', plannedStartAt: null, plannedEndAt: null, remark: ''
     }]))
     if (!result.complete) error.value = '展阶包含校验错误，请先处理下方问题后再提交'
-  } catch(reason) {
+  } catch (reason) {
     error.value = reason instanceof Error ? reason.message : 'BOM展阶预览失败'
     preview.value = null
   } finally {
@@ -131,6 +164,7 @@ function validChoice(order: BomBuildOrder) {
   return !!choice?.ruleCode && rules.value.some(rule => rule.ruleCode === choice.ruleCode)
     && (!order.routings.length || order.routings.some(route => route.id === choice.routingId))
 }
+
 const canConfirm = computed(() => {
   if (retryConfirmation.value) return true
   return !!preview.value?.complete && preview.value.orders.length > 0
@@ -139,10 +173,14 @@ const canConfirm = computed(() => {
 
 async function confirm() {
   if ((!preview.value && !retryConfirmation.value) || !canConfirm.value || busy.value) return
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   if (!retryConfirmation.value) {
     const currentPreview = preview.value
-    if (!currentPreview) { busy.value = false; return }
+    if (!currentPreview) {
+      busy.value = false
+      return
+    }
     const submittedChoices: BomBuildChoice[] = currentPreview.orders.map(order => {
       const choice = choices.value[order.path]!
       return { ...choice, path: order.path, routingId: choice.routingId || null }
@@ -159,8 +197,9 @@ async function confirm() {
       (savedSource, confirmation) => api.bomBuildConfirm(savedSource, confirmation))
     ElMessage.success(`已创建 ${result.orders.length} 张工单：${result.orders.map(item => item.workorder.workorder.code).join('、')}`)
     retryConfirmation.value = null
-    emit('update:modelValue', false); emit('completed')
-  } catch(reason) {
+    emit('update:modelValue', false)
+    emit('completed')
+  } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '批量创建失败'
   } finally {
     busy.value = false
@@ -174,7 +213,11 @@ async function startNewAfterUnknown() {
     const pending = restorePendingBomBuild(window.localStorage, pendingKey()).pending
     if (pending?.confirmation.requestId === retryConfirmation.value.confirmation.requestId)
       window.localStorage.removeItem(pendingKey())
-    retryConfirmation.value = null; preview.value = null; choices.value = {}; requestId.value = ''; error.value = ''
+    retryConfirmation.value = null
+    preview.value = null
+    choices.value = {}
+    requestId.value = ''
+    error.value = ''
   } catch { /* The original request remains available for retry. */ }
 }
 </script>
@@ -200,8 +243,8 @@ async function startNewAfterUnknown() {
           <el-table-column prop="path" label="BOM路径" />
           <el-table-column prop="ruleCode" label="工单编码规则" />
           <el-table-column prop="routingId" label="工艺ID" />
-          <el-table-column prop="plannedStartAt" label="计划开始"><template #default="{row}">{{ row.plannedStartAt?.slice(0,10) || '—' }}</template></el-table-column>
-          <el-table-column prop="plannedEndAt" label="计划结束"><template #default="{row}">{{ row.plannedEndAt?.slice(0,10) || '—' }}</template></el-table-column>
+          <el-table-column prop="plannedStartAt" label="计划开始"><template #default="{ row }"><DateTimeText :value="row.plannedStartAt" /></template></el-table-column>
+          <el-table-column prop="plannedEndAt" label="计划结束"><template #default="{ row }"><DateTimeText :value="row.plannedEndAt" /></template></el-table-column>
           <el-table-column prop="remark" label="备注" />
         </el-table>
       </div>

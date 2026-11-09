@@ -35,7 +35,7 @@ defineExpose({ reload: load, loading })
         <el-table-column label="待收尾差额" min-width="160" align="right"><template #default="{ row }"><QuantityText :value="row.pendingCompletionQty" /><div class="secondary">合格品缺口：<QuantityText :value="row.goodOutputGapQty" /></div></template></el-table-column>
         <el-table-column label="入库收尾达成率" min-width="200"><template #default="{ row }"><template v-if="row.completionPercent != null"><MetricValue :value="row.completionPercent" unit="%" /><span v-if="Number(row.completionPercent) > 100" class="secondary"> · 超计划</span><el-progress :percentage="bar(row.completionPercent)" :show-text="false" :stroke-width="6" /></template><span v-else>{{ row.issue || '无法计算' }}</span></template></el-table-column>
         <el-table-column label="工单创建时间" min-width="180"><template #default="{ row }">{{ parseTime(row.createTime) || '—' }}</template></el-table-column>
-        <el-table-column label="最近完全入库" min-width="170"><template #default="{ row }">{{ parseTime(row.lastCompletedAt) || '尚无完全入库记录' }}</template></el-table-column>
+        <el-table-column label="最近完全入库" min-width="180"><template #default="{ row }">{{ parseTime(row.lastCompletedAt) || '尚无完全入库记录' }}</template></el-table-column>
         <el-table-column label="操作" width="110" fixed="right"><template #default="{ row }"><RouterLink v-if="auth.hasPermission('business:mes:production:execution:list', 'factory')" :to="{ path: '/production/mesProductionExecution', query: { workorderId: row.id } }">查看执行</RouterLink></template></el-table-column>
       </el-table>
       <Pagination v-model:page="page" v-model:limit="limit" :total="result.value?.total || 0" :page-sizes="[5, 10, 20, 50]" :auto-scroll="false" @pagination="paginate" />

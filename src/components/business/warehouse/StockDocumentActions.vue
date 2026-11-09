@@ -5,6 +5,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
 import { useClosureCommand } from '@/composables/useClosureCommand'
+import { formatDateTime } from '@/lib/dateTime'
 import { stockDocuments, stockDocumentPermission as p, stockDocumentPurpose, type MaterialIssueBasis, type ProductionInputBasis, type ApprovalIntent, type CancellationIntent, type CancellationBasis, type ProductionBasis } from '@/api/wm/stockDocuments'
 
 const ElMessageBox = usePageMessageBox()
@@ -190,7 +191,7 @@ onBeforeUnmount(clear)
       <p v-if="inputBasis?.workorderCode">工单：{{ inputBasis.workorderCode }}；确认投入：<QuantityText :value="inputBasis.outputQty" />；领料明细见下表。</p>
       <p v-if="materialIssueBasis">确认投入：<QuantityText :value="materialIssueBasis.outputQty" />；扫码内容：{{ materialIssueBasis.code }}</p>
       <p v-if="inputBasis?.batchNo">材料批次：{{ inputBasis.batchNo }}</p>
-      <p v-if="inputBasis?.confirmedAt">投入确认时间：{{ inputBasis.confirmedAt }}</p>
+      <p v-if="inputBasis?.confirmedAt">投入确认时间：{{ formatDateTime(inputBasis.confirmedAt) }}</p>
       <p v-if="inputBasis?.stockApplied != null">生产投入库存效力：{{ inputBasis.stockApplied ? '有效' : row.status==='REVERSED' ? '已撤回' : '未生效' }}</p>
       <p v-if="inputBasis?.pathError" role="alert">{{ inputBasis.pathError }}</p>
       <p v-if="row.sourceDeclarationId">由质量处置生成。</p>

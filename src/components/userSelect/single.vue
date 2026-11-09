@@ -28,13 +28,13 @@
       <!--用户数据-->
       <el-col :span="20" :xs="24">
         <QueryForm
-          @submit="handleQuery"
           v-show="showSearch"
           ref="queryForm"
           :model="queryParams"
           size="small"
           :inline="true"
           label-width="68px"
+          @submit="handleQuery"
         >
           <el-form-item label="用户名称" prop="userName">
             <el-input
@@ -109,7 +109,7 @@
               />
             </template>
           </el-table-column>
-          <el-table-column v-if="columns[6].visible" label="创建时间" align="center" prop="createTime" width="160">
+          <el-table-column v-if="columns[6].visible" label="创建时间" align="center" prop="createTime" width="180">
             <template #default="scope">
               <span>{{ parseTime(scope.row.createTime) }}</span>
             </template>
@@ -142,8 +142,8 @@ import { listUser } from '@/api/system/user'
 import { treeselect } from '@/api/system/dept'
 
 export default {
-  components: { PageDialog, QueryForm },
   name: 'UserSingleSelect',
+  components: { PageDialog, QueryForm },
   emits: ['onSelected'],
   dicts: ['sys_normal_disable', 'sys_user_sex'],
   data() {

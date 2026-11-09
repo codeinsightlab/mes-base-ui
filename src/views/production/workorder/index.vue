@@ -7,6 +7,7 @@ import PageDrawer from '@/components/page/PageDrawer.vue'
 import QueryForm from '@/components/QueryForm.vue'
 
 import QuantityText from '@/components/business/production/QuantityText.vue'
+import DateTimeText from '@/components/DateTimeText.vue'
 import QuantityInput from '@/components/business/material/QuantityInput.vue'
 import { normalizedQuantityInput, positiveQuantity } from '@/lib/production/quantityRules'
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
@@ -387,7 +388,7 @@ onMounted(load)
       <el-table-column label="执行目标合计" width="120" align="right"><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.allocatedTargetQty)">{{ formatQuantity(row.allocation.allocatedTargetQty) }}</span></template></el-table-column>
       <el-table-column label="未分配执行数量" width="145" align="right"><template #header><el-tooltip content="未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量。"><span>未分配执行数量 ⓘ</span></el-tooltip></template><template #default="{row}"><span class="workorder-quantity" :title="String(row.allocation.remainingTargetQty)">{{ formatQuantity(row.allocation.remainingTargetQty) }}</span></template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="{row}"><StatusTag v-bind="orderState(row.workorder.status)" /></template></el-table-column>
-      <el-table-column label="创建时间" width="190" show-overflow-tooltip><template #default="{row}">{{ row.workorder.createTime || '—' }}</template></el-table-column>
+      <el-table-column label="创建时间" width="190" show-overflow-tooltip><template #default="{row}"><DateTimeText :value="row.workorder.createTime" /></template></el-table-column>
       <el-table-column label="操作" fixed="right" width="300"><template #default="{row}">
         <div class="workorder-actions">
           <el-button v-if="can('query')" link type="primary" @click="open(row.workorder.id)">详情 / 执行</el-button>
@@ -416,8 +417,8 @@ onMounted(load)
         <el-form-item label="计划数量" required><QuantityInput v-model="form.plannedQty" required positive :unchanged-value="editId && form.productId === originalProductId ? originalPlannedQty : null" :material-id="form.productId" :disabled="busy" @validity="plannedQuantityValid = $event" /></el-form-item>
         <el-form-item label="默认工艺" :required="hasPublishedRoutes !== false"><SearchSelect v-model="form.routingId" :disabled="!form.productId" :options="routeSearch.items.value" :selected-option="selectedRoute" :loading="routesLoading" :error="routeSearch.error.value" :placeholder="form.productId ? '搜索该物料适用的已发布工艺' : '请先选择产出物料'" @search="routeSearch.scheduleSearch" @open="routeSearch.open" @retry="routeSearch.retry" /></el-form-item>
         <p v-if="hasPublishedRoutes === false" class="help-block">当前产品无已发布适用工艺，领料后直接办理成品入库，无需报工。</p>
-        <el-form-item label="计划开始"><el-date-picker v-model="form.plannedStartAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
-        <el-form-item label="计划结束"><el-date-picker v-model="form.plannedEndAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
+        <el-form-item label="计划开始"><el-date-picker v-model="form.plannedStartAt" type="datetime" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
+        <el-form-item label="计划结束"><el-date-picker v-model="form.plannedEndAt" type="datetime" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DDTHH:mm:ss" /></el-form-item>
         <el-form-item label="外部标识"><el-input v-model="form.externalId" maxlength="128" readonly /></el-form-item>
         <el-form-item label="外部单号"><el-input v-model="form.externalCode" maxlength="128" readonly /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" maxlength="500" /></el-form-item>

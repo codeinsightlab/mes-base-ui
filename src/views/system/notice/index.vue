@@ -2,7 +2,7 @@
   <div class="app-container">
     <PageHeader section="MES BASE / SYSTEM" title="通知公告" description="公告内容与发布状态" />
     <el-alert v-if="queryError" :title="queryError" type="error" :closable="false" show-icon class="mb8"><el-button size="small" @click="getList">重试</el-button></el-alert>
-    <QueryForm @submit="handleQuery" v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px">
+    <QueryForm v-show="showSearch" ref="queryForm" class="filter-panel" :model="queryParams" size="small" :inline="true" label-width="68px" @submit="handleQuery">
       <el-form-item label="公告标题" prop="noticeTitle">
         <el-input
           v-model="queryParams.noticeTitle"
@@ -89,9 +89,9 @@
         </template>
       </el-table-column>
       <el-table-column label="创建者" align="center" prop="createBy" width="100" />
-      <el-table-column label="创建时间" align="center" prop="createTime" width="120">
+      <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
+          <span>{{ parseTime(scope.row.createTime) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" min-width="150" fixed="right" class-name="small-padding fixed-width">
@@ -178,8 +178,8 @@ import { sourceList } from '@/utils/sourceList'
 import { listNotice, getNotice, delNotice, addNotice, updateNotice } from '@/api/system/notice'
 
 export default {
-  components: { PageDialog, QueryForm },
   name: 'Notice',
+  components: { PageDialog, QueryForm },
   dicts: ['sys_notice_status', 'sys_notice_type'],
   data() {
     return {

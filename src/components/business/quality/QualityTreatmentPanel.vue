@@ -44,91 +44,245 @@ const dirty = computed(() => actionOpen.value && !!originalForm.value && snapsho
 watch(() => pending.value != null && pending.value.kind !== 'retired-return' || busy.value, v => emit('pending', v), { flush: 'sync' })
 watch(dirty, v => emit('dirty', v), { flush: 'sync' })
 const relatedOptions = computed(() => props.candidates.filter(d => d.declarationId !== props.declarationId && d.executionCode === view.value?.executionCode && !['UNVERIFIED', 'UNRESOLVED'].includes(d.processingState) && d.recordAction !== 'VOID'))
+
 function assessmentAttributionLabel(value: string | null | undefined) {
   if (value === 'INDEPENDENT') return '确认为独立申报'
   if (value === 'OVERLAP') return '确认为重复申报'
   if (!value) return '归属待确认'
   return `归属待确认（${value}）`
 }
+
 let generation = 0, attempt = 0, uncertain = false, initialOpened = false
 const pendingKey = () => `mes-quality-action:${auth.username}:${auth.factoryId}:${props.declarationId}`
-function resetForm() { Object.assign(form, { quantity: '', warehouseId: null, reason: '' }); attribution.value = 'INDEPENDENT'; related.value = null; basis.value = ''; formError.value = '' }
-function clear() { generation++; eventAttempt++;events.value = [];eventTotal.value = 0;eventPage.value = 1;eventLoading.value = false;eventError.value = ''; attempt++; view.value = null; error.value = ''; pending.value = null; busy.value = loading.value = false; actionOpen.value = false; recoveryBlocked.value = false; restoreError.value = ''; uncertain = false; initialOpened = false; originalForm.value = ''; resetForm() }
+
+function resetForm() {
+  Object.assign(form, { quantity: '', warehouseId: null, reason: '' })
+  attribution.value = 'INDEPENDENT'
+  related.value = null
+  basis.value = ''
+  formError.value = ''
+}
+
+function clear() {
+  generation++
+  eventAttempt++
+  events.value = []
+  eventTotal.value = 0
+  eventPage.value = 1
+  eventLoading.value = false
+  eventError.value = ''
+  attempt++
+  view.value = null
+  error.value = ''
+  pending.value = null
+  busy.value = loading.value = false
+  actionOpen.value = false
+  recoveryBlocked.value = false
+  restoreError.value = ''
+  uncertain = false
+  initialOpened = false
+  originalForm.value = ''
+  resetForm()
+}
+
 function restore() {
   try {
-    const raw = sessionStorage.getItem(pendingKey()); if (!raw) return
+    const raw = sessionStorage.getItem(pendingKey())
+    if (!raw) return
     const saved = JSON.parse(raw) as { kind: string;command: { requestId: string;expectedRevision: number;destination?: string;quantity?: string;warehouseId?: string;assessment?: { type: string }}}
     if (!saved || !['assess', 'dispose'].includes(saved.kind) || typeof saved.command?.requestId !== 'string' || !Number.isInteger(saved.command.expectedRevision)) throw new Error('请求格式不完整')
-    if (saved.kind === 'dispose' && saved.command.destination === 'RETURN_NODE') { pending.value = { kind: 'retired-return', command: { requestId: saved.command.requestId }}; uncertain = true; return }
+    if (saved.kind === 'dispose' && saved.command.destination === 'RETURN_NODE') {
+      pending.value = { kind: 'retired-return', command: { requestId: saved.command.requestId }}
+      uncertain = true
+      return
+    }
     if (saved.kind === 'dispose' && (saved.command.destination !== 'WAREHOUSE' || typeof saved.command.quantity !== 'string' || typeof saved.command.warehouseId !== 'string') || saved.kind === 'assess' && (!saved.command.assessment || !['INDEPENDENT', 'OVERLAP'].includes(saved.command.assessment.type))) throw new Error('请求内容不完整')
-    pending.value = saved as Pending; uncertain = true; actionKind.value = saved.kind as 'assess' | 'dispose'; actionOpen.value = true
-  } catch { recoveryBlocked.value = true; restoreError.value = '待确认请求无法读取，请保留会话并联系管理员核对，避免重复处理。' }
+    pending.value = saved as Pending
+    uncertain = true
+    actionKind.value = saved.kind as 'assess' | 'dispose'
+    actionOpen.value = true
+  } catch {
+    recoveryBlocked.value = true
+    restoreError.value = '待确认请求无法读取，请保留会话并联系管理员核对，避免重复处理。'
+  }
 }
+
 async function load() {
-  const scope = generation, ticket = ++attempt; if (!allowed.value) return
-  loading.value = true; error.value = ''; view.value = null
+  const scope = generation, ticket = ++attempt
+  if (!allowed.value) return
+  loading.value = true
+  error.value = ''
+  view.value = null
   try {
-    const data = await api.details(props.declarationId); if (scope !== generation || ticket !== attempt) return
+    const data = await api.details(props.declarationId)
+    if (scope !== generation || ticket !== attempt) return
     view.value = data
 
-  } catch(e) { if (scope === generation && ticket === attempt)error.value = e instanceof Error ? e.message : '不良详情读取失败' } finally { if (scope === generation && ticket === attempt)loading.value = false }
-  if (scope === generation && ticket === attempt && !initialOpened && props.initialAction && !pending.value && ((props.initialAction === 'assess' && canAssess.value) || (props.initialAction === 'dispose' && canTreat.value))) { initialOpened = true; openAction(props.initialAction) }
+  } catch (e) {
+    if (scope === generation && ticket === attempt)error.value = e instanceof Error ? e.message : '不良详情读取失败'
+  } finally {
+    if (scope === generation && ticket === attempt)loading.value = false
+  }
+  if (scope === generation && ticket === attempt && !initialOpened && props.initialAction && !pending.value && ((props.initialAction === 'assess' && canAssess.value) || (props.initialAction === 'dispose' && canTreat.value))) {
+    initialOpened = true
+    openAction(props.initialAction)
+  }
 }
+
 async function loadEvents() {
   const scope = generation, ticket = ++eventAttempt
   if (!allowed.value) return
-  eventLoading.value = true;eventError.value = ''
-  try { const page = await api.history(props.declarationId, (eventPage.value - 1) * 20, 20);if (scope !== generation || ticket !== eventAttempt) return;events.value = page.items;eventTotal.value = page.total } catch(e) { if (scope === generation && ticket === eventAttempt) { events.value = [];eventTotal.value = 0;eventError.value = e instanceof Error ? e.message : '处理记录读取失败' } } finally { if (scope === generation && ticket === eventAttempt)eventLoading.value = false }
+  eventLoading.value = true
+  eventError.value = ''
+  try {
+    const page = await api.history(props.declarationId, (eventPage.value - 1) * 20, 20)
+    if (scope !== generation || ticket !== eventAttempt) return
+    events.value = page.items
+    eventTotal.value = page.total
+  } catch (e) {
+    if (scope === generation && ticket === eventAttempt) {
+      events.value = []
+      eventTotal.value = 0
+      eventError.value = e instanceof Error ? e.message : '处理记录读取失败'
+    }
+  } finally {
+    if (scope === generation && ticket === eventAttempt)eventLoading.value = false
+  }
 }
+
 async function checkPending() {
   const intent = pending.value
   if (!intent || intent.kind === 'retired-return' || busy.value || !auth.hasPermission('business:quality:defect:revise', 'factory')) return
-  const scope = generation, key = pendingKey();busy.value = true;formError.value = ''
+  const scope = generation, key = pendingKey()
+  busy.value = true
+  formError.value = ''
   try {
     await api.check(props.declarationId, intent.kind === 'assess' ? { kind: 'assess', assessment: intent.command } : { kind: 'dispose', disposition: intent.command })
     if (scope !== generation) return
-    sessionStorage.removeItem(key);pending.value = null;uncertain = false;actionOpen.value = false;resetForm();emit('changed');void load();void loadEvents()
-  } catch(e) { if (scope === generation)formError.value = e instanceof ApiError && e.status === 404 ? '尚未查到原请求；这不能证明此前未提交，请保留原请求核对。' : e instanceof Error ? e.message : '原请求核对失败，原请求仍保留' } finally { if (scope === generation)busy.value = false }
+    sessionStorage.removeItem(key)
+    pending.value = null
+    uncertain = false
+    actionOpen.value = false
+    resetForm()
+    emit('changed')
+    void load()
+    void loadEvents()
+  } catch (e) {
+    if (scope === generation)formError.value = e instanceof ApiError && e.status === 404 ? '尚未查到原请求；这不能证明此前未提交，请保留原请求核对。' : e instanceof Error ? e.message : '原请求核对失败，原请求仍保留'
+  } finally {
+    if (scope === generation)busy.value = false
+  }
 }
-watch(() => [props.declarationId, auth.userId, auth.token, auth.factoryId, auth.revision, allowed.value, auth.hasPermission('business:quality:defect:revise', 'factory')], () => { clear();if (allowed.value) { if (auth.hasPermission('business:quality:defect:revise', 'factory'))restore();void load();void loadEvents() } }, { immediate: true, flush: 'sync' })
-onBeforeUnmount(() => { clear();emit('dirty', false);emit('pending', false) })
+
+watch(() => [props.declarationId, auth.userId, auth.token, auth.factoryId, auth.revision, allowed.value, auth.hasPermission('business:quality:defect:revise', 'factory')], () => {
+  clear()
+  if (allowed.value) {
+    if (auth.hasPermission('business:quality:defect:revise', 'factory'))restore()
+    void load()
+    void loadEvents()
+  }
+}, { immediate: true, flush: 'sync' })
+onBeforeUnmount(() => {
+  clear()
+  emit('dirty', false)
+  emit('pending', false)
+})
+
 function openAction(kind:'assess' | 'dispose') {
   if (recoveryBlocked.value || pending.value || (kind === 'assess' ? !canAssess.value : !canTreat.value)) return
-  resetForm();actionKind.value = kind;actionOpen.value = true
+  resetForm()
+  actionKind.value = kind
+  actionOpen.value = true
   if (kind === 'dispose' && view.value?.pendingDispositionQty != null)form.quantity = normalizeQuantity(view.value.pendingDispositionQty)
   originalForm.value = snapshot()
 }
+
 async function closeAction(done?:() => void) {
   if (busy.value) return
-  if (pending.value) { formError.value = '请求结果尚未确认，请使用原请求核对结果。';return }
-  if (dirty.value) { try { await ElMessageBox.confirm('是否放弃尚未提交的处理内容？', '关闭确认', { type: 'warning' }) } catch { return } }
-  actionOpen.value = false;resetForm();done?.()
+  if (pending.value) {
+    formError.value = '请求结果尚未确认，请使用原请求核对结果。'
+    return
+  }
+  if (dirty.value) {
+    try {
+      await ElMessageBox.confirm('是否放弃尚未提交的处理内容？', '关闭确认', { type: 'warning' })
+    } catch {
+      return
+    }
+  }
+  actionOpen.value = false
+  resetForm()
+  done?.()
 }
+
 async function submit() {
-  if (pending.value?.kind === 'retired-return') { formError.value = '原返工请求仅可查询历史记录，不再发送';return }
+  if (pending.value?.kind === 'retired-return') {
+    formError.value = '原返工请求仅可查询历史记录，不再发送'
+    return
+  }
   if (!auth.hasPermission('business:quality:defect:revise', 'factory') || busy.value || recoveryBlocked.value || !pending.value && (!view.value || !writable.value)) return
   if (!pending.value) {
-    if (!form.reason.trim()) { formError.value = '请填写处理说明';return }
+    if (!form.reason.trim()) {
+      formError.value = '请填写处理说明'
+      return
+    }
     if (actionKind.value === 'assess') {
-      if (!canAssess.value || !basis.value.trim() || attribution.value === 'OVERLAP' && !related.value) { formError.value = '请完整填写核实结论和说明';return }
+      if (!canAssess.value || !basis.value.trim() || attribution.value === 'OVERLAP' && !related.value) {
+        formError.value = '请完整填写核实结论和说明'
+        return
+      }
       pending.value = { kind: 'assess', command: { requestId: crypto.randomUUID(), expectedRevision: view.value!.revision, reason: form.reason.trim(), assessment: { type: attribution.value, relatedDeclarationId: attribution.value === 'OVERLAP' ? related.value : null, basis: basis.value.trim() }}}
     } else {
       if (!canTreat.value) return
-      if (!quantityValid.value || !positiveQuantity(normalizedQuantityInput(form.quantity))) { formError.value = '请输入符合单位规则的正数量，或完整处理原待入仓余量';return }
-      if (view.value!.pendingDispositionQty == null) { formError.value = '处置数量待确认，暂不能提交处理';return }
-      if (exceedsQuantity(form.quantity, view.value!.pendingDispositionQty)) { formError.value = '处理数量不能超过待处理数量';return }
-      if (!form.warehouseId) { formError.value = '请选择接收仓库';return }
+      if (!quantityValid.value || !positiveQuantity(normalizedQuantityInput(form.quantity))) {
+        formError.value = '请输入符合单位规则的正数量，或完整处理原待入仓余量'
+        return
+      }
+      if (view.value!.pendingDispositionQty == null) {
+        formError.value = '处置数量待确认，暂不能提交处理'
+        return
+      }
+      if (exceedsQuantity(form.quantity, view.value!.pendingDispositionQty)) {
+        formError.value = '处理数量不能超过待处理数量'
+        return
+      }
+      if (!form.warehouseId) {
+        formError.value = '请选择接收仓库'
+        return
+      }
       pending.value = { kind: 'dispose', command: { requestId: crypto.randomUUID(), expectedRevision: view.value!.revision, destination: 'WAREHOUSE', quantity: normalizedQuantityInput(form.quantity), warehouseId: form.warehouseId, reason: form.reason.trim() }}
     }
   }
   const storageKey = pendingKey(), scope = generation
-  try { sessionStorage.setItem(storageKey, JSON.stringify(pending.value)) } catch { formError.value = '无法保存本次请求，尚未发送。请恢复会话存储后重试。';return }
-  busy.value = true;formError.value = ''
+  try {
+    sessionStorage.setItem(storageKey, JSON.stringify(pending.value))
+  } catch {
+    formError.value = '无法保存本次请求，尚未发送。请恢复会话存储后重试。'
+    return
+  }
+  busy.value = true
+  formError.value = ''
   try {
     const result = pending.value.kind === 'assess' ? await api.assess(props.declarationId, pending.value.command) : await api.dispose(props.declarationId, pending.value.command)
-    sessionStorage.removeItem(storageKey);if (scope !== generation) return
-    view.value = result;pending.value = null;uncertain = false;actionOpen.value = false;resetForm();emit('changed');void loadEvents()
-  } catch(e) { if (scope !== generation) return;formError.value = e instanceof Error ? e.message : '处理结果待确认';if (e instanceof ApiError && e.status >= 400 && e.status < 500 && !uncertain) { sessionStorage.removeItem(storageKey);pending.value = null } else uncertain = true } finally { if (scope === generation)busy.value = false }
+    sessionStorage.removeItem(storageKey)
+    if (scope !== generation) return
+    view.value = result
+    pending.value = null
+    uncertain = false
+    actionOpen.value = false
+    resetForm()
+    emit('changed')
+    void loadEvents()
+  } catch (e) {
+    if (scope !== generation) return
+    formError.value = e instanceof Error ? e.message : '处理结果待确认'
+    if (e instanceof ApiError && e.status >= 400 && e.status < 500 && !uncertain) {
+      sessionStorage.removeItem(storageKey)
+      pending.value = null
+    } else uncertain = true
+  } finally {
+    if (scope === generation)busy.value = false
+  }
 }
 </script>
 <template>

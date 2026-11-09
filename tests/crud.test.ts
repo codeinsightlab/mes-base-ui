@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { commandFromDraft, formatValue } from '../src/lib/crud'
 describe('CRUD display and input contracts', () => {
-  it('formats precision without floating-point conversion', () => { expect(formatValue('123456789012345678.1234', 'decimal')).toBe('123,456,789,012,345,678.1234');expect(formatValue(null, 'decimal')).toBe('—') })
-  it('does not invent timestamp zone or unknown state meaning', () => { expect(formatValue('2026-10-05T10:00:00', 'datetime')).toBe('2026-10-05 10:00:00');expect(formatValue(7, 'number')).toBe('7') })
-  it('whitelists fields and excludes factory, owner, hidden conditional fields', () => { const fields = [{ key: 'factoryId', label: 'Factory', kind: 'text', readonly: true }, { key: 'name', label: '名称', kind: 'text' }, { key: 'id', label: 'ID', kind: 'text' }, { key: 'factoryChoice', label: 'Scope', kind: 'text', showWhen: { key: 'kind', value: 'FACTORY' }}] as const;expect(commandFromDraft([...fields], { id: '1', name: 'hello', factoryId: 'A', userId: 'forged', factoryChoice: 'A', kind: 'PLATFORM' }, true, 'id')).toEqual({ name: 'hello' }) })
+  it('formats precision without floating-point conversion', () => {
+    expect(formatValue('123456789012345678.1234', 'decimal')).toBe('123,456,789,012,345,678.1234')
+    expect(formatValue(null, 'decimal')).toBe('—')
+  })
+  it('formats datetime fields to seconds and preserves unknown state meaning', () => {
+    expect(formatValue('2026-10-05T10:00:00.987', 'datetime')).toBe('2026-10-05 10:00:00')
+    expect(formatValue(7, 'number')).toBe('7')
+  })
+  it('whitelists fields and excludes factory, owner, hidden conditional fields', () => {
+    const fields = [{ key: 'factoryId', label: 'Factory', kind: 'text', readonly: true }, { key: 'name', label: '名称', kind: 'text' }, { key: 'id', label: 'ID', kind: 'text' }, { key: 'factoryChoice', label: 'Scope', kind: 'text', showWhen: { key: 'kind', value: 'FACTORY' }}] as const
+    expect(commandFromDraft([...fields], { id: '1', name: 'hello', factoryId: 'A', userId: 'forged', factoryChoice: 'A', kind: 'PLATFORM' }, true, 'id')).toEqual({ name: 'hello' })
+  })
 })

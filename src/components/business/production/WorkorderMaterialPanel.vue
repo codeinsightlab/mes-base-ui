@@ -9,6 +9,7 @@ import WorkorderMaterialEditor from './WorkorderMaterialEditor.vue'
 import { emptyMaterialDemand, materialDemandDraft, workorderMaterial, type WorkorderMaterial } from '@/api/production/workorderMaterial'
 import { usePageMessageBox } from '@/lib/pageMessageBox'
 import { useAuth } from '@/stores/auth'
+import { formatDateTime } from '@/lib/dateTime'
 const props = defineProps<{ workorderId: string; productId: string; plannedQty?: string; productCode?: string; productName?: string; readonly?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth(), messageBox = usePageMessageBox()
@@ -19,35 +20,79 @@ const showBomAnalysis = ref(false)
 const canRead = computed(() => !!auth.factoryId && !auth.factorySwitching && auth.hasPermission('workorder:query', 'factory'))
 const canWrite = computed(() => canRead.value && !props.readonly && auth.hasPermission('workorder:material:update', 'factory'))
 let generation = 0
-function clear() { generation++; data.value = null; form.value = emptyMaterialDemand(); error.value = ''; busy.value = false; editing.value = false; showBomAnalysis.value = false }
+
+function clear() {
+  generation++
+  data.value = null
+  form.value = emptyMaterialDemand()
+  error.value = ''
+  busy.value = false
+  editing.value = false
+  showBomAnalysis.value = false
+}
+
 async function load() {
   if (!canRead.value) return
-  const current = ++generation; busy.value = true; error.value = ''
-  try { const value = await workorderMaterial.get(props.workorderId); if (current === generation) data.value = value } catch(reason) { if (current === generation) error.value = reason instanceof Error ? reason.message : '工单用料读取失败' } finally { if (current === generation) busy.value = false }
+  const current = ++generation
+  busy.value = true
+  error.value = ''
+  try {
+    const value = await workorderMaterial.get(props.workorderId)
+    if (current === generation) data.value = value
+  } catch (reason) {
+    if (current === generation) error.value = reason instanceof Error ? reason.message : '工单用料读取失败'
+  } finally {
+    if (current === generation) busy.value = false
+  }
 }
+
 function edit() {
   if (!data.value || !canWrite.value || data.value.frozenAt) return
-  form.value = materialDemandDraft(data.value); editing.value = true
+  form.value = materialDemandDraft(data.value)
+  editing.value = true
 }
+
 async function closeEditor(done: () => void) {
-  try { await messageBox.confirm('关闭并放弃未保存的用料修改？', '关闭用料维护', { type: 'warning' }); editing.value = false; done() } catch { return }
+  try {
+    await messageBox.confirm('关闭并放弃未保存的用料修改？', '关闭用料维护', { type: 'warning' })
+    editing.value = false
+    done()
+  } catch {
+    return
+  }
 }
+
 async function save() {
   const current = generation
   if (!canWrite.value || busy.value || confirmingSave.value || data.value?.frozenAt || !editor.value) return
   confirmingSave.value = true
   let valid: boolean
-  try { valid = await editor.value.validateAndConfirm() } finally { confirmingSave.value = false }
+  try {
+    valid = await editor.value.validateAndConfirm()
+  } finally {
+    confirmingSave.value = false
+  }
   if (!valid) return
   if (current !== generation || !canWrite.value || !editing.value) return
-  busy.value = true; error.value = ''
+  busy.value = true
+  error.value = ''
   try {
     const value = await workorderMaterial.save(props.workorderId, form.value)
     if (current !== generation) return
-    data.value = value; editing.value = false; emit('changed')
-  } catch(reason) { if (current === generation) error.value = reason instanceof Error ? reason.message : '用料保存结果未知，请刷新核对' } finally { if (current === generation) busy.value = false }
+    data.value = value
+    editing.value = false
+    emit('changed')
+  } catch (reason) {
+    if (current === generation) error.value = reason instanceof Error ? reason.message : '用料保存结果未知，请刷新核对'
+  } finally {
+    if (current === generation) busy.value = false
+  }
 }
-watch(() => [props.workorderId, props.productId, auth.revision, auth.factoryId, auth.factoryPermissions.join('|'), canRead.value, canWrite.value], () => { clear(); void load() }, { immediate: true, flush: 'sync' })
+
+watch(() => [props.workorderId, props.productId, auth.revision, auth.factoryId, auth.factoryPermissions.join('|'), canRead.value, canWrite.value], () => {
+  clear()
+  void load()
+}, { immediate: true, flush: 'sync' })
 onBeforeUnmount(clear)
 </script>
 <template>
@@ -57,7 +102,7 @@ onBeforeUnmount(clear)
     <template v-if="data">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="BOM版本引用">{{ data.bomId || '尚未选择' }}</el-descriptions-item>
-        <el-descriptions-item label="用料依据">{{ data.frozenAt ? '已固定 · ' + data.frozenAt : '首次正式领料前可调整' }}</el-descriptions-item>
+        <el-descriptions-item label="用料依据">{{ data.frozenAt ? '已固定 · ' + formatDateTime(data.frozenAt) : '首次正式领料前可调整' }}</el-descriptions-item>
         <el-descriptions-item label="工作中心">{{ data.workCenter || '尚未设置' }}</el-descriptions-item>
         <el-descriptions-item label="允许领料仓库">{{ data.warehouseIds && data.warehouseIds !== '[]' ? data.warehouseIds : '不限仓库' }}</el-descriptions-item>
       </el-descriptions>

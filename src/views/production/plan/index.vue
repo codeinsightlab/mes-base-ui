@@ -91,12 +91,12 @@ function validate(items: Row[]) {
         </el-table-column>
         <el-table-column label="计划开始" min-width="190">
           <template #default="{ row }">
-            <el-date-picker v-model="row.plannedStartAt as any" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" :disabled="!writable" />
+            <el-date-picker v-model="row.plannedStartAt as any" type="datetime" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DDTHH:mm:ss" :disabled="!writable" />
           </template>
         </el-table-column>
         <el-table-column label="计划完成" min-width="190">
           <template #default="{ row }">
-            <el-date-picker v-model="row.plannedEndAt as any" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" :disabled="!writable" />
+            <el-date-picker v-model="row.plannedEndAt as any" type="datetime" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DDTHH:mm:ss" :disabled="!writable" />
           </template>
         </el-table-column>
         <el-table-column label="优先级" width="120" align="center">
