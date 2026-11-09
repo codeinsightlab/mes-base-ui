@@ -274,8 +274,8 @@ onBeforeUnmount(clear)
       <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
       <section v-loading="loading" class="panel document-header" aria-label="主单信息">
         <h2>{{ presentation === 'dialog' ? '基本信息' : '主单信息' }}</h2>
-        <slot name="header-fields" :draft="draft" :disabled="!writable || loading || saving">
-          <DocumentFields :fields="headerFields" :draft="draft" :disabled="!writable || loading || saving" @submit="save">
+        <slot name="header-fields" :draft="draft" :disabled="!writable || loading || saving" :mode="writable ? 'edit' : 'display'">
+          <DocumentFields :fields="headerFields" :draft="draft" :disabled="!writable || loading || saving" :mode="writable ? 'edit' : 'display'" @submit="save">
             <template v-for="(_, name) in $slots" #[name]="slotProps"><slot :name="name" v-bind="slotProps" /></template>
           </DocumentFields>
         </slot>

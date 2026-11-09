@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import QuantityInput from './QuantityInput.vue'
+import QuantityText from '../production/QuantityText.vue'
 import { readBomTree } from '@/api/basic/bomTree'
 import { bomRatio } from '@/lib/bomRatio'
 import BomTreeEditor from './BomTreeEditor.vue'
@@ -29,26 +30,61 @@ const canCreate = computed(() => auth.hasPermission('business:material:create', 
 const canCopy = computed(() => canCreate.value && auth.hasPermission('business:material:query', 'factory'))
 const headerApi:CrudApi = { ...bomApi,
   list: q => bomApi.list({ ...q, productId: String(props.material.id) }),
-  detail: async id => { const row = await bomApi.detail!(id);revision.value = String(row.revision);return row },
-  create: async body => { const row = await bomApi.create({ ...body as Row, productId: props.material.id, baseQty: bomRatio((body as Row).baseQty) });revision.value = String(row.revision);return row },
-  update: async(id, body) => { const row = await bomApi.update(id, { ...body as Row, revision: revision.value, baseQty: bomRatio((body as Row).baseQty) });revision.value = String(row.revision);return row }
+  detail: async id => {
+    const row = await bomApi.detail!(id)
+    revision.value = String(row.revision)
+    return row
+  },
+  create: async body => {
+    const row = await bomApi.create({ ...body as Row, productId: props.material.id, baseQty: bomRatio((body as Row).baseQty) })
+    revision.value = String(row.revision)
+    return row
+  },
+  update: async(id, body) => {
+    const row = await bomApi.update(id, { ...body as Row, revision: revision.value, baseQty: bomRatio((body as Row).baseQty) })
+    revision.value = String(row.revision)
+    return row
+  }
 }
+
 async function refreshBomAfterItemMutation() {
   await document.value?.refresh()
 }
+
 const picker = ref<InstanceType<typeof MaterialPicker> | null>(null)
 const materialLabels = ref<Record<string, string>>({})
+
 async function chooseComponent() {
   const selected = await picker.value?.choose()
   if (!selected) return null
   materialLabels.value[String(selected.id)] = String(selected.code) + ' · ' + String(selected.name)
   return { materialId: selected.id, specification: selected.specification, unitName: props.unitNames[String(selected.unitId)] ?? String(selected.unitId) }
 }
+
 const itemApi:CrudApi = { ...bomItemApi,
-  create: async body => { const result = await bomItemApi.create({ ...body as Row, quantity: bomRatio((body as Row).quantity) });await refreshBomAfterItemMutation();clearGraph();return result },
-  update: async(id, body) => { const row = body as Row;const result = await bomItemApi.update(id, { materialId: row.materialId, quantity: bomRatio(row.quantity), childBomId: row.childBomId, sort: row.sort });await refreshBomAfterItemMutation();clearGraph();return result },
-  remove: async id => { await bomItemApi.remove(id);await refreshBomAfterItemMutation();clearGraph() },
-  delids: async ids => { await bomItemApi.delids!(ids);await refreshBomAfterItemMutation();clearGraph() },
+  create: async body => {
+    const result = await bomItemApi.create({ ...body as Row, quantity: bomRatio((body as Row).quantity) })
+    await refreshBomAfterItemMutation()
+    clearGraph()
+    return result
+  },
+  update: async(id, body) => {
+    const row = body as Row
+    const result = await bomItemApi.update(id, { materialId: row.materialId, quantity: bomRatio(row.quantity), childBomId: row.childBomId, sort: row.sort })
+    await refreshBomAfterItemMutation()
+    clearGraph()
+    return result
+  },
+  remove: async id => {
+    await bomItemApi.remove(id)
+    await refreshBomAfterItemMutation()
+    clearGraph()
+  },
+  delids: async ids => {
+    await bomItemApi.delids!(ids)
+    await refreshBomAfterItemMutation()
+    clearGraph()
+  },
   list: async query => {
     const result = await bomItemApi.list(query)
     for (const row of result.items) {
@@ -76,6 +112,7 @@ const itemFields:Field[] = [
   { key: 'childBomId', label: '子BOM版本', kind: 'text', format: value => value ? childBomLabels.value[String(value)] ?? '版本信息不可用' : '未指定（叶项）' },
   { key: 'sort', label: '显示顺序', kind: 'number', required: true, defaultValue: 0 }
 ]
+
 async function act(row:Row, action:'publish' | 'disable' | 'enable', refresh:() => Promise<void>) {
   const current = generation
   try {
@@ -95,9 +132,17 @@ async function act(row:Row, action:'publish' | 'disable' | 'enable', refresh:() 
     if (action === 'publish' && latest.status !== 'DRAFT' || action === 'disable' && latest.status !== 'PUBLISHED' || action === 'enable' && latest.status !== 'DISABLED')
       throw new Error('BOM状态已变化，请刷新列表后重试')
     await transition(String(row.id), action, String(latest.revision))
-    if (current === generation) { await refresh(); ElMessage.success(action === 'publish' ? 'BOM已发布' : action === 'enable' ? 'BOM已启用' : 'BOM已停用') }
-  } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '操作失败') } finally { if (current === generation) acting.value = false }
+    if (current === generation) {
+      await refresh()
+      ElMessage.success(action === 'publish' ? 'BOM已发布' : action === 'enable' ? 'BOM已启用' : 'BOM已停用')
+    }
+  } catch (e) {
+    if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  } finally {
+    if (current === generation) acting.value = false
+  }
 }
+
 async function copyVersion(row:Row, refresh:() => Promise<void>) {
   if (acting.value || !canCopy.value) return
   let current = generation
@@ -118,8 +163,13 @@ async function copyVersion(row:Row, refresh:() => Promise<void>) {
     acting.value = true
     await document.value?.open(copied)
     if (current === generation) ElMessage.success('已复制为草稿，可修改后发布')
-  } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '复制失败') } finally { if (current === generation) acting.value = false }
+  } catch (e) {
+    if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '复制失败')
+  } finally {
+    if (current === generation) acting.value = false
+  }
 }
+
 async function makeDefault(row:Row, refresh:() => Promise<void>) {
   const current = generation
   if (acting.value || row.status !== 'PUBLISHED' || row.defaultVersion === true || !canUpdate.value) return
@@ -133,14 +183,23 @@ async function makeDefault(row:Row, refresh:() => Promise<void>) {
     if (latest.status !== 'PUBLISHED' || latest.defaultVersion === true)
       throw new Error('BOM默认状态已变化，请刷新列表后重试')
     await setDefaultBom(String(row.id), String(latest.revision))
-    if (current === generation) { await refresh(); ElMessage.success('产品默认BOM版本已更新') }
-  } catch(e) { if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '设置默认版本失败') } finally { if (current === generation) acting.value = false }
+    if (current === generation) {
+      await refresh()
+      ElMessage.success('产品默认BOM版本已更新')
+    }
+  } catch (e) {
+    if (current === generation && e !== 'cancel' && e !== 'close') ElMessage.error(e instanceof Error ? e.message : '设置默认版本失败')
+  } finally {
+    if (current === generation) acting.value = false
+  }
 }
+
 function openGraph(id:string) {
   graphId.value = id
   initialGraphPending = true
   if (quantityValid.value) acceptQuantityValidity(true)
 }
+
 function acceptQuantityValidity(valid:boolean) {
   quantityValid.value = valid
   if (valid && initialGraphPending) {
@@ -148,13 +207,50 @@ function acceptQuantityValidity(valid:boolean) {
     void loadGraph()
   }
 }
+
 async function loadGraph(id = graphId.value) {
   if (!id || !quantityValid.value) return
-  const current = ++generation;graphId.value = id;graphLoading.value = true;graph.value = null;error.value = ''
-  try { const result = await structure(id, bomRatio(quantity.value));if (current === generation) graph.value = result } catch(e) { if (current === generation) error.value = e instanceof Error ? e.message : '组成计算失败' } finally { if (current === generation) graphLoading.value = false }
+  const current = ++generation
+  graphId.value = id
+  graphLoading.value = true
+  graph.value = null
+  error.value = ''
+  try {
+    const result = await structure(id, bomRatio(quantity.value))
+    if (current === generation) graph.value = result
+  } catch (e) {
+    if (current === generation) error.value = e instanceof Error ? e.message : '组成计算失败'
+  } finally {
+    if (current === generation) graphLoading.value = false
+  }
 }
-function clearGraph() { initialGraphPending = false;quantityValid.value = false;generation++;graphLoading.value = false;graph.value = null;graphId.value = '';error.value = '' }
-function clear() { tree.value = null;initialGraphPending = false;quantityValid.value = false;picker.value?.cancel();materialLabels.value = {};childBomLabels.value = {};revision.value = '';generation++;graph.value = null;graphId.value = '';error.value = '';graphLoading.value = false;acting.value = false }
+
+function clearGraph() {
+  initialGraphPending = false
+  quantityValid.value = false
+  generation++
+  graphLoading.value = false
+  graph.value = null
+  graphId.value = ''
+  error.value = ''
+}
+
+function clear() {
+  tree.value = null
+  initialGraphPending = false
+  quantityValid.value = false
+  picker.value?.cancel()
+  materialLabels.value = {}
+  childBomLabels.value = {}
+  revision.value = ''
+  generation++
+  graph.value = null
+  graphId.value = ''
+  error.value = ''
+  graphLoading.value = false
+  acting.value = false
+}
+
 watch(() => [auth.revision, auth.factoryId, auth.factorySwitching, auth.token, auth.userId, auth.factoryPermissions.join('|'), props.material.id], clear)
 defineExpose({ hasUnsavedChanges: () => !!treeEditor.value?.dirty || (document.value?.hasUnsavedChanges() ?? false) })
 onBeforeUnmount(clear)
@@ -197,8 +293,8 @@ onBeforeUnmount(clear)
       <el-button v-if="row.id && row.status==='PUBLISHED' && canUpdate" :disabled="acting" @click="act(row,'disable',refresh)">停用</el-button>
       <el-button v-if="row.id && row.status==='DISABLED' && canUpdate" :disabled="dirty || acting" @click="act(row,'enable',refresh)">启用</el-button>
     </template>
-    <template #field-baseQty="{draft,disabled}"><QuantityInput v-model="draft.baseQty" semantic="bom-ratio" show-unit :material-id="String(material.id)" :disabled="disabled" /><span class="secondary">BOM基准数量，最多六位有效小数</span></template>
-    <template #field-quantity="{draft,disabled}"><QuantityInput v-model="draft.quantity" semantic="bom-ratio" show-unit :material-id="draft.materialId as string" :disabled="disabled" /><span class="secondary">用量系数允许小数，不套库存整数限制</span></template>
+    <template #field-baseQty="{draft,disabled,mode}"><QuantityInput v-if="mode==='edit'" v-model="draft.baseQty" semantic="bom-ratio" show-unit :material-id="String(material.id)" :disabled="disabled" /><span v-else><QuantityText :value="draft.baseQty as any" /> {{ unitNames[String(draft.unitId ?? material.unitId)] || '单位待确认' }}</span><span class="secondary">BOM基准数量，最多六位有效小数</span></template>
+    <template #field-quantity="{draft,disabled,mode}"><QuantityInput v-if="mode==='edit'" v-model="draft.quantity" semantic="bom-ratio" show-unit :material-id="draft.materialId as string" :disabled="disabled" /><span v-else><QuantityText :value="draft.quantity as any" /> {{ draft.unitName || unitNames[String(draft.unitId)] || '单位待确认' }}</span><span class="secondary">用量系数允许小数，不套库存整数限制</span></template>
     <template #field-materialId="{draft,disabled}"><span>{{ materialLabels[String(draft.materialId)] ?? draft.materialId }}</span><el-button :disabled="disabled" link @click="async()=>{const selected=await chooseComponent();if(selected){draft.materialId=selected.materialId;draft.specification=selected.specification;draft.unitName=selected.unitName;draft.childBomId=null}}">选择物料</el-button></template>
     <template #field-childBomId="{draft,disabled}"><BomVersionSelect v-model="draft.childBomId as string" allow-draft placeholder="选择子版本；不选为叶项" :material-id="draft.materialId as string" :disabled="disabled" /></template>
   </MasterDetailDocument>
