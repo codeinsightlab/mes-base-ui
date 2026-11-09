@@ -10,8 +10,19 @@ const mocks = vi.hoisted(() => ({ request: vi.fn(), confirm: vi.fn() }))
 vi.mock('../src/lib/request', async original => ({ ...await original<object>(), request: mocks.request }))
 vi.mock('element-plus', async original => ({ ...await original<object>(), ElMessageBox: { confirm: mocks.confirm }}))
 let wrapper:ReturnType<typeof mount> | undefined
-beforeEach(() => { sessionStorage.clear();vi.clearAllMocks();mocks.confirm.mockResolvedValue('confirm');vi.stubGlobal('ResizeObserver', class {observe() {}unobserve() {}disconnect() {}}) })
-afterEach(() => { wrapper?.unmount();wrapper = undefined;vi.unstubAllGlobals() })
+beforeEach(() => {
+  sessionStorage.clear()
+  vi.clearAllMocks()
+  mocks.confirm.mockResolvedValue('confirm')
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}unobserve() {}disconnect() {}
+  })
+})
+afterEach(() => {
+  wrapper?.unmount()
+  wrapper = undefined
+  vi.unstubAllGlobals()
+})
 it('recovers a production request with a factory-scoped GET and no command body', async() => {
   const requestId = '00000000-0000-4000-8000-000000000001'
   mocks.request.mockResolvedValueOnce({ document: { id: '9007199254740999', documentType: 'MATERIAL_ISSUE' }, lines: [] })
@@ -20,19 +31,48 @@ it('recovers a production request with a factory-scoped GET and no command body'
   expect(mocks.request).toHaveBeenCalledWith('/api/wm/outbound-documents/by-request/' + requestId, { scope: 'factory' })
   expect(mocks.request.mock.calls[0]![1]).not.toHaveProperty('body')
 })
+
 function setup(post = true) {
-  const pinia = createPinia(), auth = useAuth(pinia);auth.factoryId = 'PROD';auth.runtimeMode = 'LOCAL';auth.username = 'admin';auth.factoryPermissions = ['business:wm:stock:document:query', ...(post ? ['business:wm:stock:document:post'] : [])]
+  const pinia = createPinia(), auth = useAuth(pinia)
+  auth.factoryId = 'PROD'
+  auth.runtimeMode = 'LOCAL'
+  auth.username = 'admin'
+  auth.factoryPermissions = ['business:wm:stock:document:query', ...(post ? ['business:wm:stock:document:post'] : [])]
   const refresh = vi.fn().mockResolvedValue(undefined)
   wrapper = mount(Actions, { props: { row: { id: '9007199254740999', revision: '8', status: 'DRAFT', documentType: 'OTHER_RECEIPT' }, dirty: false, refresh }, global: { plugins: [pinia, ElementPlus], stubs: { RouterLink: true }}})
   return { auth, refresh, s: (wrapper.vm.$ as unknown as { setupState: Record<string, any> }).setupState }
 }
+
 it('freezes original post UUID/revision across UNKNOWN and later 403; scope changes reject late completion', async() => {
-  const { s, auth, refresh } = setup();mocks.request.mockRejectedValueOnce(new Error('lost')).mockRejectedValueOnce(new ApiError('FORBIDDEN', '撤权', '', 403))
-  await s.approve();await s.approve();const first = mocks.request.mock.calls[0]![1].body;expect(mocks.request.mock.calls[1]![1].body).toEqual(first);expect(first.expectedRevision).toBe('8');expect(Object.keys(first).sort()).toEqual(['expectedRevision', 'requestId']);expect(sessionStorage.length).toBe(1)
-  let release!:(v:unknown) => void;mocks.request.mockImplementationOnce(() => new Promise(r => release = r));const waiting = s.approve();await flushPromises();auth.factoryId = 'B';await flushPromises();release({});await waiting;expect(refresh).not.toHaveBeenCalled();expect(s.intent.pending.value).toBeNull()
+  const { s, auth, refresh } = setup()
+  mocks.request.mockRejectedValueOnce(new Error('lost')).mockRejectedValueOnce(new ApiError('FORBIDDEN', '撤权', '', 403))
+  await s.approve()
+  await s.approve()
+  const first = mocks.request.mock.calls[0]![1].body
+  expect(mocks.request.mock.calls[1]![1].body).toEqual(first)
+  expect(first.expectedRevision).toBe('8')
+  expect(Object.keys(first).sort()).toEqual(['expectedRevision', 'requestId'])
+  expect(sessionStorage.length).toBe(1)
+  let release!:(v:unknown) => void
+  mocks.request.mockImplementationOnce(() => new Promise(r => release = r))
+  const waiting = s.approve()
+  await flushPromises()
+  auth.factoryId = 'B'
+  await flushPromises()
+  release({})
+  await waiting
+  expect(refresh).not.toHaveBeenCalled()
+  expect(s.intent.pending.value).toBeNull()
 })
 it('query permission cannot post; unsaved header blocks new commands', async() => {
-  const { s, auth } = setup(false);await s.approve();expect(mocks.request).not.toHaveBeenCalled();auth.factoryPermissions.push('business:wm:stock:document:post');await wrapper!.setProps({ dirty: true });await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('保存草稿')
+  const { s, auth } = setup(false)
+  await s.approve()
+  expect(mocks.request).not.toHaveBeenCalled()
+  auth.factoryPermissions.push('business:wm:stock:document:post')
+  await wrapper!.setProps({ dirty: true })
+  await s.approve()
+  expect(mocks.request).not.toHaveBeenCalled()
+  expect(s.error).toContain('保存草稿')
 })
 it('saves one aggregate command with exact quantities and server-owned parent identity', async() => {
   const { aggregateApi } = stockDocumentApis()
@@ -45,70 +85,128 @@ it('saves one aggregate command with exact quantities and server-owned parent id
   for (const key of ['documentId', 'operatorUserId', 'status', 'stockActionId']) expect(options.body.items[0]).not.toHaveProperty(key)
   expect(mocks.request).toHaveBeenCalledOnce()
 })
-it('approval endpoint preserves the exact caller intent and explicit flow for replay', async() => { mocks.request.mockResolvedValue({});const body = { requestId: 'c7b6c1e2-2e51-41d6-86b6-620efc433027', expectedRevision: '7' };await stockDocuments.approve('8', body);expect(mocks.request).toHaveBeenCalledWith('/api/wm/outbound-documents/8/actions/approve', { method: 'POST', body, scope: 'factory' }) })
+it('approval endpoint preserves the exact caller intent and explicit flow for replay', async() => {
+  mocks.request.mockResolvedValue({})
+  const body = { requestId: 'c7b6c1e2-2e51-41d6-86b6-620efc433027', expectedRevision: '7' }
+  await stockDocuments.approve('8', body)
+  expect(mocks.request).toHaveBeenCalledWith('/api/wm/outbound-documents/8/actions/approve', { method: 'POST', body, scope: 'factory' })
+})
 
 it('creates a document and its lines with the selected rule in one request', async() => {
-  const { aggregateApi } = stockDocumentApis(undefined, () => 'IN');mocks.request.mockResolvedValueOnce({ document: { id: '1' }, lines: [] })
+  const { aggregateApi } = stockDocumentApis(undefined, () => 'IN')
+  mocks.request.mockResolvedValueOnce({ document: { id: '1' }, lines: [] })
   await aggregateApi.create({ ruleCode: 'IN_RULE', documentType: 'PRODUCTION_RECEIPT', sourceExecutionCode: '9007199254740999', reason: 'TEST', remark: null, items: [{ materialId: '2', quantity: '1' }] })
   expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/inbound-documents/aggregate')
   expect(mocks.request.mock.calls[0]![1].body).toMatchObject({ header: { ruleCode: 'IN_RULE', sourceExecutionCode: '9007199254740999' }, items: [{ materialId: '2', quantity: '1' }] })
 })
-it('requires a selected rule before creating a stock document', async() => { const { aggregateApi } = stockDocumentApis();await expect(aggregateApi.create({ documentType: 'OTHER_RECEIPT', items: [] })).rejects.toThrow('请选择出入库单编码规则');expect(mocks.request).not.toHaveBeenCalled() })
-it('queries stock numbering rules with the explicit document direction', async() => { mocks.request.mockResolvedValueOnce([]);await stockDocuments.numberingRules('OUT');expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/outbound-documents/numbering-rules', { scope: 'factory' }) })
-it('reads production allowance through the inbound document API without creating handover', async() => { mocks.request.mockResolvedValue({ remaining: '40' });await stockDocuments.productionBasis('9007199254740999');expect(mocks.request).toHaveBeenCalledWith('/api/wm/inbound-documents/executions/9007199254740999/basis', { scope: 'factory' }) })
+it('requires a selected rule before creating a stock document', async() => {
+  const { aggregateApi } = stockDocumentApis()
+  await expect(aggregateApi.create({ documentType: 'OTHER_RECEIPT', items: [] })).rejects.toThrow('请选择出入库单编码规则')
+  expect(mocks.request).not.toHaveBeenCalled()
+})
+it('queries stock numbering rules with the explicit document direction', async() => {
+  mocks.request.mockResolvedValueOnce([])
+  await stockDocuments.numberingRules('OUT')
+  expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/outbound-documents/numbering-rules', { scope: 'factory' })
+})
+it('reads production allowance through the inbound document API without creating handover', async() => {
+  mocks.request.mockResolvedValue({ remaining: '40' })
+  await stockDocuments.productionBasis('9007199254740999')
+  expect(mocks.request).toHaveBeenCalledWith('/api/wm/inbound-documents/executions/9007199254740999/basis', { scope: 'factory' })
+})
 
 it('keeps unsupported source categories as drafts without attempting approval', async() => {
-  const { s } = setup();await wrapper!.setProps({ row: { id: '1', revision: '0', documentType: 'OUTSOURCE_RECEIPT', status: 'DRAFT' }})
-  await s.approve();expect(mocks.request).not.toHaveBeenCalled();expect(s.error).toContain('禁止审核')
+  const { s } = setup()
+  await wrapper!.setProps({ row: { id: '1', revision: '0', documentType: 'OUTSOURCE_RECEIPT', status: 'DRAFT' }})
+  await s.approve()
+  expect(mocks.request).not.toHaveBeenCalled()
+  expect(s.error).toContain('禁止审核')
 })
 
 it('production receipt convenience preserves the caller UUID and decimal strings in one server command', async() => {
-  mocks.request.mockResolvedValue({ document: { id: '1' }, lines: [] });const command = { requestId: '11111111-2222-4333-8444-555555555555', stockId: '9007199254740999', quantity: '1.000001', reason: '实物核对' }
+  mocks.request.mockResolvedValue({ document: { id: '1' }, lines: [] })
+  const command = { requestId: '11111111-2222-4333-8444-555555555555', stockId: '9007199254740999', quantity: '1.000001', reason: '实物核对' }
   await stockDocuments.receiveProduction('9007199254740998', command)
   expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/production/executions/9007199254740998/inbound', { method: 'POST', body: command, scope: 'factory' })
 })
 it('ordinary material issue approval uses warehouse authority and creates an independent approval intent', async() => {
-  const { s } = setup();mocks.request.mockResolvedValue(null)
+  const { s } = setup()
+  mocks.request.mockResolvedValue(null)
   await wrapper!.setProps({ row: { id: '1', revision: '0', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
   await s.approve()
   const approvals = mocks.request.mock.calls.filter(call => String(call[0]).endsWith('/actions/approve'))
-  expect(approvals).toHaveLength(1);expect(approvals[0]![1].body.requestId).not.toBe('11111111-2222-4333-8444-555555555555')
+  expect(approvals).toHaveLength(1)
+  expect(approvals[0]![1].body.requestId).not.toBe('11111111-2222-4333-8444-555555555555')
 })
 it('keeps the safe material issue basis visible to the draft approver without exposing frozen request JSON', async() => {
   const basis = { requestId: '11111111-2222-4333-8444-555555555555', code: 'WO:M#0001 ', workorderId: '9007199254740999', outputQty: '10.000001', routingId: '7', routingNodeIds: ['11', '12'] }
-  const { aggregateApi } = stockDocumentApis();mocks.request.mockResolvedValue({ document: { id: '1', documentType: 'MATERIAL_ISSUE' }, lines: [], materialIssueBasis: basis })
-  const { header } = await aggregateApi.detail('1');expect(header.materialIssueBasis).toEqual(basis);expect(header).not.toHaveProperty('sourceRequestJson')
-  const { s } = setup();await wrapper!.setProps({ row: { ...header, status: 'DRAFT', revision: '0' }});await flushPromises()
-  expect(wrapper!.text()).toContain('10');expect(wrapper!.text()).not.toContain('11 → 12');expect(wrapper!.text()).toContain('WO:M#0001')
+  const { aggregateApi } = stockDocumentApis()
+  mocks.request.mockResolvedValue({ document: { id: '1', documentType: 'MATERIAL_ISSUE' }, lines: [], materialIssueBasis: basis })
+  const { header } = await aggregateApi.detail('1')
+  expect(header.materialIssueBasis).toEqual(basis)
+  expect(header).not.toHaveProperty('sourceRequestJson')
+  const { s } = setup()
+  await wrapper!.setProps({ row: { ...header, status: 'DRAFT', revision: '0' }})
+  await flushPromises()
+  expect(wrapper!.text()).toContain('10')
+  expect(wrapper!.text()).not.toContain('11 → 12')
+  expect(wrapper!.text()).toContain('WO:M#0001')
   expect(s.materialIssueBasis.code).toBe('WO:M#0001 ')
 })
 
 it('shows an unreadable material issue basis as a local error while preserving the raw document and lines', async() => {
   const raw = { document: { id: '1', documentNo: 'QA-RAW', documentType: 'MATERIAL_ISSUE', reason: '原始依据', status: 'DRAFT', revision: '0', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }, lines: [{ id: '8', documentId: '1', materialId: '2', batchNo: '0001 ', quantity: '2.500001' }], materialIssueBasis: null, materialIssueBasisError: '冻结领料依据无法解析，请核对原记录；禁止审核' }
-  const { aggregateApi } = stockDocumentApis();mocks.request.mockResolvedValue(raw)
+  const { aggregateApi } = stockDocumentApis()
+  mocks.request.mockResolvedValue(raw)
   const { header, items } = await aggregateApi.detail('1')
-  expect(header.documentNo).toBe('QA-RAW');expect(header.reason).toBe('原始依据');expect(items).toEqual(raw.lines)
-  const { s, auth } = setup();auth.factoryPermissions.push('business:mes:material:issue:update', 'business:wm:stock:document:create', 'business:wm:stock:document:update')
-  await wrapper!.setProps({ row: header });await flushPromises();expect(wrapper!.text()).toContain('冻结领料依据无法解析')
-  expect(s.materialIssueBasis).toBeNull();expect(s.canApprove).toBe(false)
-  mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
+  expect(header.documentNo).toBe('QA-RAW')
+  expect(header.reason).toBe('原始依据')
+  expect(items).toEqual(raw.lines)
+  const { s, auth } = setup()
+  auth.factoryPermissions.push('business:mes:material:issue:update', 'business:wm:stock:document:create', 'business:wm:stock:document:update')
+  await wrapper!.setProps({ row: header })
+  await flushPromises()
+  expect(wrapper!.text()).toContain('冻结领料依据无法解析')
+  expect(s.materialIssueBasis).toBeNull()
+  expect(s.canApprove).toBe(false)
+  mocks.request.mockClear()
+  await s.approve()
+  expect(mocks.request).not.toHaveBeenCalled()
 })
 
 it('MES issue authority cannot approve an ordinary warehouse material issue', async() => {
-  const { s, auth } = setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
+  const { s, auth } = setup(false)
+  auth.factoryPermissions.push('business:mes:material:issue:update')
   await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE' }})
-  expect(s.canApprove).toBe(false);mocks.request.mockClear();await s.approve();expect(mocks.request).not.toHaveBeenCalled()
+  expect(s.canApprove).toBe(false)
+  mocks.request.mockClear()
+  await s.approve()
+  expect(mocks.request).not.toHaveBeenCalled()
 })
 it('does not approve or cancel a material issue in a non-local factory mode', async() => {
-  const { s, auth } = setup(false);auth.factoryPermissions.push('business:mes:material:issue:update')
+  const { s, auth } = setup(false)
+  auth.factoryPermissions.push('business:mes:material:issue:update')
   await wrapper!.setProps({ row: { id: '17', revision: '4', status: 'DRAFT', documentType: 'MATERIAL_ISSUE', createRequestId: '11111111-2222-4333-8444-555555555555', postRequestId: null }})
-  auth.runtimeMode = 'ERP';await flushPromises();mocks.request.mockClear()
-  await s.approve();await s.cancel()
-  expect(s.canApprove).toBe(false);expect(s.canCancel).toBe(false);expect(mocks.request).not.toHaveBeenCalled()
+  auth.runtimeMode = 'ERP'
+  await flushPromises()
+  mocks.request.mockClear()
+  await s.approve()
+  await s.cancelDraft()
+  expect(s.canApprove).toBe(false)
+  expect(s.canCancelDraft).toBe(false)
+  expect(mocks.request).not.toHaveBeenCalled()
 })
-it('uses the unified document identity for issue void and recovery', async() => {
-  mocks.request.mockResolvedValue({});await stockDocuments.voidMaterialIssue('9007199254740999');await stockDocuments.voidMaterialIssue('9007199254740999', true)
-  expect(mocks.request.mock.calls.map(call => call[0])).toEqual(['/api/wm/outbound-documents/9007199254740999/actions/void', '/api/wm/outbound-documents/9007199254740999/actions/reconcile-void'])
+it('uses the unified cancel command with the document identity and frozen intent', async() => {
+  const body = { expectedRevision: '8', requestId: '11111111-2222-4333-8444-555555555555', reason: '原单错误' }
+  mocks.request.mockResolvedValue({})
+  await stockDocuments.cancel('9007199254740999', body)
+  expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/outbound-documents/9007199254740999/actions/cancel', { method: 'POST', body, scope: 'factory' })
+})
+it('routes production issue reversal through the production business entry point', async() => {
+  const body = { expectedRevision: '8', requestId: '11111111-2222-4333-8444-555555555555', reason: '投入录入错误' }
+  mocks.request.mockResolvedValue({})
+  await stockDocuments.reverseMaterialIssue('9007199254740999', body)
+  expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/production/input/documents/9007199254740999/actions/cancel', { method: 'POST', body, scope: 'factory' })
 })
 
 it('limits legacy issue access to material issue documents and retains distinct line identity', async() => {
@@ -163,7 +261,8 @@ it('sends supplier snapshots and uses the formal purchase receipt approval', asy
   expect(mocks.request.mock.calls[0]![1].body.items[0]).not.toHaveProperty('amount')
   expect(mocks.request.mock.calls[0]![1].body.items[0]).not.toHaveProperty('referencePriceId')
   mocks.request.mockClear()
-  const { s } = setup(); await wrapper!.setProps({ row: { id: '15', revision: '2', direction: 'IN', documentType: 'PURCHASE_RECEIPT', status: 'DRAFT' }})
+  const { s } = setup()
+  await wrapper!.setProps({ row: { id: '15', revision: '2', direction: 'IN', documentType: 'PURCHASE_RECEIPT', status: 'DRAFT' }})
   await s.approve()
   expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/inbound-documents/15/actions/approve')
 })
@@ -171,23 +270,33 @@ it('sends supplier snapshots and uses the formal purchase receipt approval', asy
 const inputBasisCalls = () => mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/production-input-basis'))
 it('loads the production input basis once when document identity and source fields arrive together', async() => {
   mocks.request.mockResolvedValue(null)
-  setup();await flushPromises();mocks.request.mockClear()
-  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'POSTED', sourceWorkorderId: '7', sourceExecutionCode: 'WO:M#LOT' }});await flushPromises()
+  setup()
+  await flushPromises()
+  mocks.request.mockClear()
+  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'POSTED', sourceWorkorderId: '7', sourceExecutionCode: 'WO:M#LOT' }})
+  await flushPromises()
   expect(inputBasisCalls()).toHaveLength(1)
   expect(inputBasisCalls()[0]![0]).toBe('/api/wm/outbound-documents/44/production-input-basis')
 })
 it('does not query a production input basis until the document has an identifier', async() => {
   mocks.request.mockResolvedValue(null)
-  setup();await wrapper!.setProps({ row: { documentType: 'MATERIAL_ISSUE', direction: 'OUT' }});await flushPromises()
+  setup()
+  await wrapper!.setProps({ row: { documentType: 'MATERIAL_ISSUE', direction: 'OUT' }})
+  await flushPromises()
   expect(inputBasisCalls()).toHaveLength(0)
 })
 it('reads the basis only once after approval refresh changes document revision and source fields', async() => {
   mocks.request.mockResolvedValue(null)
   const { s, refresh } = setup()
   const row = { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'DRAFT', sourceWorkorderId: '7', sourceExecutionCode: 'WO:M#LOT' }
-  await wrapper!.setProps({ row });await flushPromises();mocks.request.mockClear()
-  refresh.mockImplementationOnce(async() => { await wrapper!.setProps({ row: { ...row, revision: '2', status: 'POSTED', sourceExecutionCode: 'WO:M#CONFIRMED' }}) })
-  await s.approve();await flushPromises()
+  await wrapper!.setProps({ row })
+  await flushPromises()
+  mocks.request.mockClear()
+  refresh.mockImplementationOnce(async() => {
+    await wrapper!.setProps({ row: { ...row, revision: '2', status: 'POSTED', sourceExecutionCode: 'WO:M#CONFIRMED' }})
+  })
+  await s.approve()
+  await flushPromises()
   expect(inputBasisCalls()).toHaveLength(1)
   expect(mocks.request.mock.calls.filter(([url]) => String(url).endsWith('/actions/approve'))).toHaveLength(1)
 })
@@ -195,8 +304,11 @@ it('reads the basis only once after approval refresh changes document revision a
 it('refreshes the basis once even when the header does not change', async() => {
   mocks.request.mockResolvedValue(null)
   const { s, refresh } = setup()
-  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'POSTED' }});await flushPromises();mocks.request.mockClear()
-  await s.refreshDocument();await flushPromises()
+  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT', revision: '1', status: 'POSTED' }})
+  await flushPromises()
+  mocks.request.mockClear()
+  await s.refreshDocument()
+  await flushPromises()
   expect(refresh).toHaveBeenCalledOnce()
   expect(inputBasisCalls()).toHaveLength(1)
 })
@@ -204,10 +316,15 @@ it('discards a delayed basis response after switching documents', async() => {
   mocks.request.mockResolvedValue(null)
   const { s } = setup()
   let release!:(value:unknown) => void
-  mocks.request.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
-  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT' }});await flushPromises()
-  await wrapper!.setProps({ row: { id: '45', documentType: 'MATERIAL_ISSUE', direction: 'OUT' }});await flushPromises()
-  release({ executionId: 'old' });await flushPromises()
+  mocks.request.mockImplementationOnce(() => new Promise(resolve => {
+    release = resolve
+  }))
+  await wrapper!.setProps({ row: { id: '44', documentType: 'MATERIAL_ISSUE', direction: 'OUT' }})
+  await flushPromises()
+  await wrapper!.setProps({ row: { id: '45', documentType: 'MATERIAL_ISSUE', direction: 'OUT' }})
+  await flushPromises()
+  release({ executionId: 'old' })
+  await flushPromises()
   expect(s.inputBasis).toBeNull()
 })
 it('omits empty basis query parameters but preserves the material issue permission filter', async() => {
@@ -222,9 +339,13 @@ it('releases the cancel button after a status-changing refresh', async() => {
   const { s, auth, refresh } = setup()
   auth.factoryPermissions.push('business:wm:stock:document:cancel')
   const row = { id: '44', documentType: 'OTHER_RECEIPT', direction: 'IN', revision: '1', status: 'DRAFT' }
-  await wrapper!.setProps({ row });await flushPromises()
-  refresh.mockImplementationOnce(async() => { await wrapper!.setProps({ row: { ...row, revision: '2', status: 'CANCELLED' }}) })
-  await s.cancel();await flushPromises()
-  expect(s.cancelBusy).toBe(false)
+  await wrapper!.setProps({ row })
+  await flushPromises()
+  refresh.mockImplementationOnce(async() => {
+    await wrapper!.setProps({ row: { ...row, revision: '2', status: 'CANCELLED' }})
+  })
+  await s.cancelDraft()
+  await flushPromises()
+  expect(s.draftCancelBusy).toBe(false)
   expect(refresh).toHaveBeenCalledOnce()
 })

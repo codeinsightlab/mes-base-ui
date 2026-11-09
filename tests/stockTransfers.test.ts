@@ -29,6 +29,20 @@ it('uses paired commands and the dedicated transfer list without transmitting cl
   expect(mocks.request.mock.calls[1]).toEqual(['/api/wm/stock-transfers', { query: { documentNo: 'TRO', status: 'DRAFT', offset: 20, limit: 20 }, scope: 'factory' }])
 })
 
+it('routes transfer reversal through the paired caller endpoint with the frozen reason and intent', async() => {
+  const body = { requestId: '11111111-2222-4333-8444-555555555555', expectedRevision: '7', reason: '原单错误' }
+  await stockTransfers.reverse('9007199254740999', body)
+  expect(mocks.request).toHaveBeenCalledExactlyOnceWith('/api/wm/stock-transfers/9007199254740999/actions/reverse', { method: 'POST', body, scope: 'factory' })
+})
+
+it('keeps the separate movement histories for both transfer documents', () => {
+  const pair = { outbound: { document: { id: '10' }, lines: [], stockMovements: [{ id: 'out-reversal' }] },
+    inbound: { document: { id: '11' }, lines: [], stockMovements: [{ id: 'in-reversal' }] }} as unknown as TransferDetail
+  const view = transferView(pair)
+  expect(view.header.outboundMovements).toEqual(pair.outbound.stockMovements)
+  expect(view.header.inboundMovements).toEqual(pair.inbound.stockMovements)
+})
+
 it('lets the server resolve an absent target stock from the destination and source identity', () => {
   const command = transferCommand({ createRequestId: 'original', reason: '调拨', items: [{ sourceStockId: '9007199254740999', targetStockId: null, targetWarehouseId: '9007199254740998', targetBinCode: ' 0001 ', quantity: '0.000001', materialId: 'forged', unitId: 'forged', batchNo: 'forged' }] })
   expect(command.items[0]).toEqual({ sourceStockId: '9007199254740999', targetStockId: null, targetWarehouseId: '9007199254740998', targetBinCode: ' 0001 ', quantity: '0.000001', remark: undefined })

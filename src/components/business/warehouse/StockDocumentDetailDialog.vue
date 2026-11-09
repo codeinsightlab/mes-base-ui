@@ -3,13 +3,14 @@ import { useStockDocumentTypes } from '@/composables/useStockDocumentTypes'
 import { computed, onBeforeUnmount, onDeactivated, ref, watch } from 'vue'
 import PageDialog from '@/components/page/PageDialog.vue'
 import StockDocumentHeader from './StockDocumentHeader.vue'
+import StockDocumentMovements from './StockDocumentMovements.vue'
 import StockDocumentLines from '@/views/wm/stockDocuments/StockDocumentLines.vue'
 import QuantityText from '@/components/business/production/QuantityText.vue'
-import { stockDocuments, type Header, type Line } from '@/api/wm/stockDocuments'
+import { stockDocuments, type Detail, type Header, type Line } from '@/api/wm/stockDocuments'
 import { canReadStockDocument, type StockDocumentReference } from '@/lib/stockDocumentReference'
 import { useAuth } from '@/stores/auth'
 const auth = useAuth(), visible = ref(false), target = ref<StockDocumentReference | null>(null)
-const document = ref<Header | null>(null), lines = ref<Line[]>([]), selectedLine = ref<Line | null>(null)
+const document = ref<Header | null>(null), lines = ref<Line[]>([]), movements = ref<Detail['stockMovements']>([]), selectedLine = ref<Line | null>(null)
 const { error: typesError, load: loadTypes, clear: clearTypes, label: typeLabel } = useStockDocumentTypes()
 const error = ref(''), lineError = ref(''), loading = ref(false)
 const originalLines = new Map()
@@ -30,6 +31,7 @@ function clear() {
   target.value = null
   document.value = null
   lines.value = []
+  movements.value = []
   selectedLine.value = null
   clearTypes()
   error.value = ''
@@ -43,6 +45,7 @@ async function load() {
   const ticket = ++generation
   document.value = null
   lines.value = []
+  movements.value = []
   selectedLine.value = null
   clearTypes()
   error.value = ''
@@ -58,6 +61,7 @@ async function load() {
           || reference.materialIssue && result.document.documentType !== 'MATERIAL_ISSUE') throw new Error('来源单据与库存流水不一致')
         document.value = result.document
         if (canLines.value) lines.value = result.lines
+        if (has('business:wm:stock:document:query')) movements.value = result.stockMovements
       } catch (reason) {
         if (ticket === generation) error.value = reason instanceof Error ? reason.message : '来源单据读取失败'
       }
@@ -113,6 +117,7 @@ defineExpose({ open, clear })
     <p v-if="loading" role="status">正在读取来源单据…</p>
     <section v-if="document" aria-label="来源单据基本信息"><h3>基本信息</h3><StockDocumentHeader :document="document" :type-label="typeLabel(document.documentType)" /></section>
     <section v-if="canLines && !error && !lineError && !loading" aria-label="来源单据明细"><h3>单据明细</h3><StockDocumentLines :header="lineHeader" :items="lines" :show-action-links="false" :writable="false" :saving="false" :can-issue-line="false" :original-lines="originalLines" /></section>
+    <StockDocumentMovements v-if="document && has('business:wm:stock:document:query')" :movements="movements" />
     <p v-if="!canLines && document" class="secondary">当前权限不允许查看完整明细。</p>
     <el-alert v-if="lineError" :title="lineError" type="error" :closable="false"><el-button link @click="load">重试</el-button></el-alert>
     <el-descriptions v-if="selectedLine" :column="2" border><el-descriptions-item label="批次">{{ selectedLine.batchNo || '无批次' }}</el-descriptions-item><el-descriptions-item label="库位">{{ selectedLine.binCode || '无库位' }}</el-descriptions-item><el-descriptions-item label="数量"><QuantityText :value="selectedLine.quantity" /></el-descriptions-item><el-descriptions-item label="备注">{{ selectedLine.remark || '—' }}</el-descriptions-item></el-descriptions>

@@ -15,9 +15,11 @@ export const stockDocumentPurpose = (value:unknown) => typeof value === 'string'
   ? { value, ...semantics[value as StockDocumentType] } : undefined
 export const stockDocumentPermission = 'business:wm:stock:document'
 export interface Header extends Row {
-  id: string; documentNo: string; direction: StockDocumentDirection; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED';
+  id: string; documentNo: string; direction: StockDocumentDirection; documentType: StockDocumentType; status: 'DRAFT' | 'POSTED' | 'CANCELLED' | 'REVERSED';
   supplierId?: string | null; businessDate?: string | null; currency?: string | null; supplierName?: string | null; supplierDocumentNo?: string | null;
-  reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionCode: string | null; postRequestId: string | null; createRequestId?: string | null
+  reason: string; remark: string | null; revision: string; sourceWorkorderId: string | null; sourceExecutionCode: string | null; postRequestId: string | null; createRequestId?: string | null;
+  createBy?: string | null; createTime?: string | null; postedBy?: string | null; postedAt?: string | null; cancelledBy?: string | null; cancelledAt?: string | null;
+  reversedBy?: string | null; reversedAt?: string | null; reversalReason?: string | null; reversalRequestId?: string | null
 }
 export interface Line extends Row { unitPrice?: string | null;amount?: string | null;referencePriceId?: string | null;referenceUnitPrice?: string | null; demandLineId?: string | null; id: string;documentId: string;lineNo: number;stockId: string | null;materialId: string;warehouseId: string | null;unitId: string | null;batchNo: string | null;binCode: string | null;quantity: string;remark: string | null;stockActionId: string | null }
 export interface MaterialIssueBasis { requestId: string;code: string;workorderId: string;outputQty: string;routingId: string;routingNodeIds: string[] }
@@ -25,17 +27,14 @@ export interface ProductionInputBasis { combinationId: string | null; allocation
   requestId: string;inputKind: string;sourceMode: string;executionCode: string;workorderId: string;workorderCode: string;
   outputQty: string;issueQty: string | null;materialId: string | null;materialCode: string | null;warehouseId: string | null;unitId: string | null;batchNo: string | null;
   bomId: string | null;bomBaseQty: string | null;bomComponentQty: string | null;pathRevision: string | null;
-  routingNodeIds: string[];businessOccurredAt: string | null;confirmedAt: string | null;stockApplied: boolean | null;voidOperationId: string | null;
-  voidResultStatus: string | null;pathError: string | null
+  routingNodeIds: string[];businessOccurredAt: string | null;confirmedAt: string | null;stockApplied: boolean | null;pathError: string | null
 }
 export interface LineLabel { lineId: string; materialCode: string | null; materialName: string | null; warehouseCode: string | null; warehouseName: string | null; warehouseSource: string | null; unitName: string | null }
-export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionCode: string } | null }
+export interface StockMovement { id: string;documentLineId: string;actionType: string;quantityDelta: string;occurredAt: string;referenceActionId: string | null;operationId: string | null;stockId: string;batchNo: string | null;binCode: string | null;operatorUserId: string;reason: string }
+export interface Detail { materialIssueBasisError?: string | null; materialIssueBasis?: MaterialIssueBasis | null; document: Header; lines: Line[]; stockMovements: StockMovement[]; qualitySource?: { sourceDeclarationId: string;sourceTreatmentId: string;sourceQualityExecutionCode: string } | null }
 export interface ProductionReceiptCommand { requestId: string; stockId: string; quantity: string; reason: string }
 export interface ApprovalIntent { requestId: string;expectedRevision: string }
-export interface MaterialIssueVoidResult {
-  documentId: string;documentStatus: string;productionInputStatus: string | null;voidOperationId: string | null;
-  voidResultStatus: string | null;voidRequestedAt: string | null;voidFinishedAt: string | null;message: string | null
-}
+export interface CancellationIntent { expectedRevision: string;requestId?: string;reason?: string }
 export interface ProductionBasis { reportingRequired: boolean; executionCode: string;productId: string;effective: string;received: string;remaining: string;canReceive: boolean;blockedReason: string | null }
 export interface CancellationBasis { workorderId: string;productId: string;status: string;handedOver: string;accepted: string;manuallyReceived: string;remaining: string }
 const root = (direction: StockDocumentDirection = 'OUT') => '/api/wm/' + (direction === 'IN' ? 'inbound-documents' : 'outbound-documents')
@@ -53,8 +52,8 @@ export const stockDocuments = {
   numberPreview: (typeKey: StockDocumentType, direction: StockDocumentDirection) => request<NumberingRuleOption>(root(direction) + '/numbering-rules/preview', { query: { typeKey }, scope: 'factory' }),
   editAggregate: (id:string, body:unknown, direction:StockDocumentDirection = 'OUT') => request<Detail>(path(id, direction) + '/aggregate', { method: 'PUT', body, scope: 'factory' }),
   approve: (id:string, body:ApprovalIntent, direction:StockDocumentDirection = 'OUT') => request<Detail>(path(id, direction) + '/actions/approve', { method: 'POST', body, scope: 'factory' }),
-  cancel: (id:string, expectedRevision:string, direction:StockDocumentDirection = 'OUT') => request<Detail>(path(id, direction) + '/actions/cancel', { method: 'POST', body: { expectedRevision }, scope: 'factory' }),
-  voidMaterialIssue: (id:string, reconcile = false) => request<MaterialIssueVoidResult>(path(id) + '/actions/' + (reconcile ? 'reconcile-void' : 'void'), { method: 'POST', scope: 'factory' }),
+  cancel: (id:string, body:CancellationIntent, direction:StockDocumentDirection = 'OUT') => request<Detail>(path(id, direction) + '/actions/cancel', { method: 'POST', body, scope: 'factory' }),
+  reverseMaterialIssue: (id:string, body:CancellationIntent) => request<Detail>(`/api/production/input/documents/${id}/actions/cancel`, { method: 'POST', body, scope: 'factory' }),
   approveProduction: (id:string, body:ApprovalIntent) => request<Detail>('/api/production/inbound-documents/' + encodeURIComponent(id) + '/actions/approve', { method: 'POST', body, scope: 'factory' }),
   receiveProduction: (id:string, body:ProductionReceiptCommand) => request<Detail>('/api/production/executions/' + encodeURIComponent(id) + '/inbound', { method: 'POST', body, scope: 'factory' }),
   productionBasis: (id:string) => request<ProductionBasis>(root('IN') + '/executions/' + encodeURIComponent(id) + '/basis', { scope: 'factory' }),
@@ -70,13 +69,13 @@ export function stockDocumentApis(access: { issueListOnly: () => boolean; issueQ
     detail: async id => (await stockDocuments.detail(id, direction(), access.issueQueryOnly())).document,
     create: unsupported, update: unsupported,
     remove: async() => {
-      throw Error('正式仓储单据仅允许作废草稿')
+      throw Error('正式仓储单据请从单据操作中作废草稿或撤销已审核单据')
     }
   }
   const itemApi: CrudApi = { list: unsupported, detail: unsupported, create: unsupported, update: unsupported, remove: unsupported }
   const view = (detail:Detail) => ({
-    header: { ...detail.document, ...detail.qualitySource, isNew: '', materialIssueBasis: detail.materialIssueBasis ?? null,
-      materialIssueBasisError: detail.materialIssueBasisError ?? null },
+    header: { ...detail.document, ...detail.qualitySource, isNew: '', stockMovements: detail.stockMovements,
+      materialIssueBasis: detail.materialIssueBasis ?? null, materialIssueBasisError: detail.materialIssueBasisError ?? null },
     items: detail.lines
   })
   const command = (raw:unknown) => {

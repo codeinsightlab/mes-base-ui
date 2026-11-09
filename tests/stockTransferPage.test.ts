@@ -4,19 +4,34 @@ import { createPinia } from 'pinia'
 import { defineComponent, reactive } from 'vue'
 import { useAuth } from '../src/stores/auth'
 import Page from '../src/views/wm/stockTransfers/index.vue'
-const mocks = vi.hoisted(() => ({ request: vi.fn(), query: {} as Record<string, string>, open: vi.fn() }))
+const mocks = vi.hoisted(() => ({ request: vi.fn(), query: {} as Record<string, string>, open: vi.fn(), prompt: vi.fn(), confirm: vi.fn() }))
 vi.mock('../src/lib/request', async original => ({ ...await original<object>(), request: mocks.request }))
 vi.mock('vue-router', () => ({ useRoute: () => reactive({ query: mocks.query }) }))
-const Document = defineComponent({ props: ['aggregateApi'], setup(_, { expose }) { expose({ open: mocks.open, hasUnsavedChanges: () => false }); return {} }, template: '<div />' })
+vi.mock('../src/lib/pageMessageBox', () => ({ usePageMessageBox: () => ({ prompt: mocks.prompt, confirm: mocks.confirm, alert: vi.fn() }) }))
+const Document = defineComponent({ props: ['aggregateApi'], setup(_, { expose }) {
+  expose({ open: mocks.open, hasUnsavedChanges: () => false })
+  return {}
+}, template: '<div />' })
 let wrapper: ReturnType<typeof mount> | undefined
-beforeEach(() => { sessionStorage.clear(); vi.clearAllMocks(); mocks.query = {} })
+beforeEach(() => {
+  sessionStorage.clear()
+  vi.clearAllMocks()
+  mocks.query = {}
+  mocks.prompt.mockResolvedValue({ value: '原单错误' })
+  mocks.confirm.mockResolvedValue('confirm')
+})
 afterEach(() => wrapper?.unmount())
+
 function setup(query = false) {
   const pinia = createPinia(), auth = useAuth(pinia)
-  auth.factoryId = 'A'; auth.username = 'operator'; auth.runtimeMode = 'LOCAL'; auth.factoryPermissions = ['business:wm:stock:document:create', ...(query ? ['business:wm:stock:document:query'] : [])]
+  auth.factoryId = 'A'
+  auth.username = 'operator'
+  auth.runtimeMode = 'LOCAL'
+  auth.factoryPermissions = ['business:wm:stock:document:create', ...(query ? ['business:wm:stock:document:query'] : [])]
   wrapper = mount(Page, { global: { plugins: [pinia], stubs: { MasterDetailDocument: Document, ElAlert: true, ElButton: true }}})
   return { auth, aggregate: wrapper.findComponent(Document).props('aggregateApi') }
 }
+
 const raw = { reason: '实物移库', items: [{ sourceStockId: '9007199254740999', targetStockId: '9007199254740998', targetWarehouseId: '2', targetBinCode: 'A', quantity: '0.000001' }] }
 it('freezes the original create UUID after an unknown response and refuses changed content', async() => {
   const { aggregate } = setup()
@@ -32,7 +47,8 @@ it('keeps the uncertain request recoverable after scope cleanup without leaking 
   const { auth, aggregate } = setup()
   mocks.request.mockRejectedValue(new Error('连接中断'))
   await expect(aggregate.create(raw)).rejects.toThrow()
-  auth.factoryId = 'B'; await flushPromises()
+  auth.factoryId = 'B'
+  await flushPromises()
   expect(wrapper!.text()).not.toContain('待核实的原创建UUID')
   expect(sessionStorage.getItem('stock-transfer-create:operator:A')).toContain('9007199254740999')
   expect(sessionStorage.getItem('stock-transfer-create:operator:B')).toBeNull()
@@ -56,19 +72,27 @@ it('echoes trusted source identity and clears a selected target when its warehou
   const row: Record<string, unknown> = { sourceStockId: '1', targetStockId: 'old', targetBinCode: 'old' }
   state.sourceSelected(row, { materialId: '9', batchNo: ' 000L ' }, '7')
   expect(row).toMatchObject({ materialId: '9', batchNo: ' 000L ', unitId: '7', targetStockId: null })
-  state.targetSelected(row, { binCode: ' 000B ' }); expect(row.targetBinCode).toBe(' 000B ')
-  row.targetStockId = '2'; state.targetWarehouseChanged(row)
-  expect(row.targetStockId).toBeNull(); expect(row.targetBinCode).toBeNull()
+  state.targetSelected(row, { binCode: ' 000B ' })
+  expect(row.targetBinCode).toBe(' 000B ')
+  row.targetStockId = '2'
+  state.targetWarehouseChanged(row)
+  expect(row.targetStockId).toBeNull()
+  expect(row.targetBinCode).toBeNull()
 })
 
 it('opens either linked document identity only with query permission and watches later links', async() => {
   mocks.query = { documentId: '9007199254740999' }
-  setup(true); await flushPromises()
+  setup(true)
+  await flushPromises()
   expect(mocks.open).toHaveBeenCalledWith({ id: '9007199254740999' })
   const state = (wrapper!.vm.$ as unknown as { setupState: Record<string, any> }).setupState
-  state.route.query.documentId = '9007199254740998'; await flushPromises()
+  state.route.query.documentId = '9007199254740998'
+  await flushPromises()
   expect(mocks.open).toHaveBeenLastCalledWith({ id: '9007199254740998' })
-  wrapper!.unmount(); mocks.open.mockClear(); setup(false); await flushPromises()
+  wrapper!.unmount()
+  mocks.open.mockClear()
+  setup(false)
+  await flushPromises()
   expect(mocks.open).not.toHaveBeenCalled()
 })
 it('uses the canonical outbound id after an inbound deep link and rejects a late previous-factory pair', async() => {
@@ -79,7 +103,32 @@ it('uses the canonical outbound id after an inbound deep link and rejects a late
   const state = (wrapper!.vm.$ as unknown as { setupState: Record<string, any> }).setupState
   expect(state.currentId).toBe('10')
   let release!: (value: unknown) => void
-  mocks.request.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
-  const pending = aggregate.detail('11'); auth.factoryId = 'B'; release(pair)
-  await expect(pending).rejects.toThrow('上下文已变化'); expect(state.currentId).toBe('')
+  mocks.request.mockImplementationOnce(() => new Promise(resolve => {
+    release = resolve
+  }))
+  const pending = aggregate.detail('11')
+  auth.factoryId = 'B'
+  release(pair)
+  await expect(pending).rejects.toThrow('上下文已变化')
+  expect(state.currentId).toBe('')
+})
+
+it('offers reversal only through the transfer caller and preserves its pending intent for retry', async() => {
+  const { auth } = setup()
+  auth.factoryPermissions.push('business:wm:stock:document:cancel')
+  const state = (wrapper!.vm.$ as unknown as { setupState: Record<string, any> }).setupState
+  state.currentId = '9007199254740999'
+  const refresh = vi.fn().mockResolvedValue(undefined)
+  mocks.request.mockRejectedValueOnce(new Error('connection lost')).mockResolvedValueOnce({})
+  const row = { id: '9007199254740999', revision: '4', status: 'POSTED' }
+  await state.reverse(row, refresh, false)
+  expect(mocks.prompt).toHaveBeenCalledOnce()
+  const first = mocks.request.mock.calls[0]![1].body
+  expect(mocks.request.mock.calls[0]![0]).toBe('/api/wm/stock-transfers/9007199254740999/actions/reverse')
+  expect(first).toMatchObject({ expectedRevision: '4', reason: '原单错误' })
+  expect(first.requestId).toMatch(/^[0-9a-f-]{36}$/)
+  await state.reverse(row, refresh, false)
+  expect(mocks.prompt).toHaveBeenCalledOnce()
+  expect(mocks.request.mock.calls[1]![1].body).toEqual(first)
+  expect(refresh).toHaveBeenCalledOnce()
 })

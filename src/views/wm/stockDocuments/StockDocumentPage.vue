@@ -10,6 +10,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import StockActionDialog from './StockActionDialog.vue'
 import StockDocumentLines from './StockDocumentLines.vue'
 import StockDocumentHeader from '@/components/business/warehouse/StockDocumentHeader.vue'
+import StockDocumentMovements from '@/components/business/warehouse/StockDocumentMovements.vue'
 import DocumentFields from '@/components/document/DocumentFields.vue'
 import MasterDetailDocument from '@/components/document/MasterDetailDocument.vue'
 import SupplierSelect from '@/components/business/SupplierSelect.vue'
@@ -293,7 +294,7 @@ const headerFields = computed<Field[]>(() => [
   { key: 'binCode', label: '库位', kind: 'text', readonly: true, hidden: true, searchable: true },
   { key: 'direction', label: '方向', kind: 'text', readonly: true, defaultValue: direction.value, hidden: true },
   { key: 'documentType', label: '单据类型', kind: 'select', required: true, defaultValue: typeof route.query.executionCode === 'string' ? 'PRODUCTION_RECEIPT' : direction.value === 'IN' ? 'OTHER_RECEIPT' : 'OTHER_ISSUE', searchable: true, options: typeOptions.value.map(t => ({ value: t.value, label: t.label })) },
-  { key: 'status', label: '状态', kind: 'select', readonly: true, searchable: true, options: [{ value: 'DRAFT', label: '草稿', tone: 'warning' }, { value: 'POSTED', label: '已审核', tone: 'success' }, { value: 'CANCELLED', label: '已作废', tone: 'info' }] },
+  { key: 'status', label: '状态', kind: 'select', readonly: true, searchable: true, options: [{ value: 'DRAFT', label: '草稿', tone: 'warning' }, { value: 'POSTED', label: '已审核', tone: 'success' }, { value: 'CANCELLED', label: '草稿已作废', tone: 'info' }, { value: 'REVERSED', label: '已撤销', tone: 'danger' }] },
   { key: 'sourceExecutionCode', label: '生产来源', kind: 'text', columnVisible: false, showWhen: { key: 'documentType', value: 'PRODUCTION_RECEIPT' }, defaultValue: typeof route.query.executionCode === 'string' ? route.query.executionCode : undefined },
   { key: 'sourceWorkorderId', label: '工单来源', kind: 'text', readonly: true, hidden: true },
   { key: 'supplierId', label: '供应商', kind: 'text', required: true, columnVisible: false, showWhen: { key: 'documentType', value: 'PURCHASE_RECEIPT' }},
@@ -305,7 +306,8 @@ const headerFields = computed<Field[]>(() => [
   { key: 'remark', label: '备注', kind: 'textarea', columnVisible: false, maxLength: 500 },
   { key: 'postedBy', label: '审核人', kind: 'text', readonly: true, hidden: true },
   { key: 'postRequestId', label: '审核请求', kind: 'text', readonly: true, hidden: true, columnMinWidth: 260 },
-  { key: 'postedAt', label: '审核时间', kind: 'datetime', readonly: true, columnMinWidth: 180 }
+  { key: 'postedAt', label: '审核时间', kind: 'datetime', readonly: true, columnMinWidth: 180 },
+  { key: 'reversedAt', label: '撤销时间', kind: 'datetime', readonly: true, columnMinWidth: 180 }
 ])
 const itemFields:Field[] = [
   { key: 'lineNo', label: '行号', kind: 'number', readonly: true },
@@ -360,10 +362,12 @@ const itemFields:Field[] = [
     >
       <template #search-materialId="{search}"><MaterialSelect :model-value="search.materialId || null" @update:model-value="search.materialId = $event ?? ''" /></template>
       <template #cell-postedAt="{row}"><DateTimeText :value="row.postedAt" /></template>
+      <template #cell-reversedAt="{row}"><DateTimeText :value="row.reversedAt" /></template>
       <template #header-actions="{row,refresh,dirty}"><router-link v-if="transferPath && (row.documentType==='TRANSFER_RECEIPT' || row.documentType==='TRANSFER_ISSUE')" :to="{path:transferPath,query:{documentId:String(row.id)}}">查看关联调拨</router-link><StockDocumentActions :row="row" :refresh="refresh" :dirty="dirty" @pending="id=>pendingDocument=id" /></template>
       <template #header-fields="{draft: headerDraft,disabled: headerDisabled}">
         <template v-if="headerDisabled">
           <StockDocumentHeader :document="headerDraft" :type-label="typeLabel(headerDraft.documentType)" />
+          <StockDocumentMovements v-if="headerDraft.id" :movements="headerDraft.stockMovements" />
         </template>
         <template v-else>
           <section v-for="group in [{title:'',keys:['documentType','ruleCode','sourceExecutionCode']},{title:'采购信息',keys:['supplierId','businessDate','currency','supplierDocumentNo']},{title:'收发说明',keys:['reason','remark']}] .filter(group=>group.title!=='采购信息'||headerDraft.documentType==='PURCHASE_RECEIPT')" :key="group.title" class="header-field-group">
