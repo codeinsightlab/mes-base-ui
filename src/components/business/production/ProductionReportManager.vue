@@ -309,7 +309,7 @@ const person = (name: string | null | undefined, id: string) => name || `用户 
 <template>
   <section v-if="visible && can('quantity')" aria-label="生产数量与报工管理">
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
-    <div class="table-toolbar"><strong>{{ '执行 ' + executionCode }}</strong><span v-if="quantity">计划数量：<QuantityText :value="quantity.targetQty" /> · 确认投产：<QuantityText :value="quantity.confirmedInputQty" /> · 撤销预留：<QuantityText :value="quantity.reservedInputQty" /> · 可支用投产额度：<QuantityText :value="quantity.productionInputQty" /> · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
+    <div class="table-toolbar"><strong>{{ '执行 ' + executionCode }}</strong><span v-if="quantity">计划数量：<QuantityText :value="quantity.targetQty" /> · 确认投产：<QuantityText :value="quantity.confirmedInputQty" /> · 撤销预留：<QuantityText :value="quantity.reservedInputQty" /> · 退料折合产出：<QuantityText :value="quantity.materialReturnQty" /> · 有效投入：<QuantityText :value="quantity.productionInputQty" /> · 实际工艺：{{ quantity.routingLabel || '工艺名称未记录' }}</span><el-button :loading="loading" @click="refresh">刷新数量</el-button></div>
     <el-alert title="当前净产出按正式报工与有效不良计算。不良入仓不会增加产出，入库审核后核对完结条件。" type="info" :closable="false" />
     <p v-if="quantity && !quantity.writable" class="secondary">当前不可继续正常报工；历史补录、订正及冲销仍按独立权限与业务约束校验。</p>
     <el-alert v-if="quantity?.boundary" :title="quantity.boundary" type="warning" :closable="false" />
