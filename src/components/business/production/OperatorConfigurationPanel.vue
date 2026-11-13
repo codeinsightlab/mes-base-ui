@@ -12,13 +12,18 @@ import { operatorConfiguration, type UserOption, type AssignmentNode } from '@/a
 import type { Field } from '@/lib/crud'
 const ElMessageBox = usePageMessageBox()
 
-const props = defineProps<{ operationId?: string; executionCode?: string; contextLabel?: string; triggerLabel?: string }>()
+const props = defineProps<{ operationId?: string; executionCode?: string; contextLabel?: string; triggerLabel?: string; qualificationRevision?: number }>()
 const emit = defineEmits<{ changed: []; pending: [value: boolean]; busy: [value: boolean] }>()
 const auth = useAuth(), visible = ref(false), loading = ref(false), error = ref(''), keyword = ref('')
 const selected = ref<string[]>([]), options = ref<UserOption[]>([]), nodes = ref<AssignmentNode[]>([]), nodeId = ref(''), status = ref('')
 const searching = ref(false), userLabels = ref<Record<string, UserOption>>({})
 const retainedOptions = computed(() => selected.value.map(id => userLabels.value[id]).filter((u): u is UserOption => Boolean(u) && !options.value.some(option => option.id === u.id)))
-function userLabel(id: unknown) { const u = userLabels.value[String(id)]; return u ? `${u.name}（${u.id}）` : String(id) }
+
+function userLabel(id: unknown) {
+  const u = userLabels.value[String(id)]
+  return u ? `${u.name}（${u.id}）` : String(id)
+}
+
 const offset = ref(0), hasMore = ref(false), refresh = ref(0)
 let sequence = 0, optionSequence = 0
 const assignment = computed(() => Boolean(props.executionCode))
@@ -27,64 +32,148 @@ const canRead = computed(() => auth.hasPermission(permission.value + ':list', 'f
 const canCreate = computed(() => auth.hasPermission(permission.value + ':create', 'factory'))
 const mutable = computed(() => !assignment.value || ['READY', 'RUNNING'].includes(status.value))
 const node = computed(() => nodes.value.find(n => n.id === nodeId.value))
-const fixed = computed(() => { const value: Record<string, string> = {}; if (assignment.value) { value.executionCode = props.executionCode!; value.routingNodeId = nodeId.value } else value.operationId = props.operationId!; return value })
+const fixed = computed(() => {
+  const value: Record<string, string> = {}
+  if (assignment.value) {
+    value.executionCode = props.executionCode!
+    value.routingNodeId = nodeId.value
+  } else value.operationId = props.operationId!
+  return value
+})
 const fields = computed<Field[]>(() => [
   { key: 'id', label: '关系编号', kind: 'text', hidden: true, readonly: true },
   { key: 'userId', label: '操作人员', kind: 'select', options: options.value.map(u => ({ label: `${u.name}（${u.id}）`, value: u.id })) },
   { key: 'remark', label: '备注', kind: 'text' },
   ...(assignment.value ? [{ key: 'assignedAt', label: '派工时间', kind: 'datetime', readonly: true } as Field] : [])
 ])
-function clear() { sequence++; optionSequence++; searching.value = false; userLabels.value = {}; visible.value = false; loading.value = false; error.value = ''; keyword.value = ''; selected.value = []; options.value = []; nodes.value = []; nodeId.value = ''; status.value = ''; offset.value = 0; hasMore.value = false }
+
+function clear() {
+  sequence++
+  optionSequence++
+  searching.value = false
+  userLabels.value = {}
+  visible.value = false
+  loading.value = false
+  error.value = ''
+  keyword.value = ''
+  selected.value = []
+  options.value = []
+  nodes.value = []
+  nodeId.value = ''
+  status.value = ''
+  offset.value = 0
+  hasMore.value = false
+}
+
 watch(() => [props.operationId, props.executionCode, auth.factoryId, auth.revision, auth.factoryPermissions.join('|')], clear, { flush: 'sync' })
+watch(() => props.qualificationRevision, () => {
+  refresh.value++
+  if (assignment.value) void loadOptions()
+})
 onBeforeUnmount(clear)
+
 async function loadOptions(more = false) {
   if (!visible.value || !canRead.value || assignment.value && !node.value) return
-  const ticket = ++optionSequence; searching.value = true; error.value = ''
-  if (!more) { offset.value = 0; options.value = []; hasMore.value = false }
+  const ticket = ++optionSequence
+  searching.value = true
+  error.value = ''
+  if (!more) {
+    offset.value = 0
+    options.value = []
+    hasMore.value = false
+  }
   try {
     if (assignment.value) {
       const page = await operatorConfiguration.candidates(node.value!.operationId, offset.value)
       if (ticket !== optionSequence) return
-      options.value = [...options.value, ...page.items]; offset.value = page.nextOffset; hasMore.value = page.hasMore
+      options.value = [...options.value, ...page.items]
+      offset.value = page.nextOffset
+      hasMore.value = page.hasMore
     } else {
       const page = await operatorConfiguration.users(keyword.value, offset.value)
       if (ticket !== optionSequence) return
-      options.value = [...options.value, ...page.items]; offset.value += page.items.length; hasMore.value = offset.value < page.total
+      options.value = [...options.value, ...page.items]
+      offset.value += page.items.length
+      hasMore.value = offset.value < page.total
     }
     userLabels.value = { ...userLabels.value, ...Object.fromEntries(options.value.map(u => [u.id, u])) }
-  } catch(e) { if (ticket === optionSequence) error.value = e instanceof Error ? e.message : '人员读取失败' } finally { if (ticket === optionSequence) searching.value = false }
+  } catch (e) {
+    if (ticket === optionSequence) error.value = e instanceof Error ? e.message : '人员读取失败'
+  } finally {
+    if (ticket === optionSequence) searching.value = false
+  }
 }
+
 function searchPeople(value: string) {
   if (assignment.value || !visible.value || loading.value) return
   keyword.value = value.trim().slice(0, 100)
   void loadOptions()
 }
+
 async function open() {
   if (!canRead.value) return
-  clear(); visible.value = true
+  clear()
+  visible.value = true
   if (assignment.value) {
-    const ticket = ++sequence; loading.value = true
-    try { const result = await operatorConfiguration.nodes(props.executionCode!); if (ticket !== sequence) return; nodes.value = result.nodes; status.value = result.status } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '节点读取失败' } finally { if (ticket === sequence) loading.value = false }
+    const ticket = ++sequence
+    loading.value = true
+    try {
+      const result = await operatorConfiguration.nodes(props.executionCode!)
+      if (ticket !== sequence) return
+      nodes.value = result.nodes
+      status.value = result.status
+    } catch (e) {
+      if (ticket === sequence) error.value = e instanceof Error ? e.message : '节点读取失败'
+    } finally {
+      if (ticket === sequence) loading.value = false
+    }
   } else await loadOptions()
 }
-function nodeLabel(n: AssignmentNode) { return `${n.code} · ${n.name?.trim() || '工序名称未记录'}（节点 ${n.id}）` }
-function changeNode() { selected.value = []; options.value = []; refresh.value++; void loadOptions() }
+
+function nodeLabel(n: AssignmentNode) {
+  return `${n.code} · ${n.name?.trim() || '工序名称未记录'}（节点 ${n.id}）`
+}
+
+function changeNode() {
+  selected.value = []
+  options.value = []
+  refresh.value++
+  void loadOptions()
+}
+
 async function save() {
   if (!canCreate.value || !mutable.value || !selected.value.length || selected.value.length > 100 || loading.value) return
-  const ticket = ++sequence; loading.value = true; error.value = ''
+  const ticket = ++sequence
+  loading.value = true
+  error.value = ''
   try {
     if (assignment.value) await assignmentApi.create({ executionCode: props.executionCode, routingNodeId: nodeId.value, userId: selected.value[0], remark: null })
     else await operatorConfiguration.bind(props.operationId!, selected.value)
-    if (ticket === sequence) { selected.value = []; refresh.value++; ElMessage.success(assignment.value ? '节点派工已保存' : '工序能力已保存'); emit('changed') }
-  } catch(e) { if (ticket === sequence) error.value = e instanceof Error ? e.message : '保存失败' } finally { if (ticket === sequence) loading.value = false }
+    if (ticket === sequence) {
+      selected.value = []
+      refresh.value++
+      ElMessage.success(assignment.value ? '节点派工已保存' : '工序能力已保存')
+      emit('changed')
+    }
+  } catch (e) {
+    if (ticket === sequence) error.value = e instanceof Error ? e.message : '保存失败'
+  } finally {
+    if (ticket === sequence) loading.value = false
+  }
 }
+
 async function beforeClose(done: () => void) {
   const ticket = sequence
   if (selected.value.length) {
-    try { await ElMessageBox.confirm('尚有未保存的人员选择，是否放弃？', '关闭配置', { type: 'warning' }) } catch { return }
+    try {
+      await ElMessageBox.confirm('尚有未保存的人员选择，是否放弃？', '关闭配置', { type: 'warning' })
+    } catch {
+      return
+    }
   }
   if (ticket !== sequence) return
-  clear(); done()
+  clear()
+  done()
 }
 
 watch(() => selected.value.length > 0, value => emit('pending', value), { flush: 'sync' })

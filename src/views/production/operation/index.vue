@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OperatorQualificationPanel from '@/components/business/production/OperatorQualificationPanel.vue'
 import OperationDefectTypePanel from '@/components/business/quality/OperationDefectTypePanel.vue'
 import OperatorConfigurationPanel from '@/components/business/production/OperatorConfigurationPanel.vue'
 import { ref, watch } from 'vue'
@@ -9,12 +10,16 @@ import { api as generatedApi } from '@/api/production/operation'
 import { request } from '@/lib/request'
 import type { Field, Row } from '@/lib/crud'
 import { useAuth } from '@/stores/auth'
+const qualificationOpen = ref(false), qualificationRevision = ref(0)
 const page = ref<InstanceType<typeof CrudPage> | null>(null)
 const auth = useAuth()
 const typePending = ref(false), typeBusy = ref(false)
 const peoplePending = ref(false), peopleBusy = ref(false), editorTab = ref('information')
 let editingRevision: { id: string; revision: number } | null = null
-watch(() => auth.revision, () => { editingRevision = null }, { flush: 'sync' })
+watch(() => auth.revision, () => {
+  editingRevision = null
+  qualificationOpen.value = false
+}, { flush: 'sync' })
 const fields: Field[] = [
   { key: 'id', label: '编号', kind: 'text', readonly: true, hidden: true },
 
@@ -51,6 +56,8 @@ const sync = () => request<{ fetched: number; created: number; updated: number; 
   '/api/production/operation/actions/sync', { method: 'POST', scope: 'factory' })
 </script>
 <template>
+  <div>
+    <OperatorQualificationPanel v-if="qualificationOpen" @changed="qualificationRevision++" />
   <CrudPage
     ref="page"
     title="工序"
@@ -76,7 +83,7 @@ const sync = () => request<{ fetched: number; created: number; updated: number; 
         </el-tab-pane>
         <el-tab-pane label="可操作人员" name="people" lazy>
           <p class="secondary">人员配置单独保存，保存后立即生效。</p>
-          <OperatorConfigurationPanel v-if="editId && auth.hasPermission('business:mes:operation:user:list', 'factory')" :key="editId" :operation-id="editId" :context-label="String(draft.code) + ' · ' + String(draft.name)" @pending="peoplePending = $event" @busy="peopleBusy = $event" />
+          <OperatorConfigurationPanel v-if="editId && auth.hasPermission('business:mes:operation:user:list', 'factory')" :key="editId" :qualification-revision="qualificationRevision" :operation-id="editId" :context-label="String(draft.code) + ' · ' + String(draft.name)" @pending="peoplePending = $event" @busy="peopleBusy = $event" />
           <p v-else class="secondary">{{ editId ? '暂无查看工序能力人员的权限。' : '请先保存工序，再编辑并配置可操作人员。' }}</p>
         </el-tab-pane>
         <el-tab-pane label="不良类型" name="defects" lazy>
@@ -85,6 +92,7 @@ const sync = () => request<{ fetched: number; created: number; updated: number; 
         </el-tab-pane>
       </el-tabs>
     </template>
-    <template #toolbar><SyncButton permission="operation:sync" scope="factory" :run="sync" @completed="page?.load()" /></template>
+    <template #toolbar><el-button v-if="auth.hasPermission('business:mes:operation:user:list', 'factory')" @click="qualificationOpen = !qualificationOpen">用户工序资格</el-button><SyncButton permission="operation:sync" scope="factory" :run="sync" @completed="page?.load()" /></template>
   </CrudPage>
+  </div>
 </template>
