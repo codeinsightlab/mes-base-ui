@@ -7,7 +7,8 @@ export interface TypeInput { code: string; name: string; defaultWasteCategory: W
 export interface Page<T> { items: T[]; total: number; offset: number; limit: number }
 export interface DeclarationContext { executionCode: string; nodeId: string; operationId: string; operationName: string | null; productId: string; productCode: string; productName: string; types: DefectType[]; typeTotal: number; offset: number; limit: number; canOverrideWasteCategory: boolean }
 export interface Declaration { requestId: string; executionCode: string; nodeId: string; defectTypeId: string; expectedTypeRevision: number; quantity: string; wasteCategory: WasteCategory; remark: string | null; occurredAt: string }
-export interface Statistics { operationId: string; defectTypeId: string | null; typeName: string | null; typeNameVariants?: number; wasteCategory: string; declaredQty: string; independentQty: string; overlapQty: string; unverifiedQty: string; returnedQty: string | null; netDefectQty: string | null; invalidActions: number }
+/** invalidActions counts unresolved declarations; their derived quantities are unavailable. */
+export interface Statistics { operationId: string | null; defectTypeId: string | null; typeName: string | null; typeNameVariants?: number; wasteCategory: string; declaredQty: string | null; independentQty: string | null; overlapQty: string | null; unverifiedQty: string | null; returnedQty: string | null; netDefectQty: string | null; invalidActions: number }
 const root = '/api/quality/defects'
 const typePath = (id: string) => '/api/production/operation/' + encodeURIComponent(id) + '/defect-types'
 export const qualityV2 = {
