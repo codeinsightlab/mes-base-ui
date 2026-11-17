@@ -15,44 +15,209 @@ const props = defineProps<{ modelValue?: string | null;batchNo?: string | null;b
 const emit = defineEmits<{ 'update:modelValue': [string | null];selected: [WmInventoryVo, string] }>()
 const auth = useAuth(), rows = ref<WmInventoryVo[]>([]), loading = ref(false), error = ref(''), offset = ref(0), total = ref(0)
 const creating = ref(false), batch = ref(''), bin = ref('')
+const canCreate = computed(() => props.receipt && auth.runtimeMode === 'LOCAL' && auth.hasPermission('business:wm:inventory:create', 'factory'))
+const createTooltip = computed(() => {
+  if (!props.materialId || !props.warehouseId) return '请先选择物料和仓库'
+  if (props.disabled) return '当前单据不可编辑'
+  if (!auth.hasPermission('business:wm:inventory:list', 'factory')) return '缺少库存来源查询权限'
+  if (loading.value) return '正在处理库存来源'
+  return '新增批次/库位'
+})
+const selectedRow = computed(() => rows.value.find(row => row.id === props.modelValue))
+const selectedLabel = computed(() => {
+  const row = selectedRow.value
+  if (row) return `${row.materialName || '物料名称待确认'} · ${row.warehouseName || '仓库名称待确认'} · ${row.batchNo || '无批次'} / ${row.binCode || '无库位'}`
+  return `${props.batchNo || '无批次'} / ${props.binCode || '无库位'}`
+})
 let generation = 0
 const allowed = computed(() => auth.runtimeMode === 'LOCAL' && !!props.materialId && !!props.warehouseId && auth.hasPermission('business:wm:inventory:list', 'factory'))
-function clear() { generation++;rows.value = [];error.value = '';loading.value = false;creating.value = false;batch.value = '';bin.value = '';offset.value = total.value = 0 }
+
+function clear() {
+  generation++
+  rows.value = []
+  error.value = ''
+  loading.value = false
+  creating.value = false
+  batch.value = ''
+  bin.value = ''
+  offset.value = total.value = 0
+}
+
 async function load(more = false) {
   if (!allowed.value) return
-  const g = ++generation;loading.value = true;error.value = ''
-  try { const r = await api.list({ materialId: props.materialId!, warehouseId: props.warehouseId!, status: 'ENABLED', offset: more ? offset.value + 20 : 0, limit: 20 });if (g !== generation) return;offset.value = more ? offset.value + 20 : 0;rows.value = more ? [...rows.value, ...r.items] : r.items;total.value = r.total } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '来源读取失败' } finally { if (g === generation)loading.value = false }
+  const g = ++generation
+  loading.value = true
+  error.value = ''
+  try {
+    const r = await api.list({ materialId: props.materialId!, warehouseId: props.warehouseId!, status: 'ENABLED', offset: more ? offset.value + 20 : 0, limit: 20 })
+    if (g !== generation) return
+    offset.value = more ? offset.value + 20 : 0
+    rows.value = more ? [...rows.value, ...r.items] : r.items
+    total.value = r.total
+  } catch (e) {
+    if (g === generation)error.value = e instanceof Error ? e.message : '来源读取失败'
+  } finally {
+    if (g === generation)loading.value = false
+  }
 }
+
 async function selected(id:string | null) {
-  emit('update:modelValue', id);if (!id) return
-  const g = ++generation;loading.value = true
-  try { const [s, m] = await Promise.all([api.detail(id), materials.detail(props.materialId!)]);if (g === generation)emit('selected', s, m.unitId) } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '来源校验失败' } finally { if (g === generation)loading.value = false }
+  emit('update:modelValue', id)
+  if (!id) return
+  const g = ++generation
+  loading.value = true
+  try {
+    const [s, m] = await Promise.all([api.detail(id), materials.detail(props.materialId!)])
+    if (g === generation)emit('selected', s, m.unitId)
+  } catch (e) {
+    if (g === generation)error.value = e instanceof Error ? e.message : '来源校验失败'
+  } finally {
+    if (g === generation)loading.value = false
+  }
 }
+
 async function create() {
   if (!allowed.value || loading.value || !auth.hasPermission('business:wm:inventory:create', 'factory')) return
-  const g = ++generation;loading.value = true
-  try { const s = await api.create({ materialId: props.materialId, warehouseId: props.warehouseId, batchNo: batch.value || null, binCode: bin.value || null, status: 'ENABLED', remark: '入库单受控零余额来源' });if (g !== generation) return;rows.value = [s, ...rows.value];await selected(s.id);batch.value = '';bin.value = '';creating.value = false } catch(e) { if (g === generation)error.value = e instanceof Error ? e.message : '零余额来源创建失败' } finally { if (g === generation)loading.value = false }
+  const g = ++generation
+  loading.value = true
+  try {
+    const s = await api.create({ materialId: props.materialId, warehouseId: props.warehouseId, batchNo: batch.value || null, binCode: bin.value || null, status: 'ENABLED', remark: '入库单受控零余额来源' })
+    if (g !== generation) return
+    rows.value = [s, ...rows.value]
+    await selected(s.id)
+    batch.value = ''
+    bin.value = ''
+    creating.value = false
+  } catch (e) {
+    if (g === generation)error.value = e instanceof Error ? e.message : '零余额来源创建失败'
+  } finally {
+    if (g === generation)loading.value = false
+  }
 }
+
 async function close(done?:() => void) {
   const g = generation
-  if (batch.value || bin.value) { try { await ElMessageBox.confirm('放弃未保存的库存来源信息？', '未保存的修改', { type: 'warning' }) } catch { return } }
+  if (batch.value || bin.value) {
+    try {
+      await ElMessageBox.confirm('放弃未保存的库存来源信息？', '未保存的修改', { type: 'warning' })
+    } catch {
+      return
+    }
+  }
   if (g !== generation) return
-  generation++;loading.value = false;creating.value = false;batch.value = '';bin.value = '';if (done)done()
+  generation++
+  loading.value = false
+  creating.value = false
+  batch.value = ''
+  bin.value = ''
+  if (done)done()
 }
+
 watch(() => [auth.revision, auth.factoryId, auth.factoryPermissions.join('|'), props.materialId, props.warehouseId], clear)
 onBeforeUnmount(clear)
 </script>
 <template>
-  <div><el-select :model-value="modelValue" :disabled="disabled||!allowed" :loading="loading" placeholder="选择批次 / 库位" clearable @visible-change="(v:boolean)=>v&&load()" @update:model-value="selected">
-         <el-option v-if="modelValue&&!rows.some(r=>r.id===modelValue)" :value="modelValue" :label="`${batchNo||'无批次'} / ${binCode||'无库位'}`" />
-         <el-option v-for="r in rows" :key="r.id" :value="r.id" :label="`${r.batchNo||'无批次'} / ${r.binCode||'无库位'} · 可用 ${formatQuantity(r.availableQuantity??r.quantity)}`" />
-         <template #footer><el-button v-if="rows.length<total" link :disabled="loading" @mousedown.prevent @click="load(true)">加载更多</el-button></template>
-       </el-select>
-    <el-button v-if="receipt&&allowed&&auth.hasPermission('business:wm:inventory:create','factory')" link :disabled="disabled" @click="creating=true">新增批次 / 库位</el-button>
-    <el-text v-if="error" type="danger">{{ error }}</el-text>
+  <div class="stock-source-select">
+    <el-select class="stock-source-select__control" :model-value="modelValue" :disabled="disabled||!allowed" :loading="loading" placeholder="选择批次 / 库位" clearable popper-class="stock-source-dropdown" @visible-change="(v:boolean)=>v&&load()" @update:model-value="selected">
+      <template #label="{ label }">
+        <span class="stock-source-select__label" :title="selectedLabel || label">{{ selectedLabel || label }}</span>
+      </template>
+      <el-option v-if="modelValue&&!rows.some(r=>r.id===modelValue)" :value="modelValue" :label="`${batchNo||'无批次'} / ${binCode||'无库位'}`" />
+      <el-option v-for="r in rows" :key="r.id" :value="r.id" :label="`${r.materialName || '物料名称待确认'} · ${r.warehouseName || '仓库名称待确认'} · ${r.batchNo||'无批次'} / ${r.binCode||'无库位'}`">
+        <div class="stock-source-option" :title="`${r.materialName || '物料名称待确认'} · ${r.warehouseName || '仓库名称待确认'} · 批次 ${r.batchNo||'无批次'} · 库位 ${r.binCode||'无库位'} · 可用 ${formatQuantity(r.availableQuantity??r.quantity)}`">
+          <span class="stock-source-option__identity"><strong>{{ r.materialName || '物料名称待确认' }} · {{ r.warehouseName || '仓库名称待确认' }}</strong><small>批次 {{ r.batchNo||'无批次' }} · 库位 {{ r.binCode||'无库位' }}</small></span>
+          <small class="stock-source-option__quantity">可用 {{ formatQuantity(r.availableQuantity??r.quantity) }}</small>
+        </div>
+      </el-option>
+      <template #footer><el-button v-if="rows.length<total" link :disabled="loading" @mousedown.prevent @click="load(true)">加载更多</el-button></template>
+    </el-select>
+    <el-tooltip v-if="canCreate" :content="createTooltip" placement="top" :show-after="300">
+      <span class="stock-source-select__create-trigger"><el-button class="mes-focus-icon" size="small" circle plain icon="Plus" aria-label="新增批次/库位" :disabled="disabled||!allowed||loading" @click="creating=true" /></span>
+    </el-tooltip>
+    <el-text v-if="error" class="stock-source-select__error" type="danger">{{ error }}</el-text>
     <PageDialog v-model="creating" title="新增批次 / 库位" width="480px" append-to-body :before-close="close" @closed="batch='';bin=''">
       <el-alert title="新增批次和库位后，审核单据才会增加库存。" :closable="false" type="info" />
       <el-form label-position="top"><el-form-item label="实际批次"><el-input v-model="batch" maxlength="128" /></el-form-item><el-form-item label="实际库位"><el-input v-model="bin" maxlength="64" /></el-form-item></el-form>
       <template #footer><el-button @click="close()">取消</el-button><el-button type="primary" :loading="loading" @click="create">确认</el-button></template>
     </PageDialog></div>
 </template>
+
+<style scoped>
+.stock-source-select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.stock-source-select__control {
+  flex: 1;
+  min-width: 0;
+}
+
+.stock-source-select :deep(.el-select) {
+  width: 100%;
+  min-width: 0;
+}
+
+.stock-source-select__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-source-select__create-trigger {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.stock-source-select__error {
+  flex-basis: 100%;
+}
+
+:global(.stock-source-dropdown) {
+  max-width: min(520px, calc(100vw - 32px));
+}
+
+:global(.stock-source-dropdown .el-select-dropdown__item) {
+  height: auto;
+  min-height: 34px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+:global(.stock-source-dropdown .stock-source-option) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px 0;
+  white-space: normal;
+}
+
+:global(.stock-source-dropdown .stock-source-option__identity) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+:global(.stock-source-dropdown .stock-source-option__identity strong) {
+  font-weight: 500;
+}
+
+:global(.stock-source-dropdown .stock-source-option__identity small),
+:global(.stock-source-dropdown .stock-source-option__quantity) {
+  color: var(--ui-text-secondary);
+}
+
+:global(.stock-source-dropdown .stock-source-option__quantity) {
+  flex: 0 0 auto;
+}
+</style>
