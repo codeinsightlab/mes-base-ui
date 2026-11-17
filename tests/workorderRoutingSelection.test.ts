@@ -174,9 +174,8 @@ it('explains unallocated execution quantity, removes excess allocation, and keep
   list.mockResolvedValue({ items: [{ workorder: { id: '1', code: 'WO', plannedQty: '100', status: 'RELEASED' },
     allocation: { allocatedTargetQty: '110', remainingTargetQty: '-10', excessTargetQty: '10' }}], total: 1 })
   await setup()
-  expect(wrapper.text()).toContain('未分配执行数量')
-  expect(wrapper.findAllComponents({ name: 'ElTooltip' }).some(tip => tip.props('content') === '未分配执行数量＝计划数量－有效执行目标合计，不代表未完成量。')).toBe(true)
-  expect(wrapper.text()).not.toContain('尚未分配')
+  expect(wrapper.text()).toContain('待分配执行目标数量')
+  expect(wrapper.findAllComponents({ name: 'ElTooltip' }).some(tip => tip.props('content') === '表示计划数量中尚未分配给执行单元的部分，计算为计划数量－执行目标合计。执行目标分配后，仍可能尚未投产或完成；此数不代表剩余生产量。')).toBe(true)
   expect(wrapper.text()).not.toContain('超额分配')
   expect(wrapper.find('span[title="-10"]').text()).toBe('-10')
 })
