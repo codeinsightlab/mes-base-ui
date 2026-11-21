@@ -16,7 +16,15 @@ export interface StockTotals { quantity: string; available: string | null; unit:
 export interface StockRow extends Balance { materialId: string; warehouseId: string; batch: string; bin: string }
 export interface Movements { unit: string | null; net: string; issued: string; returned: string; days: { day: string; inbound: string; outbound: string }[] }
 export interface FlowRow { id: string; documentId: string; direction: string; lineId: string; documentNo: string; type: string; delta: string; unit: string | null; occurredAt: string }
+export interface PersonSummary { person: string; reports: number; orders: number; operations: number }
+export interface OperationCell { person: string; operation: string | null; name: string | null; reports: number; quantity: string | null; unit: string | null }
+export interface PersonReport { id: string; person: string; workorder: string | null; product: string | null; operation: string | null; reportTime: string; original: string; effective: string; unit: string | null }
 interface Responses {
+  'people-summary': { reports: number;people: number;orders: number;operations: number }
+  'people-days': Count[]
+  people: { page: Slice<PersonSummary>;cells: OperationCell[];names: Record<string, string> }
+  'person-reports': { page: Slice<PersonReport>;names: Record<string, string> }
+
   path: { facts: ExecutionQuantity; unitName: string | null }
   'order-states': Count[]; 'order-summary': OrderSummary; orders: WorkOrderProgressPage; executions: ExecutionStats; 'report-days': Count[]; reports: Slice<ReportRow>
   'defect-products': ProductCount[]; 'declaration-count': number; quality: Quality; defects: Slice<DefectRow>

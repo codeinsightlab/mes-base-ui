@@ -10,7 +10,7 @@ const topic = ref('')
 watch(() => route.query.topic, value => {
   if (route.path === '/production/analytics')topic.value = typeof value === 'string' ? value : ''
 }, { immediate: true })
-const tabs = [{ id: 'overview', label: '生产总览', perms: [access.orders, access.execution, access.report, access.quality] }, { id: 'orders', label: '工单分析', perms: [access.orders] }, { id: 'process', label: '工序与执行', perms: [access.execution, access.quantity] }, { id: 'quality', label: '质量分析', perms: [access.quality] }, { id: 'inventory', label: '库存与物料', perms: [access.stock, access.flow] }] as const
+const tabs = [{ id: 'overview', label: '生产总览', perms: [access.orders, access.execution, access.report, access.quality] }, { id: 'orders', label: '工单分析', perms: [access.orders] }, { id: 'process', label: '工序与执行', perms: [access.execution, access.quantity] }, { id: 'quality', label: '质量分析', perms: [access.quality] }, { id: 'inventory', label: '库存与物料', perms: [access.stock, access.flow] }, { id: 'people', label: '人员报工', perms: [access.report] }] as const
 const allowed = computed(() => tabs.filter(t => t.perms.some(p => auth.hasPermission(p, 'factory'))))
 const current = computed(() => topic.value ? allowed.value.find(t => t.id === topic.value) : allowed.value[0])
 </script>

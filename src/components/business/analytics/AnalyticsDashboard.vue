@@ -7,6 +7,7 @@ import WorkOrderSelect from '@/components/business/production/WorkOrderSelect.vu
 import ExecutionSelect from '@/components/business/production/ExecutionSelect.vue'
 import MetricValue from '@/components/MetricValue.vue'
 import CodeText from '@/components/CodeText.vue'
+import PeopleAnalytics from './PeopleAnalytics.vue'
 import AnalysisRegion from './AnalysisRegion.vue'
 import FactChart from './FactChart.vue'
 import type { Chart } from './chart'
@@ -17,7 +18,7 @@ import { executionStatusLabel } from '@/lib/production/executionState'
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import { useAuth } from '@/stores/auth'
 import { parseTime } from '@/utils/ruoyi'
-type Topic = 'overview' | 'orders' | 'process' | 'quality' | 'inventory'
+type Topic = 'overview' | 'orders' | 'process' | 'quality' | 'inventory' | 'people'
 const props = defineProps<{ topic: Topic }>()
 const auth = useAuth(), router = useRouter()
 const route = useRoute()
@@ -187,13 +188,14 @@ const total = computed(() => show('quality') ? defects.value.data?.total : show(
     <div class="analysis-filter filter-panel">
       <el-radio-group :model-value="preset" aria-label="统计期间" @change="choosePeriod(String($event))"><el-radio-button v-for="p in ['今天','近 7 天','本月','自定义']" :key="p" :value="p">{{ p }}</el-radio-button></el-radio-group>
       <template v-if="preset==='自定义'"><label>开始日期<input v-model="start" type="date"></label><label>结束日期<input v-model="end" type="date"></label></template><small v-else>{{ start }} — {{ end }}</small>
-      <label v-if="show('orders','quality','inventory')">{{ show('inventory')?'物料':'产品' }}<MaterialSelect v-model="product" /></label>
+      <label v-if="show('orders','quality','inventory','people')">{{ show('inventory')?'物料':'产品' }}<MaterialSelect v-model="product" /></label>
       <label v-if="show('orders') || (show('overview') && status)">工单状态<el-select v-model="status" clearable placeholder="全部状态"><el-option v-for="(label,value) in orderLabels" :key="value" :label="label" :value="value" /></el-select></label>
-      <template v-if="show('process')"><label>工单<WorkOrderSelect v-model="order" /></label><el-button v-if="order" link @click="order=null">全部工单</el-button><label>执行批次<ExecutionSelect v-model="batch" :workorder-id="order" /></label></template>
+      <template v-if="show('process','people')"><label>工单<WorkOrderSelect v-model="order" /></label><el-button v-if="order" link @click="order=null">全部工单</el-button><label v-if="show('process')">执行批次<ExecutionSelect v-model="batch" :workorder-id="order" /></label></template>
       <label v-if="show('inventory')">仓库<WarehouseSelect v-model="warehouse" source="LOCAL" history /></label>
     </div>
     <p v-if="!valid" role="alert">请选择有效的起止日期，范围最多 92 天。</p>
-    <section class="analytics-metrics" aria-label="关键指标"><div v-for="m in metrics" :key="m.label"><span>{{ m.label }}</span><MetricValue :value="m.value" :unit="m.unit" /><small>{{ m.note }}</small></div></section>
+    <PeopleAnalytics v-if="show('people')" :start="start" :end="end" :valid="valid" :product="product" :order="order" />
+    <section v-else class="analytics-metrics" aria-label="关键指标"><div v-for="m in metrics" :key="m.label"><span>{{ m.label }}</span><MetricValue :value="m.value" :unit="m.unit" /><small>{{ m.note }}</small></div></section>
     <div v-if="show('overview')" class="analytics-pair">
       <AnalysisRegion title="生产报工趋势" caption="按原报工日统计当前有效笔数" :result="reportDays" :empty="!reportDays.data?.length"><FactChart :chart="reportChart" @select="byDay" /></AnalysisRegion>
       <AnalysisRegion title="工单状态分布" caption="期间新建工单的当前状态" :result="orderStates" :empty="!orderStates.data?.length">
