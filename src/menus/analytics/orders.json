@@ -1,0 +1,1 @@
+{"id": "analytics:orders", "name": "工单分析", "path": "/analytics/orders", "component": "analytics/orders/index", "permission": "business:analytics:orders:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": []}

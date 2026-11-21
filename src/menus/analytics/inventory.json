@@ -1,0 +1,1 @@
+{"id": "analytics:inventory", "name": "库存与物料", "path": "/analytics/inventory", "component": "analytics/inventory/index", "permission": "business:analytics:inventory:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": []}

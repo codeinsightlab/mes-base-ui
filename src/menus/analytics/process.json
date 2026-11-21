@@ -1,0 +1,1 @@
+{"id": "analytics:process", "name": "工序与执行", "path": "/analytics/process", "component": "analytics/process/index", "permission": "business:analytics:process:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": []}

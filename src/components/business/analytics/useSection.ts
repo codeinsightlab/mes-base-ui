@@ -1,10 +1,9 @@
 import { ref, shallowRef, watchEffect } from 'vue'
 import { useAuth } from '@/stores/auth'
 import { ApiError } from '@/lib/request'
-import { access } from '@/api/production/analytics'
 export type ReadState = 'idle' | 'loading' | 'ready' | 'error' | 'forbidden' | 'unavailable'
 export interface Section<T> { state: ReadState; message: string; data: T | undefined; retry: () => void }
-export function useSection<T>(permission: string, enabled: () => boolean, read: (signal: AbortSignal) => Promise<T>, localOnly = false) {
+export function useSection<T>(permission: string | readonly string[], enabled: () => boolean, read: (signal: AbortSignal) => Promise<T>, localOnly = false) {
   const auth = useAuth(), revision = ref(0)
   const retry = () => {
     revision.value++
@@ -20,7 +19,8 @@ export function useSection<T>(permission: string, enabled: () => boolean, read: 
       set('idle')
       return
     }
-    if (![access.menu, permission].every(p => auth.hasPermission(p, 'factory'))) {
+    const required = typeof permission === 'string' ? [permission] : permission
+    if (!required.every(p => auth.hasPermission(p, 'factory'))) {
       set('forbidden', '当前账号缺少该区域的读取权限')
       return
     }

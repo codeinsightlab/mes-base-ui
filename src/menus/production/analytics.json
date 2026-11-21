@@ -1,1 +1,0 @@
-{ "id": "production:analytics", "name": "生产分析", "path": "/production/analytics", "component": "production/analytics/index", "permission": "business:analytics:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": [] }

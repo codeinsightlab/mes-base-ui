@@ -1,0 +1,1 @@
+{"id": "analytics:people", "name": "人员报工", "path": "/analytics/people", "component": "analytics/people/index", "permission": "business:analytics:people:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": []}

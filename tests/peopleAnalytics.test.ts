@@ -4,14 +4,14 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { expect, it, vi } from 'vitest'
 import PeopleAnalytics from '../src/components/business/analytics/PeopleAnalytics.vue'
 import { useAuth } from '../src/stores/auth'
-import { access, readAnalytics } from '../src/api/production/analytics'
+import { access, boards, readAnalytics } from '../src/api/production/analytics'
 vi.mock('../src/api/production/analytics', async original => ({
   ...await original<typeof import('../src/api/production/analytics')>(), readAnalytics: vi.fn()
 }))
 it('人员与工序单元格和趋势日共用明细范围，作废审计不改汇总范围', async() => {
   const who = '9007199254740993'
   const pinia = createPinia()
-  useAuth(pinia).$patch({ factoryId: 'A', factoryPermissions: [access.menu, access.report] })
+  useAuth(pinia).$patch({ factoryId: 'A', factoryPermissions: [boards.people.permission, access.report] })
   const page = { items: [{ person: who, reports: 1, operations: 1, orders: 1 }], total: 1, limit: 20, offset: 0 }
   vi.mocked(readAnalytics).mockImplementation(async key => {
     if (key === 'people') return { page, names: { [who]: '操作人甲' }, cells: ['31', '42'].map(operation => ({ person: who, operation, name: '剪切', reports: 1, quantity: '1.500000', unit: 'kg' })) }
@@ -33,6 +33,28 @@ it('人员与工序单元格和趋势日共用明细范围，作废审计不改�
     await w.findAll('input[type=radio]')[1].setValue()
     expect(detail().voided).toBe('true')
     expect(calls.filter(c => c[0] === 'people-summary').at(-1)![1]).toMatchObject({ end: '2026-10-02', person: who, operation: '31' })
+  } finally {
+    w.unmount()
+  }
+})
+
+it('仅勾选人员报工可以读取汇总、趋势和交叉表，明细需要原报工权限', async() => {
+  const pinia = createPinia()
+  useAuth(pinia).$patch({ factoryId: 'A', factoryPermissions: [boards.people.permission] })
+  vi.mocked(readAnalytics).mockReset().mockImplementation(async key => {
+    if (key === 'people-summary') return { reports: 0, people: 0, orders: 0, operations: 0 }
+    if (key === 'people-days') return []
+    return { page: { items: [], total: 0, limit: 20, offset: 0 }, cells: [], names: {} as Record<string, string> }
+  })
+  const w = mount(PeopleAnalytics, { props: { start: '2026-10-01', end: '2026-10-02', valid: true, product: null, order: null }, global: { plugins: [pinia, ElementPlus], stubs: { FactChart: true, PageDialog: true }}})
+  try {
+    await flushPromises()
+    expect(new Set(vi.mocked(readAnalytics).mock.calls.map(([key]) => key))).toEqual(new Set(['people-summary', 'people', 'people-days']))
+    expect(w.text()).toContain('当前账号缺少该区域的读取权限')
+    vi.mocked(readAnalytics).mockClear()
+    useAuth(pinia).$patch({ factoryPermissions: [boards.quality.permission, access.report] })
+    await flushPromises()
+    expect(readAnalytics).not.toHaveBeenCalled()
   } finally {
     w.unmount()
   }

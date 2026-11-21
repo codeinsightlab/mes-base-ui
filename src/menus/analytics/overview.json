@@ -1,0 +1,1 @@
+{"id": "analytics:overview", "name": "生产总览", "path": "/analytics/overview", "component": "analytics/overview/index", "permission": "business:analytics:overview:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": []}

@@ -13,13 +13,14 @@ import FactChart from './FactChart.vue'
 import type { Chart } from './chart'
 import { calendarDay, plusDays, useSection, type Section } from './useSection'
 import { recentReports } from '@/api/production/workspace'
-import { access, readAnalytics, type Amount } from '@/api/production/analytics'
+import { access, boards, readAnalytics, type Amount, type Board } from '@/api/production/analytics'
 import { executionStatusLabel } from '@/lib/production/executionState'
 import { menuPathForComponent } from '@/lib/menuWorkspaces'
 import { useAuth } from '@/stores/auth'
 import { parseTime } from '@/utils/ruoyi'
-type Topic = 'overview' | 'orders' | 'process' | 'quality' | 'inventory' | 'people'
+type Topic = Board
 const props = defineProps<{ topic: Topic }>()
+const boardPermission = boards[props.topic].permission
 const auth = useAuth(), router = useRouter()
 const route = useRoute()
 const initialDay = (value: unknown, fallback: string) => {
@@ -83,22 +84,22 @@ watch([start, end, product, warehouse, order, batch, status, recordKind], () => 
 watch(day, () => {
   page.value = 1
 }, { flush: 'sync' })
-const orderStates = useSection(access.orders, () => active('overview', 'orders'), s => readAnalytics('order-states', { ...period(), product: product.value, status: status.value }, s))
-const summary = useSection(access.orders, () => active('orders'), s => readAnalytics('order-summary', { ...period(), product: product.value, status: status.value }, s))
-const orderRows = useSection(access.orders, () => active('overview', 'orders') && recordKind.value === 'orders', s => readAnalytics('orders', { ...period(), ...paging(), product: product.value, status: status.value, progress: progressBucket.value }, s))
-const exec = useSection(access.execution, () => active('overview', 'process'), s => readAnalytics('executions', { ...period(), order: order.value }, s))
-const quantities = useSection(access.quantity, () => show('process') && !!batch.value, s => readAnalytics('path', { execution: batch.value, order: order.value }, s).then(r => ({ ...r.facts, unitName: r.unitName })))
-const reportDays = useSection(access.report, () => active('overview'), s => readAnalytics('report-days', period(), s))
-const reportRows = useSection(access.report, () => active('overview') && recordKind.value === 'reports', s => readAnalytics('reports', { ...detailPeriod(), ...paging() }, s))
-const recent = useSection(access.report, () => show('overview') && recordKind.value === 'recent', recentReports)
-const declarations = useSection(access.quality, () => active('overview', 'quality'), s => readAnalytics('declaration-count', { ...period(), product: product.value }, s))
-const productRank = useSection(access.quality, () => active('quality'), s => readAnalytics('defect-products', period(), s))
-const quality = useSection(access.quality, () => active('quality') && !!product.value, s => readAnalytics('quality', { ...period(), material: product.value }, s))
-const defects = useSection(access.quality, () => active('quality'), s => readAnalytics('defects', { ...detailPeriod(), ...paging(), product: product.value, ...(defectFilter.value ? { [defectFilter.value.dimension]: defectFilter.value.id } : {}) }, s))
-const stock = useSection(access.stock, () => show('inventory') && !!product.value, s => readAnalytics('balances', { material: product.value, warehouse: warehouse.value }, s), true)
-const stockRows = useSection(access.stock, () => show('inventory') && recordKind.value === 'stocks', s => readAnalytics('stocks', { ...paging(), material: product.value, warehouse: warehouse.value }, s), true)
-const moves = useSection(access.flow, () => active('inventory') && !!product.value, s => readAnalytics('movements', { ...period(), material: product.value, warehouse: warehouse.value }, s), true)
-const flows = useSection(access.flow, () => active('inventory') && !!product.value && recordKind.value === 'flows', s => readAnalytics('flows', { ...detailPeriod(), ...paging(), material: product.value, warehouse: warehouse.value }, s), true)
+const orderStates = useSection(boardPermission, () => active('overview', 'orders'), s => readAnalytics('order-states', { ...period(), product: product.value, status: status.value }, s, props.topic))
+const summary = useSection(boardPermission, () => active('orders'), s => readAnalytics('order-summary', { ...period(), product: product.value, status: status.value }, s))
+const orderRows = useSection([boardPermission, access.orders], () => active('overview', 'orders') && recordKind.value === 'orders', s => readAnalytics('orders', { ...period(), ...paging(), product: product.value, status: status.value, progress: progressBucket.value }, s, props.topic))
+const exec = useSection(boardPermission, () => active('overview', 'process'), s => readAnalytics('executions', { ...period(), order: order.value }, s, props.topic))
+const quantities = useSection([boardPermission, access.quantity], () => show('process') && !!batch.value, s => readAnalytics('path', { execution: batch.value, order: order.value }, s).then(r => ({ ...r.facts, unitName: r.unitName })))
+const reportDays = useSection(boardPermission, () => active('overview'), s => readAnalytics('report-days', period(), s))
+const reportRows = useSection([boardPermission, access.report], () => active('overview') && recordKind.value === 'reports', s => readAnalytics('reports', { ...detailPeriod(), ...paging() }, s))
+const recent = useSection([boardPermission, access.report], () => show('overview') && recordKind.value === 'recent', recentReports)
+const declarations = useSection(boardPermission, () => active('overview', 'quality'), s => readAnalytics('declaration-count', { ...period(), product: product.value }, s, props.topic))
+const productRank = useSection(boardPermission, () => active('quality'), s => readAnalytics('defect-products', period(), s))
+const quality = useSection(boardPermission, () => active('quality') && !!product.value, s => readAnalytics('quality', { ...period(), material: product.value }, s))
+const defects = useSection([boardPermission, access.quality], () => active('quality'), s => readAnalytics('defects', { ...detailPeriod(), ...paging(), product: product.value, ...(defectFilter.value ? { [defectFilter.value.dimension]: defectFilter.value.id } : {}) }, s))
+const stock = useSection(boardPermission, () => show('inventory') && !!product.value, s => readAnalytics('balances', { material: product.value, warehouse: warehouse.value }, s), true)
+const stockRows = useSection([boardPermission, access.stock], () => show('inventory') && recordKind.value === 'stocks', s => readAnalytics('stocks', { ...paging(), material: product.value, warehouse: warehouse.value }, s), true)
+const moves = useSection(boardPermission, () => active('inventory') && !!product.value, s => readAnalytics('movements', { ...period(), material: product.value, warehouse: warehouse.value }, s), true)
+const flows = useSection([boardPermission, access.flow], () => active('inventory') && !!product.value && recordKind.value === 'flows', s => readAnalytics('flows', { ...detailPeriod(), ...paging(), material: product.value, warehouse: warehouse.value }, s), true)
 const days = computed(() => {
   const result:string[] = []
   if (valid.value) for (let d = start.value;d <= end.value;d = plusDays(d, 1)) result.push(d)
@@ -188,7 +189,7 @@ const total = computed(() => show('quality') ? defects.value.data?.total : show(
     <div class="analysis-filter filter-panel">
       <el-radio-group :model-value="preset" aria-label="统计期间" @change="choosePeriod(String($event))"><el-radio-button v-for="p in ['今天','近 7 天','本月','自定义']" :key="p" :value="p">{{ p }}</el-radio-button></el-radio-group>
       <template v-if="preset==='自定义'"><label>开始日期<input v-model="start" type="date"></label><label>结束日期<input v-model="end" type="date"></label></template><small v-else>{{ start }} — {{ end }}</small>
-      <label v-if="show('orders','quality','inventory','people')">{{ show('inventory')?'物料':'产品' }}<MaterialSelect v-model="product" /></label>
+      <label v-if="show('orders','quality','inventory','people')">{{ show('inventory')?'物料':'产品' }}<MaterialSelect v-if="has('business:material:list')" v-model="product" /><el-input v-else v-model="product" placeholder="输入物料 ID" clearable /></label>
       <label v-if="show('orders') || (show('overview') && status)">工单状态<el-select v-model="status" clearable placeholder="全部状态"><el-option v-for="(label,value) in orderLabels" :key="value" :label="label" :value="value" /></el-select></label>
       <template v-if="show('process','people')"><label>工单<WorkOrderSelect v-model="order" /></label><el-button v-if="order" link @click="order=null">全部工单</el-button><label v-if="show('process')">执行批次<ExecutionSelect v-model="batch" :workorder-id="order" /></label></template>
       <label v-if="show('inventory')">仓库<WarehouseSelect v-model="warehouse" source="LOCAL" history /></label>

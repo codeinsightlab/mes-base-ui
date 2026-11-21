@@ -4,7 +4,7 @@ import AnalysisRegion from './AnalysisRegion.vue'
 import FactChart from './FactChart.vue'
 import PageDialog from '@/components/page/PageDialog.vue'
 import MetricValue from '@/components/MetricValue.vue'
-import { access, readAnalytics, type OperationCell, type PersonReport } from '@/api/production/analytics'
+import { access, boards, readAnalytics, type OperationCell, type PersonReport } from '@/api/production/analytics'
 import { productionReport } from '@/api/production/productionReport'
 import { parseTime } from '@/utils/ruoyi'
 import { plusDays, useSection } from './useSection'
@@ -51,12 +51,12 @@ watch([day, voided], () => {
 watch(originalId, () => {
   historyPage.value = 1
 }, { flush: 'sync' })
-const summary = useSection(access.report, enabled, s => readAnalytics('people-summary', scope(), s))
-const matrix = useSection(access.report, enabled, s => readAnalytics('people', { ...scope(), ...range(peoplePage.value) }, s))
-const dates = useSection(access.report, enabled, s => readAnalytics('people-days', scope(), s))
-const details = useSection(access.report, enabled, s => readAnalytics('person-reports', { ...scope(), ...(day.value ? { start: day.value, end: day.value } : {}), voided: String(voided.value), ...range(detailsPage.value) }, s))
-const original = useSection(access.report, () => !!originalId.value, () => productionReport.detail(originalId.value))
-const history = useSection(access.report, () => !!originalId.value, () => productionReport.history(originalId.value, (historyPage.value - 1) * limit, limit))
+const summary = useSection(boards.people.permission, enabled, s => readAnalytics('people-summary', scope(), s))
+const matrix = useSection(boards.people.permission, enabled, s => readAnalytics('people', { ...scope(), ...range(peoplePage.value) }, s))
+const dates = useSection(boards.people.permission, enabled, s => readAnalytics('people-days', scope(), s))
+const details = useSection([boards.people.permission, access.report], enabled, s => readAnalytics('person-reports', { ...scope(), ...(day.value ? { start: day.value, end: day.value } : {}), voided: String(voided.value), ...range(detailsPage.value) }, s))
+const original = useSection([boards.people.permission, access.report], () => !!originalId.value, () => productionReport.detail(originalId.value))
+const history = useSection([boards.people.permission, access.report], () => !!originalId.value, () => productionReport.history(originalId.value, (historyPage.value - 1) * limit, limit))
 const metrics = [['reports', '有效报工', '笔'], ['people', '参与人员', '人'], ['orders', '参与工单', '张'], ['operations', '参与工序', '道']] as const
 const cells = computed(() => new Map(matrix.value.data?.cells.map(c => [c.person + '/' + c.operation, c])))
 const columns = computed(() => {

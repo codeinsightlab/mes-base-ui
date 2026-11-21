@@ -31,11 +31,21 @@ interface Responses {
   balances: StockTotals; stocks: Slice<StockRow>; movements: Movements; flows: Slice<FlowRow>
 }
 export const access = {
-  menu: 'business:analytics:view', orders: 'workorder:list', execution: 'business:mes:production:execution:list', quantity: 'business:production:report:quantity',
+  orders: 'workorder:list', execution: 'business:mes:production:execution:list', quantity: 'business:production:report:quantity',
   report: 'business:production:report:detail', quality: 'business:quality:defect:read', stock: 'business:wm:inventory:list', flow: 'business:wm:stock:action:list',
 }
-export function readAnalytics<K extends keyof Responses>(key: K, params: Record<string, string | number | null | undefined>, signal: AbortSignal) {
+export const boards = {
+  overview: { title: '生产总览', permission: 'business:analytics:overview:view' },
+  orders: { title: '工单分析', permission: 'business:analytics:orders:view' },
+  process: { title: '工序与执行', permission: 'business:analytics:process:view' },
+  quality: { title: '质量分析', permission: 'business:analytics:quality:view' },
+  inventory: { title: '库存与物料', permission: 'business:analytics:inventory:view' },
+  people: { title: '人员报工', permission: 'business:analytics:people:view' },
+} as const
+export type Board = keyof typeof boards
+export function readAnalytics<K extends keyof Responses>(key: K, params: Record<string, string | number | null | undefined>, signal: AbortSignal, board?: Board) {
   const query: Record<string, string | number> = {}
   for (const [k, v] of Object.entries(params)) if (v != null && v !== '') query[k] = v
-  return request<Responses[K]>('/api/production/analytics/' + key, { query, scope: 'factory', signal })
+  const prefix = board === 'overview' && ['order-states', 'orders', 'executions', 'declaration-count'].includes(key) ? 'overview/' : ''
+  return request<Responses[K]>('/api/production/analytics/' + prefix + key, { query, scope: 'factory', signal })
 }

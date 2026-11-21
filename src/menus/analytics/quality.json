@@ -1,0 +1,1 @@
+{"id": "analytics:quality", "name": "质量分析", "path": "/analytics/quality", "component": "analytics/quality/index", "permission": "business:analytics:quality:view", "permissionScope": "factory", "kind": "MENU", "icon": "Histogram", "children": []}
