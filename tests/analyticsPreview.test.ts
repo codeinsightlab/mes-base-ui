@@ -37,7 +37,7 @@ describe('六专题设计样例', () => {
   })
   it('人员交叉表笔数与趋势合计可核对，缺少分母时质量率为空', () => {
     const b = buildBoard('people', { ...filters, person: '陈宁' })
-    expect(Number(b.table.rows[0].values.at(-1))).toBe(b.chart.series[0].values.reduce((a, n) => a + n, 0))
+    expect(Number(b.table.rows[0].values.at(-1))).toBe(b.chart.series[0].values.reduce<number>((a, n) => a + Number(n), 0))
     expect(buildBoard('quality', { ...filters, product: products[0] }).metrics[3][1]).toBe('—')
   })
 })

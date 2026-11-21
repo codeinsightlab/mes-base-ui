@@ -4,7 +4,7 @@ import { init, use, type ECharts } from 'echarts/core'
 import { BarChart, LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
-import type { Chart } from './boards'
+import type { Chart } from './chart'
 use([BarChart, LineChart, GridComponent, TooltipComponent, SVGRenderer])
 const props = defineProps<{ chart: Chart }>()
 const emit = defineEmits<{ select: [key: string] }>()
@@ -21,7 +21,7 @@ function draw() {
     animation: false, color: palette,
     textStyle: { fontFamily: css.fontFamily, color: color('--ui-text-secondary') },
     grid: { left: 5, right: 18, top: 14, bottom: 4, containLabel: true },
-    tooltip: { trigger: 'axis', confine: true, valueFormatter: (value: number) => value.toLocaleString('zh-CN') + ' ' + props.chart.unit },
+    tooltip: { trigger: 'axis', confine: true, renderMode: 'richText', valueFormatter: (value: unknown) => value == null ? '待确认' : String(value) + ' ' + props.chart.unit },
     xAxis: { type: 'category', data: props.chart.labels, boundaryGap: props.chart.type === 'bar',
       axisTick: { show: false }, axisLine: { lineStyle: { color: color('--mes-grid') }},
       axisLabel: { color: color('--ui-text-secondary'), fontSize: 11, hideOverlap: true, margin: 12, interval: Math.max(0, Math.ceil(props.chart.labels.length / 8) - 1) }},
@@ -58,5 +58,5 @@ onBeforeUnmount(() => {
 <template>
   <div class="chart-legend"><span>单位 · {{ chart.unit }}</span><span v-for="(line, i) in chart.series" :key="line.name"><i :class="'ink-' + i" />{{ line.name }}</span></div>
   <div ref="surface" class="chart-surface" role="img" :aria-label="chart.title + '，单位' + chart.unit" />
-  <details class="chart-values"><summary>查看数据点</summary><div><button v-for="(key, i) in chart.keys" :key="key" @click="emit('select', key)">{{ chart.labels[i] }} · {{ chart.series.map(s => s.values[i]).join(' / ') }} {{ chart.unit }}</button></div></details>
+  <details class="chart-values"><summary>查看数据点</summary><div><button v-for="(key, i) in chart.keys" :key="key" @click="emit('select', key)">{{ chart.labels[i] }} · {{ chart.series.map(s => s.values[i] ?? '待确认').join(' / ') }} {{ chart.unit }}</button></div></details>
 </template>

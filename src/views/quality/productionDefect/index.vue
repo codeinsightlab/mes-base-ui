@@ -4,6 +4,7 @@ import { usePageMessageBox } from '@/lib/pageMessageBox'
 import PageDialog from '@/components/page/PageDialog.vue'
 
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import ScopeTag from '@/components/ScopeTag.vue'
@@ -168,6 +169,32 @@ function showHistory(row:Version, intent?:'assess' | 'dispose') {
   void loadHistory()
 }
 
+const route = useRoute()
+const linkedError = ref('')
+
+async function readLinkedDeclaration(id: unknown, stillCurrent: () => boolean) {
+  linkedError.value = ''
+  if (typeof id !== 'string' || !id || !can('read') || !auth.factoryId || auth.factorySwitching) return
+  try {
+    const row = await api.detail(id)
+    if (stillCurrent()) showHistory(row)
+  } catch (e) {
+    if (stillCurrent()) linkedError.value = message(e)
+  }
+}
+
+const linkRetry = ref(0)
+watch(() => [route?.query.declarationId, route?.query.sourceFactory, auth.factoryId, auth.revision, auth.factorySwitching, access.value, linkRetry.value], (_, _previous, cleanup) => {
+  let current = true
+  cleanup(() => {
+    current = false
+  })
+  // A link identifies a declaration only inside the factory where it was selected.
+  linkedError.value = ''
+  if (route?.query.sourceFactory !== auth.factoryId) return
+  void readLinkedDeclaration(route?.query.declarationId, () => current)
+}, { immediate: true, flush: 'sync' })
+
 async function closeHistory(done?:() => void) {
   if (treatmentPending.value) {
     ElMessage.warning('处理结果尚未确认，请先核对原请求')
@@ -330,6 +357,7 @@ void load()
 </script>
 <template>
   <div class="app-container quality-page">
+    <el-alert v-if="linkedError" type="error" :closable="false"><span>{{ linkedError }}</span><el-button link @click="linkRetry++">重新读取申报</el-button></el-alert>
     <PageHeader title="不良品管理" description="记录生产不良、核实申报并办理入仓，追溯每次正式交接。"><ScopeTag kind="FACTORY" :factory-id="auth.factoryId" /><el-button v-if="can('create')" type="primary" @click="declarationOpen=true">登记不良</el-button></PageHeader>
     <el-tabs v-model="section"><el-tab-pane label="不良记录" name="records" /><el-tab-pane label="统计分析" name="statistics" /></el-tabs>
     <template v-if="section==='records'">

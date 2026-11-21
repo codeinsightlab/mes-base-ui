@@ -1,3 +1,4 @@
+import type { Chart, Line } from '@/components/business/analytics/chart'
 import { balances, days, defects, executions, format, inside, materials, movements, orders, orderStates, people, reports, sum } from './sample'
 
 export const topics = {
@@ -15,8 +16,7 @@ export interface Filters {
 }
 export type Reading = [label: string, value: number | string, unit: string, note: string]
 export type Measure = { label: string; value: number; token?: string }
-export interface Line { name: string; values: number[] }
-export interface Chart { title: string; caption: string; unit: string; labels: string[]; series: Line[]; type: 'line' | 'bar'; keys: string[] }
+export type { Chart } from '@/components/business/analytics/chart'
 export interface Section { title: string; caption: string; unit: string; bars: Measure[] }
 export interface Entry { key: string; order?: string; batch?: string; values: string[]; progress?: number; day?: string }
 export interface Table { title: string; columns: string[]; rows: Entry[]; note: string }

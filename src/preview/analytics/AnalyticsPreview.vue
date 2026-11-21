@@ -6,7 +6,7 @@ import MetricValue from '@/components/MetricValue.vue'
 import CodeText from '@/components/CodeText.vue'
 import { buildBoard, topics, type Entry, type Table, type Topic } from './boards'
 import { balances, defects, executions, executionStates, format, inside, materials, operations, orders, orderStates, people, products, referenceDay, reports, shiftDay, stores, sum } from './sample'
-import FactChart from './FactChart.vue'
+import FactChart from '@/components/business/analytics/FactChart.vue'
 const icons = { overview: Grid, orders: Tickets, process: SetUp, quality: DataAnalysis, inventory: Box, people: User }
 
 function fromHash(): Topic {
