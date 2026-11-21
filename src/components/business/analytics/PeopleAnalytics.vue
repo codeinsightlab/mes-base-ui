@@ -59,7 +59,15 @@ const original = useSection(access.report, () => !!originalId.value, () => produ
 const history = useSection(access.report, () => !!originalId.value, () => productionReport.history(originalId.value, (historyPage.value - 1) * limit, limit))
 const metrics = [['reports', '有效报工', '笔'], ['people', '参与人员', '人'], ['orders', '参与工单', '张'], ['operations', '参与工序', '道']] as const
 const cells = computed(() => new Map(matrix.value.data?.cells.map(c => [c.person + '/' + c.operation, c])))
-const columns = computed(() => Array.from(new Map(matrix.value.data?.cells.map(c => [c.operation, c.name || '工序待确认'])).entries()))
+const columns = computed(() => {
+  const labels = new Map(matrix.value.data?.cells.map(c => [c.operation, c.name || '工序待确认']))
+  const seen = new Set<string>(), repeated = new Set<string>()
+  for (const label of labels.values()) {
+    if (seen.has(label)) repeated.add(label)
+    seen.add(label)
+  }
+  return Array.from(labels, ([id, label]) => [id, id && repeated.has(label) ? `${label}（ID ${id}）` : label] as const)
+})
 const columnPage = ref(1), columnSize = 6
 const visibleColumns = computed(() => columns.value.slice((columnPage.value - 1) * columnSize, columnPage.value * columnSize))
 watch(columns, () => {
@@ -75,7 +83,7 @@ const chart = computed<Chart>(() => {
 function selectPerson(id:string, cell?:OperationCell) {
   personLabel.value = matrix.value.data?.names[id] || id
   if (cell?.operation) {
-    operationLabel.value = cell.name || cell.operation
+    operationLabel.value = columns.value.find(([id]) => id === cell.operation)?.[1] || cell.operation
     operation.value = cell.operation
   }
   person.value = id

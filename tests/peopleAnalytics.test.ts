@@ -14,7 +14,7 @@ it('人员与工序单元格和趋势日共用明细范围，作废审计不改�
   useAuth(pinia).$patch({ factoryId: 'A', factoryPermissions: [access.menu, access.report] })
   const page = { items: [{ person: who, reports: 1, operations: 1, orders: 1 }], total: 1, limit: 20, offset: 0 }
   vi.mocked(readAnalytics).mockImplementation(async key => {
-    if (key === 'people') return { page, names: { [who]: '操作人甲' }, cells: [{ person: who, operation: '31', name: '剪切', reports: 1, quantity: '1.500000', unit: 'kg' }] }
+    if (key === 'people') return { page, names: { [who]: '操作人甲' }, cells: ['31', '42'].map(operation => ({ person: who, operation, name: '剪切', reports: 1, quantity: '1.500000', unit: 'kg' })) }
     if (key === 'people-summary') return { reports: 1, people: 1, operations: 1, orders: 1 }
     if (key === 'people-days') return [{ key: '2026-10-01', count: 1 }]
     return { page: { ...page, items: [] }, names: {} as Record<string, string> }
@@ -22,6 +22,8 @@ it('人员与工序单元格和趋势日共用明细范围，作废审计不改�
   const w = mount(PeopleAnalytics, { props: { start: '2026-10-01', end: '2026-10-02', valid: true, product: '7', order: '9' }, global: { plugins: [pinia, ElementPlus], stubs: { FactChart: { template: '<button @click="$emit(\'select\',\'2026-10-01\')">选择日期</button>' }, PageDialog: true }}})
   try {
     await flushPromises()
+    expect(w.text()).toContain('剪切（ID 31）')
+    expect(w.text()).toContain('剪切（ID 42）')
     await w.findAll('button').find(b => b.text() === '1 笔')!.trigger('click')
     await w.findAll('button').find(b => b.text() === '选择日期')!.trigger('click')
     await flushPromises()
